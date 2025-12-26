@@ -81,7 +81,9 @@ See `docs/sprint-plan.md` for daily tasks.
 ## Ownership
 
 - Backend Lead: Joshua
+- 
   Core Team: Patrick, Gilbert
   
 - Frontend Lead: Mike
+- 
   Core Team: Debora, Praise, Fatsani
