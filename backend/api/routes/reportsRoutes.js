@@ -1,9 +1,17 @@
+// In api/routes/reportsRoutes.js, change to:
 const express = require('express');
 const router = express.Router();
-const reportsController = require('../controllers/reportsController');
 
-router.get('/financial', reportsController.getFinancialReports);
-router.post('/financial', reportsController.createFinancialReport); 
-router.get('/compliance', reportsController.getComplianceReports);
-router.post('/compliance', reportsController.createComplianceReport);
+// Use the existing controllers
+const complianceController = require('../controllers/complianceReportControllers');
+const financialController = require('../controllers/finincialReportController');
+
+// Financial reports
+router.get('/financial', financialController.getFinancialReports);
+router.post('/financial', financialController.createFinancialReport); 
+
+// Compliance reports
+router.get('/compliance', complianceController.getComplianceReports);
+router.post('/compliance', complianceController.createComplianceReport);
+
 module.exports = router;
