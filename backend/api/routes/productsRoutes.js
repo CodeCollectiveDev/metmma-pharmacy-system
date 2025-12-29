@@ -1,50 +1,19 @@
-/**
- * Product Routes
- * All routes for product management
- * Created by: Gilbert (BE Dev 2)
- */
+//  CREATED BY PATRICK
 
 const express = require('express');
 const router = express.Router();
+const productController = require('../controllers/productsController')
+const { createProductSchema, updateProductSchema, validateProduct } = require('../validators/productValidator');
 
-// Import product controllers
-const {
-  getAllProducts,
-  getProductById,
-  getLowStockProducts,
-  getExpiringProducts,
-  getProductsByCategory,
-  searchProducts
-} = require('../controllers/productsController');
+// Standard CRUD
+router.get('/', productController.getAllProducts);
+router.get('/low-stock', productController.getLowStockProducts);
+router.get('/expiring', productController.getExpiringProducts);
+router.get('/:id', productController.getProductById);
 
-// @route   GET /api/products
-// @desc    Get all products
-// @access  Public
-router.get('/', getAllProducts);
-
-// @route   GET /api/products/search
-// @desc    Search products
-// @access  Public
-router.get('/search', searchProducts);
-
-// @route   GET /api/products/low-stock
-// @desc    Get low stock products
-// @access  Public
-router.get('/low-stock', getLowStockProducts);
-
-// @route   GET /api/products/expiring
-// @desc    Get expiring products
-// @access  Public
-router.get('/expiring', getExpiringProducts);
-
-// @route   GET /api/products/category/:category
-// @desc    Get products by category
-// @access  Public
-router.get('/category/:category', getProductsByCategory);
-
-// @route   GET /api/products/:id
-// @desc    Get single product by ID
-// @access  Public
-router.get('/:id', getProductById);
+// Protected writes using the Validator
+router.post('/', validateProduct(createProductSchema), productController.createProduct);
+router.put('/:id', validateProduct(updateProductSchema), productController.updateProduct);
+router.delete('/:id', productController.deleteProduct);
 
 module.exports = router;
