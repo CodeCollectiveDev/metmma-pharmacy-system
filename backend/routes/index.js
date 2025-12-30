@@ -6,6 +6,12 @@ router.get('/', (req, res) => {
   res.json({ message: 'API is working' });
 });
 
+// Auth routes
+router.use('/auth', require('./authRoutes'));
+
+// Auth routes
+router.use('/auth', require('./authRoutes'));
+
 // please add more routes here (tapanga sir---by patrick)
 
 // Import route modules
