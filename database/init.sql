@@ -58,38 +58,46 @@ CREATE TABLE IF NOT EXISTS products (
 COMMENT ON TABLE products IS 'Pharmacy medicines and products inventory';
 COMMENT ON COLUMN products.reorder_level IS 'Minimum stock level before reorder alert';
 
--- SALES TABLE - Sales transactions
+-- Main Sales Table
 CREATE TABLE IF NOT EXISTS sales (
     id SERIAL PRIMARY KEY,
-    sale_number VARCHAR(50) UNIQUE NOT NULL,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    total_amount DECIMAL(10, 2) NOT NULL CHECK (total_amount >= 0),
-    discount_amount DECIMAL(10, 2) DEFAULT 0,
-    tax_amount DECIMAL(10, 2) DEFAULT 0,
-    net_amount DECIMAL(10, 2) NOT NULL,
-    payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('cash', 'card', 'mobile_money', 'insurance')),
-    payment_status VARCHAR(20) DEFAULT 'completed' CHECK (payment_status IN ('pending', 'completed', 'refunded')),
+    receipt_number VARCHAR(50) UNIQUE NOT NULL,
+    total_amount DECIMAL(12, 2) NOT NULL,
+    payment_method VARCHAR(20) DEFAULT 'cash',
     customer_name VARCHAR(100),
-    customer_phone VARCHAR(20),
-    sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    synced BOOLEAN DEFAULT TRUE,
+    user_id INTEGER, -- Removed NOT NULL for easier testing
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 COMMENT ON TABLE sales IS 'Sales transactions with financial details';
 
--- SALE_ITEMS TABLE - Individual items in each sale
+-- Individual items in a sale
 CREATE TABLE IF NOT EXISTS sale_items (
     id SERIAL PRIMARY KEY,
-    sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES products(id),
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
-    unit_price DECIMAL(10, 2) NOT NULL CHECK (unit_price >= 0),
-    total_price DECIMAL(10, 2) NOT NULL CHECK (total_price >= 0),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    sale_id INTEGER REFERENCES sales(id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES products(id),
+    quantity INTEGER NOT NULL,
+    unit_price DECIMAL(12, 2) NOT NULL,
+    subtotal DECIMAL(12, 2) NOT NULL
 );
 
 COMMENT ON TABLE sale_items IS 'Individual items sold in each transaction';
+
+-- STOCK_MOVEMENTS TABLE - Audit trail for every stock change
+CREATE TABLE IF NOT EXISTS stock_movements (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id), -- Who performed the action?
+    movement_type VARCHAR(20) NOT NULL CHECK (
+        movement_type IN ('purchase', 'sale', 'adjustment_in', 'adjustment_out', 'return', 'expired', 'damage')
+    ),
+    quantity_change INTEGER NOT NULL, -- e.g., +50 or -10
+    previous_quantity INTEGER NOT NULL,
+    new_quantity INTEGER NOT NULL,
+    notes TEXT, -- e.g., "Received from SADM shipment" or "Dropped bottle"
+    movement_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE stock_movements IS 'Audit log for all inventory changes';
 
 -- ============================================
 -- SECTION 3: HR TABLES (Gilbert's Section)

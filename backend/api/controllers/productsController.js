@@ -1,362 +1,195 @@
-/**
- * Products Controller
- * Handles all product-related operations
- * Created by: Gilbert (BE Dev 2)
- */
+//  CREATED BY PATRICK
 
-const pool = require('../db').pool || require('../../db/connection').pool;
+const pool = require('../db').pool;
 
 /**
- * @desc    Get all products
- * @route   GET /api/products
- * @access  Public (will add authentication later)
+ * Helper to keep response format consistent
  */
+const formatProduct = (p) => ({
+  id: p.id,
+  productCode: p.product_code,
+  name: p.name,
+  genericName: p.generic_name,
+  batchNumber: p.batch_number,
+  expiryDate: p.expiry_date,
+  quantity: p.quantity,
+  unitPrice: p.unit_price,
+  sellingPrice: p.selling_price,
+  costPrice: p.cost_price,
+  supplier: p.supplier,
+  category: p.category,
+  reorderLevel: p.reorder_level,
+  location: p.location,
+  barcode: p.barcode,
+  isActive: p.is_active,
+  stockStatus: p.quantity === 0 ? 'Out of Stock' : 
+               p.quantity <= p.reorder_level ? 'Low Stock' : 'In Stock'
+});
+
+// --- READ OPERATIONS ---
+
 const getAllProducts = async (req, res) => {
   try {
-    console.log('📦 Fetching all products from database...');
-    
-    // Get query parameters for filtering
-    const { category, search, minPrice, maxPrice, inStock, page = 1, limit = 50 } = req.query;
+    const { category, search, page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
-    
     let query = 'SELECT * FROM products WHERE is_active = TRUE';
     const values = [];
-    let paramCount = 0;
-    
-    // Apply filters if provided
+
     if (category) {
-      paramCount++;
-      query += ` AND category ILIKE $${paramCount}`;
       values.push(`%${category}%`);
+      query += ` AND category ILIKE $${values.length}`;
     }
-    
     if (search) {
-      paramCount++;
-      query += ` AND (name ILIKE $${paramCount} OR product_code ILIKE $${paramCount} OR generic_name ILIKE $${paramCount})`;
       values.push(`%${search}%`);
+      query += ` AND (name ILIKE $${values.length} OR product_code ILIKE $${values.length} OR generic_name ILIKE $${values.length})`;
     }
-    
-    if (minPrice) {
-      paramCount++;
-      query += ` AND selling_price >= $${paramCount}`;
-      values.push(parseFloat(minPrice));
-    }
-    
-    if (maxPrice) {
-      paramCount++;
-      query += ` AND selling_price <= $${paramCount}`;
-      values.push(parseFloat(maxPrice));
-    }
-    
-    if (inStock === 'true') {
-      query += ' AND quantity > 0';
-    } else if (inStock === 'false') {
-      query += ' AND quantity = 0';
-    }
-    
-    // Add sorting and pagination
-    query += ' ORDER BY name ASC';
-    query += ` LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+
+    query += ` ORDER BY name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
     values.push(parseInt(limit), offset);
-    
-    // Execute query
+
     const result = await pool.query(query, values);
-    const products = result.rows;
-    
-    // Get total count for pagination
-    const countQuery = 'SELECT COUNT(*) as total FROM products WHERE is_active = TRUE';
-    const countResult = await pool.query(countQuery);
-    const total = parseInt(countResult.rows[0].total);
-    
-    console.log(`✅ Found ${products.length} products (Total: ${total})`);
-    
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      total,
-      page: parseInt(page),
-      totalPages: Math.ceil(total / limit),
-      data: products.map(product => ({
-        id: product.id,
-        productCode: product.product_code,
-        name: product.name,
-        genericName: product.generic_name,
-        batchNumber: product.batch_number,
-        expiryDate: product.expiry_date,
-        quantity: product.quantity,
-        unitPrice: product.unit_price,
-        sellingPrice: product.selling_price,
-        costPrice: product.cost_price,
-        supplier: product.supplier,
-        category: product.category,
-        reorderLevel: product.reorder_level,
-        location: product.location,
-        barcode: product.barcode,
-        isActive: product.is_active,
-        createdAt: product.created_at,
-        updatedAt: product.updated_at,
-        stockStatus: product.quantity === 0 ? 'Out of Stock' : 
-                    product.quantity <= product.reorder_level ? 'Low Stock' : 'In Stock'
-      }))
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fetching products:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching products',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.json({ success: true, count: result.rows.length, data: result.rows.map(formatProduct) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Fetch error', error: err.message });
   }
 };
 
-/**
- * @desc    Get single product by ID
- * @route   GET /api/products/:id
- * @access  Public
- */
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`📦 Fetching product with ID: ${id}`);
-    
-    const query = 'SELECT * FROM products WHERE id = $1 AND is_active = TRUE';
-    const result = await pool.query(query, [id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: `Product with ID ${id} not found`
-      });
-    }
-    
-    const product = result.rows[0];
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        id: product.id,
-        productCode: product.product_code,
-        name: product.name,
-        genericName: product.generic_name,
-        batchNumber: product.batch_number,
-        expiryDate: product.expiry_date,
-        quantity: product.quantity,
-        unitPrice: product.unit_price,
-        sellingPrice: product.selling_price,
-        costPrice: product.cost_price,
-        supplier: product.supplier,
-        category: product.category,
-        reorderLevel: product.reorder_level,
-        location: product.location,
-        barcode: product.barcode,
-        isActive: product.is_active,
-        createdAt: product.created_at,
-        updatedAt: product.updated_at,
-        stockStatus: product.quantity === 0 ? 'Out of Stock' : 
-                    product.quantity <= product.reorder_level ? 'Low Stock' : 'In Stock'
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fetching product:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching product',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Product not found' });
+    res.json({ success: true, data: formatProduct(result.rows[0]) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/**
- * @desc    Get low stock products
- * @route   GET /api/products/low-stock
- * @access  Public
- */
 const getLowStockProducts = async (req, res) => {
   try {
-    console.log('⚠️ Fetching low stock products...');
-    
-    const query = `
-      SELECT * FROM products 
-      WHERE quantity <= reorder_level 
-        AND quantity > 0 
-        AND is_active = TRUE
-      ORDER BY quantity ASC
-    `;
-    
-    const result = await pool.query(query);
-    const products = result.rows;
-    
-    console.log(`✅ Found ${products.length} low stock products`);
-    
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      data: products.map(product => ({
-        id: product.id,
-        productCode: product.product_code,
-        name: product.name,
-        quantity: product.quantity,
-        reorderLevel: product.reorder_level,
-        supplier: product.supplier,
-        stockStatus: 'Low Stock',
-        daysUntilReorder: product.reorder_level - product.quantity
-      }))
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fetching low stock products:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching low stock products',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    const result = await pool.query('SELECT * FROM products WHERE quantity <= reorder_level AND is_active = TRUE ORDER BY quantity ASC');
+    res.json({ success: true, count: result.rows.length, data: result.rows.map(formatProduct) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/**
- * @desc    Get expiring products
- * @route   GET /api/products/expiring
- * @access  Public
- */
 const getExpiringProducts = async (req, res) => {
   try {
-    const { days = 90 } = req.query; // Default: next 90 days
-    
-    console.log(`📅 Fetching products expiring in next ${days} days...`);
-    
-    const query = `
-      SELECT * FROM products 
-      WHERE expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${days} days'
-        AND quantity > 0 
-        AND is_active = TRUE
-      ORDER BY expiry_date ASC
-    `;
-    
-    const result = await pool.query(query);
-    const products = result.rows;
-    
-    console.log(`✅ Found ${products.length} expiring products`);
-    
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      days,
-      data: products.map(product => ({
-        id: product.id,
-        productCode: product.product_code,
-        name: product.name,
-        batchNumber: product.batch_number,
-        expiryDate: product.expiry_date,
-        quantity: product.quantity,
-        supplier: product.supplier,
-        daysToExpiry: Math.ceil((new Date(product.expiry_date) - new Date()) / (1000 * 60 * 60 * 24))
-      }))
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fetching expiring products:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching expiring products',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    const { days = 90 } = req.query;
+    const result = await pool.query(`SELECT * FROM products WHERE expiry_date <= CURRENT_DATE + INTERVAL '${days} days' AND quantity > 0 AND is_active = TRUE ORDER BY expiry_date ASC`);
+    res.json({ success: true, count: result.rows.length, data: result.rows.map(formatProduct) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/**
- * @desc    Get products by category
- * @route   GET /api/products/category/:category
- * @access  Public
- */
-const getProductsByCategory = async (req, res) => {
-  try {
-    const { category } = req.params;
-    console.log(`🏷️ Fetching products in category: ${category}`);
-    
-    const query = `
-      SELECT * FROM products 
-      WHERE category ILIKE $1 
-        AND is_active = TRUE
-      ORDER BY name ASC
-    `;
-    
-    const result = await pool.query(query, [`%${category}%`]);
-    const products = result.rows;
-    
-    console.log(`✅ Found ${products.length} products in category "${category}"`);
-    
-    res.status(200).json({
-      success: true,
-      category,
-      count: products.length,
-      data: products
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fetching products by category:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching products by category',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-};
+// --- WRITE OPERATIONS ---
 
-/**
- * @desc    Search products
- * @route   GET /api/products/search
- * @access  Public
- */
-const searchProducts = async (req, res) => {
+const createProduct = async (req, res) => {
   try {
-    const { q } = req.query;
+    const data = req.body; // Already validated by Joi
     
-    if (!q) {
-      return res.status(400).json({
-        success: false,
-        message: 'Search query is required'
-      });
+    // Check for unique product code
+    const existing = await pool.query('SELECT id FROM products WHERE product_code = $1', [data.productCode]);
+    if (existing.rows.length > 0) return res.status(409).json({ success: false, message: 'Product code already exists' });
+
+    const query = `
+      INSERT INTO products (product_code, name, generic_name, batch_number, expiry_date, quantity, unit_price, selling_price, cost_price, supplier, category, reorder_level, location, barcode)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`;
+    
+    const values = [data.productCode, data.name, data.genericName, data.batchNumber, data.expiryDate, data.quantity, data.unitPrice, data.sellingPrice, data.costPrice, data.supplier, data.category, data.reorderLevel, data.location, data.barcode];
+    
+    const result = await pool.query(query, values);
+    const product = result.rows[0];
+
+    // Log initial stock movement
+    if (data.quantity > 0) {
+      await pool.query('INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+      [product.id, 'purchase', data.quantity, 0, data.quantity, 'Initial Inventory Entry']);
     }
-    
-    console.log(`🔍 Searching products for: "${q}"`);
-    
-    const query = `
-      SELECT * FROM products 
-      WHERE (name ILIKE $1 OR product_code ILIKE $1 OR generic_name ILIKE $1 OR barcode ILIKE $1)
-        AND is_active = TRUE
-      ORDER BY name ASC
-      LIMIT 20
-    `;
-    
-    const result = await pool.query(query, [`%${q}%`]);
-    const products = result.rows;
-    
-    console.log(`✅ Found ${products.length} products matching "${q}"`);
-    
-    res.status(200).json({
-      success: true,
-      search: q,
-      count: products.length,
-      data: products
-    });
-    
-  } catch (error) {
-    console.error('❌ Error searching products:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while searching products',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+
+    res.status(201).json({ success: true, data: formatProduct(product) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Creation failed', error: err.message });
   }
 };
 
-module.exports = {
-  getAllProducts,
-  getProductById,
-  getLowStockProducts,
-  getExpiringProducts,
-  getProductsByCategory,
-  searchProducts
+const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, ...updates } = req.body; 
+
+    const currentResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (currentResult.rows.length === 0) return res.status(404).json({ success: false, message: 'Product not found' });
+    const current = currentResult.rows[0];
+
+    // FIXED: Ensure we are comparing numbers accurately
+    const isQuantityChanging = updates.quantity !== undefined && parseInt(updates.quantity) !== parseInt(current.quantity);
+
+    if (isQuantityChanging && !reason) {
+      return res.status(400).json({ success: false, message: 'Reason required for stock adjustment' });
+    }
+
+    const fieldMap = { 
+      productCode: 'product_code', 
+      genericName: 'generic_name', 
+      batchNumber: 'batch_number', 
+      expiryDate: 'expiry_date', 
+      unitPrice: 'unit_price', 
+      sellingPrice: 'selling_price', 
+      costPrice: 'cost_price', 
+      reorderLevel: 'reorder_level', 
+      isActive: 'is_active' 
+    };
+
+    let setClauses = [];
+    let values = [];
+    let i = 1;
+
+    // We only update fields that were actually sent in the request
+    for (const [key, val] of Object.entries(updates)) {
+      if (val !== undefined) {
+        setClauses.push(`${fieldMap[key] || key} = $${i}`);
+        values.push(val);
+        i++;
+      }
+    }
+
+    if (setClauses.length === 0) return res.status(400).json({ success: false, message: 'No fields to update' });
+
+    values.push(id);
+    const query = `UPDATE products SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${i} RETURNING *`;
+    const result = await pool.query(query, values);
+    const updated = result.rows[0];
+
+    // Log the movement if quantity changed
+    if (isQuantityChanging) {
+      const diff = parseInt(updates.quantity) - parseInt(current.quantity);
+      await pool.query(
+        'INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+        [id, diff > 0 ? 'adjustment_in' : 'adjustment_out', diff, current.quantity, updated.quantity, reason]
+      );
+    }
+
+    res.json({ success: true, data: formatProduct(updated) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Update failed', error: err.message });
+  }
 };
+
+const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // We do a "Soft Delete" (set isActive to false) so we don't lose sales history
+    const result = await pool.query('UPDATE products SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING name', [id]);
+    
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Product not found' });
+    
+    res.json({ success: true, message: `Product '${result.rows[0].name}' deactivated successfully` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Delete failed', error: err.message });
+  }
+};
+
+module.exports = { getAllProducts, getProductById, getLowStockProducts, getExpiringProducts, createProduct, updateProduct, deleteProduct };
