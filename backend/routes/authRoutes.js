@@ -35,8 +35,8 @@ const loginHandler = async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Check if user is active
-    if (!user.is_active) {
+    // Check if user is active (default to true if column doesn't exist)
+    if (user.is_active === false) {
       return res.status(401).json({ error: 'Account is deactivated' });
     }
 
