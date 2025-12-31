@@ -7,10 +7,10 @@ router.get('/', (req, res) => {
 });
 
 // Auth routes
-router.use('/auth', require('./authRoutes'));
-
-// Auth routes
-router.use('/auth', require('./authRoutes'));
+const authRoutes = require('./authRoutes');
+router.use('/auth', authRoutes);
+// Login endpoint at /api/login
+router.use('/login', authRoutes.loginRouter);
 
 // please add more routes here (tapanga sir---by patrick)
 

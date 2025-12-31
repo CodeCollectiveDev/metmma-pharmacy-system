@@ -18,4 +18,10 @@ const createUser = async (username, password, role) => {
   return result.rows[0];
 };
 
-module.exports = { createUser };
+const findUserByUsername = async (username) => {
+  const query = 'SELECT id, username, password_hash, role, is_active FROM users WHERE username = $1';
+  const result = await pool.query(query, [username]);
+  return result.rows[0] || null;
+};
+
+module.exports = { createUser, findUserByUsername };
