@@ -5,6 +5,9 @@ require('dotenv').config();
 const app = express();
 const port = 3000; // why do we always have to use port 3000
 
+// Security middleware
+require('./middleware/security')(app);
+
 // Middleware
 app.use(express.json());
 
