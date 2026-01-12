@@ -5,11 +5,16 @@ import Login from '@/modules/auth/views/Login.vue'
 // Lazy-load dashboard view
 const Dashboard = () => import('@/modules/dashboard/views/Dashboard.vue')
 
+
 const routes = [
   { path: '/login', component: Login },
+
   { path: '/', redirect: '/dashboard' },
-  { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } }
+  { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
+  { path: '/sidebar', component: sidebar },
 ]
+
+
 
 const router = createRouter({
   history: createWebHistory(),
