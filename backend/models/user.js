@@ -10,18 +10,108 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-const createUser = async (username, password, role) => {
+const DB_ROLES = ['admin', 'pharmacist', 'cashier', 'store_manager', 'hr_officer'];
+
+const normalizeRole = (role) => {
+  if (role == null) return null;
+  const raw = String(role).trim();
+  if (!raw) return null;
+
+  const lc = raw.toLowerCase();
+  const compact = lc.replace(/[\s-]+/g, '_'); // "store manager" -> "store_manager"
+
+  const aliases = {
+    admin: 'admin',
+    pharmacist: 'pharmacist',
+    cashier: 'cashier',
+    store_manager: 'store_manager',
+    storemanager: 'store_manager',
+    hr_officer: 'hr_officer',
+    hrofficer: 'hr_officer',
+    hr: 'hr_officer',
+  };
+
+  return aliases[compact] || null;
+};
+
+const createUser = async ({ username, password, role, full_name, email }) => {
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole || !DB_ROLES.includes(normalizedRole)) {
+    const err = new Error('Invalid role');
+    err.code = 'INVALID_ROLE';
+    throw err;
+  }
+
+  if (!full_name || !String(full_name).trim()) {
+    const err = new Error('full_name is required');
+    err.code = 'INVALID_FULL_NAME';
+    throw err;
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
-  const query = 'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role';
-  const values = [username, hashedPassword, role];
-  const result = await pool.query(query, values);
-  return result.rows[0];
+  
+  // Try full schema first (with email and full_name), fallback to minimal schema
+  let query, values, result;
+  try {
+    // Full schema: username, password_hash, email, role, full_name
+    query = `
+      INSERT INTO users (username, password_hash, email, role, full_name)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, username, email, role, full_name, is_active, created_at
+    `;
+    values = [username, hashedPassword, email || null, normalizedRole, full_name];
+    result = await pool.query(query, values);
+    return result.rows[0];
+  } catch (err) {
+    // If full_name or email columns don't exist, try minimal schema
+    if (err.code === '42703' && (err.message.includes('email') || err.message.includes('full_name'))) {
+      try {
+        // Minimal schema: username, password_hash, role only
+        query = `
+          INSERT INTO users (username, password_hash, role)
+          VALUES ($1, $2, $3)
+          RETURNING id, username, role, created_at
+        `;
+        values = [username, hashedPassword, normalizedRole];
+        result = await pool.query(query, values);
+        // Add missing fields for API consistency
+        return { 
+          ...result.rows[0], 
+          email: email || null, 
+          full_name: full_name || null,
+          is_active: true 
+        };
+      } catch (err2) {
+        throw err2;
+      }
+    }
+    throw err;
+  }
 };
 
 const findUserByUsername = async (username) => {
-  const query = 'SELECT id, username, password_hash, role FROM users WHERE username = $1';
-  const result = await pool.query(query, [username]);
-  return result.rows[0] || null;
+  // Try full schema first, fallback to minimal schema
+  try {
+    const query = 'SELECT id, username, password_hash, role, email, full_name, is_active FROM users WHERE username = $1';
+    const result = await pool.query(query, [username]);
+    return result.rows[0] || null;
+  } catch (err) {
+    if (err.code === '42703') {
+      // Minimal schema: only id, username, password_hash, role
+      const query = 'SELECT id, username, password_hash, role FROM users WHERE username = $1';
+      const result = await pool.query(query, [username]);
+      if (result.rows[0]) {
+        return { 
+          ...result.rows[0], 
+          email: null, 
+          full_name: null,
+          is_active: true 
+        };
+      }
+      return null;
+    }
+    throw err;
+  }
 };
 
-module.exports = { createUser, findUserByUsername };
+module.exports = { createUser, findUserByUsername, normalizeRole, DB_ROLES };
