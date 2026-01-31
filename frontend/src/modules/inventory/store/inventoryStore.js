@@ -35,9 +35,32 @@ export const useInventoryStore = defineStore('inventory', () => {
         }
     }
 
-    // Delete product
+    // Update product using hybrid layer
+    async function updateProduct(product) {
+        try {
+            const res = await dataOrchestrator.saveItem('products', product, dataService.updateProduct);
+            if (res.ok) {
+                await fetchProducts();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error updating product:', error);
+            return false;
+        }
+    }
+
+    // Delete product (attempt API, then local)
     async function deleteProduct(product) {
         try {
+            if (window.navigator.onLine) {
+                try {
+                    await dataService.deleteProduct(product);
+                } catch (apiError) {
+                    console.warn('API delete failed, removing locally:', apiError);
+                }
+            }
+
             const res = await remove('products', product);
             if (res.ok) {
                 await fetchProducts(); // Refresh list
@@ -49,9 +72,49 @@ export const useInventoryStore = defineStore('inventory', () => {
         }
     }
 
+    // Restock product and log movement
+    async function restockProduct(product, quantityToAdd, note = '') {
+        const qty = Number(quantityToAdd || 0);
+        if (Number.isNaN(qty) || qty <= 0) return false;
+
+        const productId = product.id || product._id;
+        const now = new Date().toISOString();
+        const updated = {
+            ...product,
+            id: productId,
+            stock: Number(product.stock || 0) + qty,
+            lastRestockedAt: now,
+            lastRestockedQty: qty,
+            lastRestockNote: note,
+            lowStockIgnored: false,
+            restockHistory: [
+                ...(product.restockHistory || []),
+                { date: now, quantity: qty, note }
+            ]
+        };
+
+        return await updateProduct(updated);
+    }
+
+    // Ignore low stock notifications for a product
+    async function ignoreLowStock(product, reason = '') {
+        const productId = product.id || product._id;
+        const updated = {
+            ...product,
+            id: productId,
+            lowStockIgnored: true,
+            lowStockIgnoredAt: new Date().toISOString(),
+            lowStockIgnoreReason: reason
+        };
+
+        return await updateProduct(updated);
+    }
+
     // Getters
     const lowStockProducts = computed(() => {
-        return products.value.filter(p => p.stock <= (p.minStockLevel || 10));
+        return products.value.filter(
+            p => p.stock <= (p.minStockLevel || 10) && !p.lowStockIgnored
+        );
     });
 
     const expiredProducts = computed(() => {
@@ -64,7 +127,10 @@ export const useInventoryStore = defineStore('inventory', () => {
         loading,
         fetchProducts,
         addProduct,
+        updateProduct,
         deleteProduct,
+        restockProduct,
+        ignoreLowStock,
         lowStockProducts,
         expiredProducts
     };

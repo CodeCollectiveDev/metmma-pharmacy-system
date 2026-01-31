@@ -3,12 +3,8 @@ import { createPinia } from 'pinia'
 import './style.css'
 import App from './App.vue'
 import router from './router'
-import { seedDatabase } from './pouchdb/seed'
 
 import { syncWorker } from './services/sync/syncWorker'
-
-// Seed the DB
-seedDatabase();
 
 // Start Background Sync
 syncWorker.start();
