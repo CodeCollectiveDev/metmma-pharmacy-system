@@ -71,11 +71,11 @@ const requireRole = (...allowedRoles) => {
 
 // Role constants for consistency
 const ROLES = {
-  ADMIN: 'Admin',
-  PHARMACIST: 'Pharmacist',
-  CASHIER: 'Cashier',
+  ADMIN: 'admin',
+  PHARMACIST: 'pharmacist',
+  CASHIER: 'cashier',
+  STORE_MANAGER: 'store_manager',
   HR_OFFICER: 'hr_officer',
-  STORE_MANAGER: 'store_manager'
 };
 
 module.exports = {

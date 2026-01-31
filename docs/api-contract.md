@@ -14,14 +14,20 @@ Authentication uses **JWT Bearer Tokens**.
 {
   "username": "admin",
   "password": "password",
+  "full_name": "Admin User",
+  "email": "admin@example.com",
   "role": "Admin"
 }
+
+Notes:
+- `full_name` is required (matches DB schema).
+- `email` is optional.
+- `role` is stored as lowercase in the DB (`admin`, `pharmacist`, `cashier`, `store_manager`, `hr_officer`), but the API accepts common UI role names like `Admin` and normalizes them.
 
 ### POST /api/auth/login
 {
   "username": "admin",
-  "password": "password",
-  "role": "Admin"
+  "password": "password"
 }
 
 Response:
@@ -29,7 +35,8 @@ Response:
   "token": "jwt-token",
   "user": {
     "id": 1,
-    "role": "Admin"
+    "username": "admin",
+    "role": "admin"
   }
 }
 ---
