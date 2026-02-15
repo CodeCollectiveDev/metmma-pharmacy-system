@@ -103,17 +103,17 @@ router.post('/register', async (req, res) => {
     const user = await createUser({ username, password, role, full_name, email });
 
     // Also create employee record for HR system
-    const nameParts = full_name.trim().split(' ');
-    const firstName = nameParts[0] || full_name;
-    const lastName = nameParts.slice(1).join(' ') || '';
+    // const nameParts = full_name.trim().split(' ');
+    // const firstName = nameParts[0] || full_name;
+    // const lastName = nameParts.slice(1).join(' ') || '';
 
-    await client.query(
-      `INSERT INTO employees (first_name, last_name, role, hire_date, email, phone, status)
-       VALUES ($1, $2, $3, CURRENT_DATE, $4, '', 'active')`,
-      [firstName, lastName, role, email || '']
-    );
+    // await client.query(
+    //   `INSERT INTO employees (first_name, last_name, role, hire_date, email, phone, status)
+    //    VALUES ($1, $2, $3, CURRENT_DATE, $4, '', 'active')`,
+    //   [firstName, lastName, role, email || '']
+    // );
 
-    await client.query('COMMIT');
+    // await client.query('COMMIT');
 
     res.status(201).json({ message: 'User created successfully', user });
   } catch (err) {
