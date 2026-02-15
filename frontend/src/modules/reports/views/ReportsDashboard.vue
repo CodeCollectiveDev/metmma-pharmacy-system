@@ -1,36 +1,47 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
-import { getAll } from '@/pouchdb'
+import { dataOrchestrator } from '@/services/data/dataOrchestrator'
+import { dataService } from '@/services/api/dataService'
 import { FileText, Download, Filter, TrendingUp, Package, Users, Calendar } from 'lucide-vue-next'
 
 const activeTab = ref('sales')
 const products = ref([])
 const employees = ref([])
-const transactions = ref([])
+const salesData = ref([])
 const dateFilter = ref('today')
 
 onMounted(async () => {
-  products.value = await getAll('products')
-  employees.value = await getAll('employees')
-  transactions.value = await getAll('transactions')
+  // Fetch from backend APIs instead of local storage
+  products.value = await dataOrchestrator.fetchCollection('products', dataService.getProducts)
+  employees.value = await dataOrchestrator.fetchCollection('employees', dataService.getEmployees)
+  
+  // Fetch sales history and normalize
+  const transactions = await dataOrchestrator.fetchCollection('transactions', dataService.getSalesHistory)
+  salesData.value = transactions.map(t => ({
+    id: t.id,
+    date: (t.created_at || t.date || '').toString().slice(0, 10),
+    product: t.product_name || t.product || 'Unknown',
+    qty: t.quantity || t.qty || 0,
+    total: t.total_amount || t.total || 0,
+    customer: t.customer_name || 'Walk-in'
+  }))
 })
 
-// Mock sales data for demonstration
-const salesData = computed(() => [
-  { id: 1, date: '2026-01-25', product: 'Paracetamol 500mg', qty: 5, total: 2500, customer: 'Walk-in' },
-  { id: 2, date: '2026-01-25', product: 'Amoxicillin 500mg', qty: 2, total: 3000, customer: 'Walk-in' },
-  { id: 3, date: '2026-01-24', product: 'Vitamin C 1000mg', qty: 3, total: 3000, customer: 'Walk-in' },
-  { id: 4, date: '2026-01-24', product: 'Ibuprofen 400mg', qty: 4, total: 3400, customer: 'Walk-in' },
-  { id: 5, date: '2026-01-23', product: 'Cough Syrup 100ml', qty: 2, total: 2400, customer: 'Walk-in' },
-])
-
-const lowStockProducts = computed(() => products.value.filter(p => p.stock <= (p.minStockLevel || 10)))
+const lowStockProducts = computed(() => products.value.filter(p => p.stock <= (p.minStockLevel || 10) && !p.lowStockIgnored))
 const expiredProducts = computed(() => products.value.filter(p => new Date(p.expiryDate) < new Date()))
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK', minimumFractionDigits: 0 }).format(amount || 0)
 }
+
+const totalSales = computed(() => {
+  return salesData.value.reduce((sum, s) => sum + Number(s.total || 0), 0)
+})
+
+const avgTransaction = computed(() => {
+  return salesData.value.length > 0 ? totalSales.value / salesData.value.length : 0
+})
 
 const exportToCsv = (data, filename) => {
   if (data.length === 0) return alert('No data to export')
@@ -94,7 +105,7 @@ const exportToCsv = (data, filename) => {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <p class="text-sm text-gray-500">Total Sales</p>
-          <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatCurrency(14300) }}</p>
+          <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatCurrency(totalSales) }}</p>
         </div>
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <p class="text-sm text-gray-500">Transactions</p>
@@ -102,7 +113,7 @@ const exportToCsv = (data, filename) => {
         </div>
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <p class="text-sm text-gray-500">Avg. Transaction</p>
-          <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatCurrency(2860) }}</p>
+          <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatCurrency(avgTransaction) }}</p>
         </div>
       </div>
 

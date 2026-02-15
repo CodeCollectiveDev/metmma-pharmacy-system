@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useRole } from '@/composables/useRole'
 import { 
   LayoutDashboard, 
   Package, 
@@ -10,11 +11,13 @@ import {
   Settings, 
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Lock
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
+const { logout: logoutRole, userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos } = useRole()
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false }
@@ -30,25 +33,49 @@ const user = computed(() => {
   }
 })
 
-const role = computed(() => localStorage.getItem('role') || '')
+// All available menu items with visibility conditions
+const allMenuItems = [
+  { 
+    path: '/dashboard', 
+    label: 'Dashboard', 
+    icon: LayoutDashboard, 
+    show: computed(() => ['admin', 'store_manager', 'pharmacist', 'hr_officer'].includes(userRole.value))
+  },
+  { 
+    path: '/pos', 
+    label: 'Point of Sale', 
+    icon: ShoppingCart, 
+    show: canAccessPos
+  },
+  { 
+    path: '/inventory', 
+    label: 'Inventory', 
+    icon: Package, 
+    show: canAccessInventory
+  },
+  { 
+    path: '/hr', 
+    label: 'HR Management', 
+    icon: Users, 
+    show: canAccessHr,
+    restricted: true // Marks as sensitive/restricted feature
+  },
+  { 
+    path: '/reports', 
+    label: 'Reports', 
+    icon: FileText, 
+    show: canAccessReports
+  },
+]
 
 const menuItems = computed(() => {
-  const items = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'store_manager', 'pharmacist', 'hr_officer'] },
-    { path: '/pos', label: 'Point of Sale', icon: ShoppingCart, roles: ['cashier', 'admin'] },
-    { path: '/inventory', label: 'Inventory', icon: Package, roles: ['admin', 'store_manager', 'pharmacist'] },
-    { path: '/hr', label: 'HR Management', icon: Users, roles: ['admin', 'hr_officer'] },
-    { path: '/reports', label: 'Reports', icon: FileText, roles: ['admin', 'store_manager', 'pharmacist', 'hr_officer'] },
-  ]
-  return items.filter(item => item.roles.includes(role.value))
+  return allMenuItems.filter(item => item.show.value)
 })
 
 const isActive = (path) => route.path === path || route.path.startsWith(path + '/')
 
-const logout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('role')
-  localStorage.removeItem('user')
+const handleLogout = () => {
+  logoutRole()
   router.push('/login')
 }
 </script>
@@ -88,9 +115,13 @@ const logout = () => {
                 ? 'bg-blue-600 text-white' 
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white'
             ]"
+            :title="item.restricted ? 'Restricted to HR Officers and Admins' : ''"
           >
             <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
-            <span v-if="!collapsed" class="text-sm font-medium">{{ item.label }}</span>
+            <span v-if="!collapsed" class="text-sm font-medium flex items-center gap-2">
+              {{ item.label }}
+              <Lock v-if="item.restricted" class="w-3 h-3 text-amber-400" />
+            </span>
           </router-link>
         </li>
       </ul>
@@ -104,11 +135,11 @@ const logout = () => {
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium truncate">{{ user.name || 'User' }}</div>
-          <div class="text-xs text-slate-400 capitalize">{{ role }}</div>
+          <div class="text-xs text-slate-400 capitalize">{{ userRole }}</div>
         </div>
       </div>
       <button 
-        @click="logout"
+        @click="handleLogout"
         :class="[
           'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-slate-300 hover:bg-red-600/20 hover:text-red-400 transition-colors',
           collapsed ? 'justify-center' : ''

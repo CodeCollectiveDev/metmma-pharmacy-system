@@ -6,6 +6,10 @@ import { Plus, Search, Package, AlertTriangle, Calendar, Edit, ScanBarcode } fro
 
 const store = useInventoryStore()
 const showAddForm = ref(false)
+const showRestockModal = ref(false)
+const restockTarget = ref(null)
+const restockQty = ref('')
+const restockNote = ref('')
 const filter = ref('all')
 const searchQuery = ref('')
 const barcodeSearch = ref('')
@@ -66,12 +70,79 @@ const saveProduct = async () => {
   }
 }
 
+const openRestockModal = (product) => {
+  restockTarget.value = product
+  restockQty.value = ''
+  restockNote.value = ''
+  showRestockModal.value = true
+}
+
+const confirmRestock = async () => {
+  if (!restockTarget.value) return
+  const quantity = Number(restockQty.value)
+  if (Number.isNaN(quantity) || quantity <= 0) {
+    alert('Please enter a valid quantity greater than 0')
+    return
+  }
+
+  const success = await store.restockProduct(restockTarget.value, quantity, restockNote.value)
+  if (success) {
+    showRestockModal.value = false
+    restockTarget.value = null
+    restockQty.value = ''
+    restockNote.value = ''
+    alert('Stock updated successfully')
+  } else {
+    alert('Failed to update stock')
+  }
+}
+
+const ignoreLowStock = async (product) => {
+  const reason = window.prompt('Optional reason to ignore low stock:', '') || ''
+  const success = await store.ignoreLowStock(product, reason)
+  if (success) {
+    alert('Low stock notification ignored')
+  } else {
+    alert('Failed to ignore low stock notification')
+  }
+}
+
+const removeExpired = async (product) => {
+  const confirmRemove = window.confirm('Remove expired item from stock? This will delete it.')
+  if (!confirmRemove) return
+  const success = await store.deleteProduct(product)
+  if (success) {
+    alert('Expired item removed')
+  } else {
+    alert('Failed to remove expired item')
+  }
+}
+
+const removeAllExpired = async () => {
+  if (!store.expiredProducts.length) return
+  const confirmRemove = window.confirm('Remove ALL expired items from stock? This will delete them.')
+  if (!confirmRemove) return
+
+  let failures = 0
+  for (const product of store.expiredProducts) {
+    const success = await store.deleteProduct(product)
+    if (!success) failures += 1
+  }
+
+  if (failures === 0) {
+    alert('All expired items removed')
+  } else {
+    alert(`Some items could not be removed (${failures} failed).`)
+  }
+}
+
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK', minimumFractionDigits: 0 }).format(amount || 0)
 }
 
 const isExpired = (date) => new Date(date) < new Date()
-const isLowStock = (product) => product.stock <= (product.minStockLevel || 10)
+const isLowStock = (product) => product.stock <= (product.minStockLevel || 10) && !product.lowStockIgnored
+const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel || 10) && product.lowStockIgnored
 </script>
 
 <template>
@@ -158,6 +229,38 @@ const isLowStock = (product) => product.stock <= (product.minStockLevel || 10)
             <input v-model="searchQuery" type="text" placeholder="Search products..." class="pl-10 pr-4 py-2 border rounded-lg w-64 focus:ring-2 focus:ring-blue-500 outline-none">
             <Search class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
+          <button
+            v-if="store.expiredProducts.length"
+            @click="removeAllExpired"
+            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Remove All Expired
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Restock Modal -->
+    <div v-if="showRestockModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Restock Item</h3>
+        <div class="space-y-3">
+          <div class="text-sm text-gray-600">
+            <div><span class="font-medium">Product:</span> {{ restockTarget?.name }}</div>
+            <div><span class="font-medium">Current Stock:</span> {{ restockTarget?.stock ?? 0 }}</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Quantity to Add</label>
+            <input v-model="restockQty" type="number" min="1" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 50" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Note (supplier/invoice)</label>
+            <input v-model="restockNote" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Optional" />
+          </div>
+        </div>
+        <div class="mt-6 flex justify-end gap-2">
+          <button @click="showRestockModal = false" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+          <button @click="confirmRestock" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Confirm Restock</button>
         </div>
       </div>
     </div>
@@ -171,9 +274,10 @@ const isLowStock = (product) => product.stock <= (product.minStockLevel || 10)
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch #</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expiry</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock (Qty)</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -194,12 +298,38 @@ const isLowStock = (product) => product.stock <= (product.minStockLevel || 10)
             <td class="px-6 py-4 font-medium text-gray-800">{{ formatCurrency(product.price) }}</td>
             <td class="px-6 py-4">
               <span v-if="isExpired(product.expiryDate)" class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">Expired</span>
+              <span v-else-if="isLowStockIgnored(product)" class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">Low Stock (Ignored)</span>
               <span v-else-if="isLowStock(product)" class="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">Low Stock</span>
               <span v-else class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">OK</span>
             </td>
+            <td class="px-6 py-4">
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-if="!isExpired(product.expiryDate)"
+                  @click="openRestockModal(product)"
+                  class="px-2.5 py-1 text-xs font-medium rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                >
+                  Restock
+                </button>
+                <button
+                  v-if="isLowStock(product)"
+                  @click="ignoreLowStock(product)"
+                  class="px-2.5 py-1 text-xs font-medium rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  Ignore Low Stock
+                </button>
+                <button
+                  v-if="isExpired(product.expiryDate)"
+                  @click="removeExpired(product)"
+                  class="px-2.5 py-1 text-xs font-medium rounded bg-red-50 text-red-700 hover:bg-red-100"
+                >
+                  Remove Expired
+                </button>
+              </div>
+            </td>
           </tr>
           <tr v-if="filteredProducts.length === 0">
-            <td colspan="7" class="px-6 py-8 text-center text-gray-400">No products found</td>
+            <td colspan="8" class="px-6 py-8 text-center text-gray-400">No products found</td>
           </tr>
         </tbody>
       </table>

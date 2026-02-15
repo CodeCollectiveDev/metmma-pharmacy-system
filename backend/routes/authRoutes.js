@@ -85,6 +85,9 @@ const loginHandler = async (req, res) => {
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+  const pool = require('../api/db').pool;
+  const client = await pool.connect();
+  
   try {
     // Validate input
     const { error, value } = registerSchema.validate(req.body);
@@ -94,11 +97,27 @@ router.post('/register', async (req, res) => {
 
     const { username, password, role, full_name, email } = value;
 
-    // Create user
+    await client.query('BEGIN');
+
+    // Create user in users table
     const user = await createUser({ username, password, role, full_name, email });
+
+    // Also create employee record for HR system
+    const nameParts = full_name.trim().split(' ');
+    const firstName = nameParts[0] || full_name;
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    await client.query(
+      `INSERT INTO employees (first_name, last_name, role, hire_date, email, phone, status)
+       VALUES ($1, $2, $3, CURRENT_DATE, $4, '', 'active')`,
+      [firstName, lastName, role, email || '']
+    );
+
+    await client.query('COMMIT');
 
     res.status(201).json({ message: 'User created successfully', user });
   } catch (err) {
+    await client.query('ROLLBACK');
     if (err.code === '23505') { // Unique violation
       res.status(409).json({ error: 'Username already exists' });
     } else if (err.code === 'INVALID_ROLE' || err.code === 'INVALID_FULL_NAME') {
@@ -107,6 +126,8 @@ router.post('/register', async (req, res) => {
       console.error(err);
       res.status(500).json({ error: 'Internal server error' });
     }
+  } finally {
+    client.release();
   }
 });
 

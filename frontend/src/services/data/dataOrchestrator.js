@@ -10,6 +10,48 @@ const isOnline = () => window.navigator.onLine;
  * Hybrid Data Orchestrator
  * Prioritizes backend API but falls back to local storage (LocalForage)
  */
+const normalizeCollectionItems = (collection, items) => {
+    if (!Array.isArray(items)) return [];
+
+    if (collection === 'products') {
+        return items.map((item) => ({
+            ...item,
+            stock: item.stock ?? item.quantity ?? 0,
+            minStockLevel: item.minStockLevel ?? item.reorderLevel ?? 10,
+            price: item.price ?? item.sellingPrice ?? item.unitPrice ?? 0,
+            productCode: item.productCode ?? item.product_code,
+            batchNumber: item.batchNumber ?? item.batch_number,
+            expiryDate: item.expiryDate ?? item.expiry_date,
+            supplier: item.supplier,
+            category: item.category,
+            _id: (item.id || item._id || item.product_id || item.productCode || item.product_code)?.toString()
+        }));
+    }
+
+    if (collection === 'employees') {
+        return items.map((item) => ({
+            ...item,
+            name: item.name || `${item.first_name || ''} ${item.last_name || ''}`.trim(),
+            position: item.position || item.role || 'Employee',
+            department: item.department || 'General',
+            status: item.status || 'active',
+            _id: (item.id || item._id)?.toString()
+        }));
+    }
+
+    if (collection === 'transactions') {
+        return items.map((item) => ({
+            ...item,
+            _id: (item.id || item._id || item.sale_id || item.receipt_number)?.toString()
+        }));
+    }
+
+    return items.map((item) => ({
+        ...item,
+        _id: (item.id || item._id)?.toString()
+    }));
+};
+
 export const dataOrchestrator = {
     /**
      * Fetch all items for a collection
@@ -19,7 +61,8 @@ export const dataOrchestrator = {
         if (isOnline()) {
             try {
                 const response = await apiMethod();
-                const items = response.data;
+                const payload = response?.data?.data ?? response?.data ?? [];
+                const items = normalizeCollectionItems(collection, payload);
 
                 // Sync local storage with fresh data from server
                 for (const item of items) {
@@ -58,8 +101,9 @@ export const dataOrchestrator = {
             syncStatus = 'pending';
         }
 
-        // Always update local storage
-        const localItem = { ...item, syncStatus };
+        // Always update local storage (normalize before saving)
+        const normalized = normalizeCollectionItems(collection, [item])[0] || item;
+        const localItem = { ...normalized, syncStatus };
         const saved = await save(collection, localItem);
 
         return { ...saved, offline: syncStatus === 'pending' };

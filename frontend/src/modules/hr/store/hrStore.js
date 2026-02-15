@@ -22,8 +22,20 @@ export const useHrStore = defineStore('hr', () => {
 
     async function addEmployee(employee) {
         try {
-            const result = await save('employees', employee)
-            if (result.ok) {
+            // Normalize employee data to match backend schema
+            const employeeData = {
+                first_name: employee.first_name || employee.name?.split(' ')[0] || '',
+                last_name: employee.last_name || employee.name?.split(' ').slice(1).join(' ') || '',
+                role: employee.position || employee.role || 'employee',
+                hire_date: employee.startDate || employee.hire_date || new Date().toISOString().split('T')[0],
+                salary: employee.salary || 0,
+                email: employee.email || '',
+                phone: employee.phone || '',
+                status: employee.status || 'active'
+            }
+            
+            const result = await dataService.addEmployee(employeeData)
+            if (result.data?.success || result.status === 201) {
                 await fetchEmployees()
                 return true
             }
@@ -36,6 +48,7 @@ export const useHrStore = defineStore('hr', () => {
 
     async function fetchAttendance() {
         try {
+            // Fetch all attendance records or from last 30 days
             attendance.value = await getAll('attendance')
         } catch (error) {
             console.error('Error fetching attendance:', error)
@@ -44,8 +57,15 @@ export const useHrStore = defineStore('hr', () => {
 
     async function markAttendance(record) {
         try {
-            const result = await save('attendance', record)
-            if (result.ok) {
+            // Normalize attendance record
+            const attendanceData = {
+                employee_id: record.employee_id || record.employeeId,
+                date: record.date || new Date().toISOString().split('T')[0],
+                status: record.status || 'present'
+            }
+            
+            const result = await dataService.markAttendance(attendanceData)
+            if (result.data?.success || result.status === 201) {
                 await fetchAttendance()
                 return true
             }

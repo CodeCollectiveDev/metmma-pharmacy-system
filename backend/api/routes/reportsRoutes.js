@@ -5,6 +5,7 @@ const router = express.Router();
 // Use the existing controllers
 const complianceController = require('../controllers/complianceReportControllers');
 const financialController = require('../controllers/finincialReportController');
+const { getRecentActivity } = require('../controllers/recentActivityController');
 const { financialReportSchema, complianceReportSchema } = require('../validators/reportValidators');
 
 const validateSchema = (schema, prop = 'body') => (req, res, next) => {
@@ -26,5 +27,8 @@ router.post('/financial', validateSchema(financialReportSchema, 'body'), financi
 // Compliance reports
 router.get('/compliance', complianceController.getComplianceReports);
 router.post('/compliance', validateSchema(complianceReportSchema, 'body'), complianceController.createComplianceReport);
+
+// Recent activity feed
+router.get('/recent-activity', getRecentActivity);
 
 module.exports = router;
