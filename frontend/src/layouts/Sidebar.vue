@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
+import { authService } from '@/services/api/authService'
 import { 
   LayoutDashboard, 
   Package, 
@@ -17,7 +18,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { logout: logoutRole, userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos } = useRole()
+const { userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos } = useRole()
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false }
@@ -74,8 +75,8 @@ const menuItems = computed(() => {
 
 const isActive = (path) => route.path === path || route.path.startsWith(path + '/')
 
-const handleLogout = () => {
-  logoutRole()
+const handleLogout = async () => {
+  await authService.logout()
   router.push('/login')
 }
 </script>

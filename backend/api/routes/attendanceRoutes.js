@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const attendanceController = require('../controllers/attendanceControllers');
 const { attendanceSchema, employeeIdParam } = require('../validators/attendanceValidators');
+const { authenticate, authorize, ROLES } = require('../../middleware/roleMiddleware');
+const { checkAndRefreshSession } = require('../../middleware/sessionMiddleware');
 
 // Local inline Joi validator helper
 const validateSchema = (schema, prop = 'body') => (req, res, next) => {
@@ -16,7 +18,7 @@ const validateSchema = (schema, prop = 'body') => (req, res, next) => {
   next();
 };
 
-router.get('/employee/:employee_id', validateSchema(employeeIdParam, 'params'), attendanceController.getAttendanceByEmployee);
-router.post('/', validateSchema(attendanceSchema, 'body'), attendanceController.addAttendance);
+router.get('/employee/:employee_id', authenticate, authorize(ROLES.ADMIN, ROLES.HR_OFFICER), checkAndRefreshSession, validateSchema(employeeIdParam, 'params'), attendanceController.getAttendanceByEmployee);
+router.post('/', authenticate, authorize(ROLES.ADMIN, ROLES.HR_OFFICER), checkAndRefreshSession, validateSchema(attendanceSchema, 'body'), attendanceController.addAttendance);
 
 module.exports = router; 

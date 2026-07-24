@@ -3,6 +3,8 @@ const Joi = require('joi');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { createUser, findUserByUsername, normalizeRole, DB_ROLES } = require('../models/user');
+const { createSession, invalidateSession, invalidateSessionByToken } = require('../middleware/sessionMiddleware');
+const { authenticate } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
@@ -29,10 +31,18 @@ const loginSchema = Joi.object({
   password: Joi.string().required()
 });
 
+const getClientIp = (req) => {
+  return (
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    null
+  );
+};
+
 // Login handler function (reusable)
 const loginHandler = async (req, res) => {
   try {
-    // Validate input
     const { error, value } = loginSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
@@ -40,24 +50,20 @@ const loginHandler = async (req, res) => {
 
     const { username, password } = value;
 
-    // Find user by username
     const user = await findUserByUsername(username);
     if (!user) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Check if user is active (default to true if column doesn't exist because we are using a default value)
     if (user.is_active === false) {
       return res.status(401).json({ error: 'Account is deactivated' });
     }
 
-    // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Generate JWT token
     const token = jwt.sign(
       { 
         id: user.id, 
@@ -68,7 +74,13 @@ const loginHandler = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    // Return token and user info
+    await createSession(
+      user.id,
+      token,
+      getClientIp(req),
+      req.headers['user-agent'] || null
+    );
+
     res.json({
       token,
       user: {
@@ -89,7 +101,6 @@ router.post('/register', async (req, res) => {
   const client = await pool.connect();
   
   try {
-    // Validate input
     const { error, value } = registerSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
@@ -99,26 +110,12 @@ router.post('/register', async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Create user in users table
     const user = await createUser({ username, password, role, full_name, email });
-
-    // Also create employee record for HR system
-    // const nameParts = full_name.trim().split(' ');
-    // const firstName = nameParts[0] || full_name;
-    // const lastName = nameParts.slice(1).join(' ') || '';
-
-    // await client.query(
-    //   `INSERT INTO employees (first_name, last_name, role, hire_date, email, phone, status)
-    //    VALUES ($1, $2, $3, CURRENT_DATE, $4, '', 'active')`,
-    //   [firstName, lastName, role, email || '']
-    // );
-
-    // await client.query('COMMIT');
 
     res.status(201).json({ message: 'User created successfully', user });
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err.code === '23505') { // Unique violation
+    if (err.code === '23505') {
       res.status(409).json({ error: 'Username already exists' });
     } else if (err.code === 'INVALID_ROLE' || err.code === 'INVALID_FULL_NAME') {
       res.status(400).json({ error: err.message });
@@ -133,6 +130,21 @@ router.post('/register', async (req, res) => {
 
 // POST /api/auth/login
 router.post('/login', loginHandler);
+
+// POST /api/auth/logout - invalidate current session
+router.post('/logout', authenticate, (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    invalidateSessionByToken(token);
+  }
+  res.json({ message: 'Logged out successfully' });
+});
+
+// POST /api/auth/ping - keep session alive
+router.post('/ping', authenticate, (req, res) => {
+  res.json({ message: 'Session active' });
+});
 
 // Create a separate router for login endpoint at /api/login
 const loginRouter = express.Router();

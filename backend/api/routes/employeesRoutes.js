@@ -14,6 +14,8 @@ const {
   ROLES
 } = require('../../middleware/roleMiddleware');
 
+const { checkAndRefreshSession } = require('../../middleware/sessionMiddleware');
+
 /**
  * Generic validation middleware
  */
@@ -46,6 +48,7 @@ router.get(
   '/',
   authenticate,
   authorize(ROLES.ADMIN, ROLES.HR_OFFICER),
+  checkAndRefreshSession,
   employeesController.getEmployees
 );
 
@@ -54,6 +57,7 @@ router.get(
   '/:id',
   authenticate,
   authorize(ROLES.ADMIN, ROLES.HR_OFFICER),
+  checkAndRefreshSession,
   validateSchema(idParam, 'params'),
   employeesController.getEmployeeById
 );
@@ -63,6 +67,7 @@ router.post(
   '/',
   authenticate,
   authorize(ROLES.ADMIN),
+  checkAndRefreshSession,
   validateSchema(employeeCreateSchema, 'body'),
   employeesController.addEmployee
 );
@@ -72,6 +77,7 @@ router.put(
   '/:id',
   authenticate,
   authorize(ROLES.ADMIN),
+  checkAndRefreshSession,
   validateSchema(idParam, 'params'),
   validateSchema(employeeUpdateSchema, 'body'),
   employeesController.updateEmployee
@@ -82,6 +88,7 @@ router.delete(
   '/:id',
   authenticate,
   authorize(ROLES.ADMIN),
+  checkAndRefreshSession,
   validateSchema(idParam, 'params'),
   employeesController.deleteEmployee
 );

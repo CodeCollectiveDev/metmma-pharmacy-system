@@ -21,9 +21,23 @@ export const authService = {
         }
     },
 
-    logout: () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('user');
+    logout: async () => {
+        try {
+            await apiClient.post('/auth/logout');
+        } catch (error) {
+            console.error('[AuthService] Logout error:', error);
+        } finally {
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
+            localStorage.removeItem('user');
+        }
+    },
+
+    ping: async () => {
+        try {
+            await apiClient.post('/auth/ping');
+        } catch (error) {
+            console.error('[AuthService] Ping error:', error);
+        }
     }
 };

@@ -100,6 +100,24 @@ CREATE TABLE IF NOT EXISTS stock_movements (
 COMMENT ON TABLE stock_movements IS 'Audit log for all inventory changes';
 
 -- ============================================
+-- SESSIONS TABLE - Session management and inactivity tracking
+-- ============================================
+CREATE TABLE IF NOT EXISTS sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) NOT NULL,
+    last_activity TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_activity ON sessions(last_activity);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+
+-- ============================================
 -- SECTION 3: HR TABLES (Gilbert's Section)
 -- ============================================
 -- Gilbert: These tables handle employees, attendance, and HR functions
@@ -150,13 +168,12 @@ COMMENT ON TABLE attendance IS 'Daily employee attendance tracking';
 --OPERATION REPORTS TABLE
 CREATE TABLE IF NOT EXISTS operation_reports (
     id SERIAL PRIMARY KEY,
-    report_id SERIAL PRIMARY KEY,
     report_date DATE,
     total_sales NUMERIC(12,2),
     total_expenses NUMERIC(12,2),
     net_profit NUMERIC(12,2),
-    metrics JSONB, -- store structured analytics data
-    created_by INT REFERENCES employees(employee_id)
+    metrics JSONB,
+    created_by INTEGER REFERENCES employees(id)
 );
 
 COMMENT ON TABLE operation_reports IS 'Daily, weekly, monthly operational performance reports';
@@ -169,7 +186,7 @@ CREATE TABLE IF NOT EXISTS compliance_reports (
     description TEXT,
     status VARCHAR(50) CHECK (status IN ('pending', 'completed', 'in_progress')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by INT REFERENCES employees(employee_id)
+    created_by INTEGER REFERENCES employees(id)
 );
 
 COMMENT ON TABLE compliance_reports IS 'Regulatory compliance reports for audits and inspections';
@@ -177,13 +194,12 @@ COMMENT ON TABLE compliance_reports IS 'Regulatory compliance reports for audits
 -- FINANCIAL REPORTS TABLE
 CREATE TABLE IF NOT EXISTS financial_reports (
     id SERIAL PRIMARY KEY,
-    report_id SERIAL PRIMARY KEY,
     report_date DATE,
     total_revenue NUMERIC(12,2),
     total_costs NUMERIC(12,2),
-    expenses_breakdown JSONB, -- detailed expenses
+    expenses_breakdown JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by INT REFERENCES employees(employee_id)
+    created_by INTEGER REFERENCES employees(id)
 );
 
 COMMENT ON TABLE financial_reports IS 'Financial performance reports for accounting and management';
