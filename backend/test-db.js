@@ -30,10 +30,10 @@ async function test() {
     console.log(`✅ Products in database: ${count.rows[0].count}`);
     
     // Test 4: Show sample products
-    const products = await pool.query('SELECT product_code, name, quantity, price FROM products');
+    const products = await pool.query('SELECT product_code, name, quantity, unit_price, selling_price FROM products');
     console.log('📦 Sample products:');
     products.rows.forEach(p => {
-      console.log(`   - ${p.product_code}: ${p.name} (Qty: ${p.quantity}, Price: ${p.price})`);
+      console.log(`   - ${p.product_code}: ${p.name} (Qty: ${p.quantity}, Unit Price: ${p.unit_price}, Selling Price: ${p.selling_price})`);
     });
     
     console.log('\n🎉 All tests passed! Your database is ready.');
