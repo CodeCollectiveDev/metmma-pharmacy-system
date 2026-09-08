@@ -36,4 +36,8 @@ export const dataService = {
     // REPORTS
     getDailySales: () => apiClient.get('/reports/sales-daily'),
     getRecentActivity: () => apiClient.get('/reports/recent-activity'),
+
+    // PRINTING
+    printReceipt: (receipt) => apiClient.post('/print/receipt', receipt),
+    testPrinter: () => apiClient.post('/print/test'),
 };

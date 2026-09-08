@@ -70,6 +70,12 @@ See `docs/sprint-plan.md` for daily tasks.
 
 ---
 
+## Thermal Printing
+
+To configure the thermal receipt printer (hardware, `.env` setup, and troubleshooting), see `docs/thermal-printing-setup.md`.
+
+---
+
 ## Communication
 
 - GitHub Issues → tasks & bugs

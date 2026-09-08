@@ -20,6 +20,7 @@ const employeesRoutes = require('../api/routes/employeesRoutes');
 const reportsRoutes = require('../api/routes/reportsRoutes');
 const productRoutes = require('../api/routes/productsRoutes'); 
 const saleRoutes = require('../api/routes/salesRoutes'); 
+const printRoutes = require('../api/routes/printRoutes');
 
 // Use routes
 router.use('/attendance', attendanceRoutes);
@@ -27,6 +28,7 @@ router.use('/employees', employeesRoutes);
 router.use('/reports', reportsRoutes);
 router.use('/products', productRoutes); 
 router.use('/sales', saleRoutes);
+router.use('/print', printRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
