@@ -30,7 +30,15 @@ export const dataService = {
     },
 
     // ATTENDANCE
-    getAttendance: (employeeId) => apiClient.get(`/attendance/${employeeId}`),
+    getAttendance: (params) => {
+        if (params && typeof params === 'object') {
+            return apiClient.get('/attendance', { params });
+        }
+        if (params !== undefined && params !== null && params !== '') {
+            return apiClient.get(`/attendance/${params}`);
+        }
+        return apiClient.get('/attendance');
+    },
     markAttendance: (record) => apiClient.post('/attendance', record),
 
     // REPORTS

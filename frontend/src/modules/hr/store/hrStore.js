@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getAll, save, remove } from '@/pouchdb'
 import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
 
@@ -8,6 +7,8 @@ export const useHrStore = defineStore('hr', () => {
     const employees = ref([])
     const attendance = ref([])
     const loading = ref(false)
+    const attendanceLoading = ref(false)
+    const attendanceError = ref(null)
 
     async function fetchEmployees() {
         loading.value = true
@@ -46,46 +47,87 @@ export const useHrStore = defineStore('hr', () => {
         }
     }
 
-    async function fetchAttendance() {
+    /**
+     * Fetch attendance records from backend API
+     * Optional filter parameter (e.g. { date: 'YYYY-MM-DD' } or employeeId)
+     */
+    async function fetchAttendance(filters) {
+        attendanceLoading.value = true
+        attendanceError.value = null
         try {
-            // Fetch all attendance records or from last 30 days
-            attendance.value = await getAll('attendance')
+            const response = await dataService.getAttendance(filters)
+            const payload = response?.data?.data ?? response?.data ?? []
+            attendance.value = Array.isArray(payload) ? payload : []
+            return attendance.value
         } catch (error) {
-            console.error('Error fetching attendance:', error)
+            const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Error fetching attendance'
+            attendanceError.value = errorMessage
+            console.error('Error fetching attendance from backend API:', error)
+            return []
+        } finally {
+            attendanceLoading.value = false
         }
     }
 
+    /**
+     * Mark/save attendance record via backend API
+     */
     async function markAttendance(record) {
+        attendanceLoading.value = true
+        attendanceError.value = null
         try {
-            // Normalize attendance record
+            const rawEmpId = record.employee_id ?? record.employeeId ?? record.id ?? record._id
+            const empId = typeof rawEmpId === 'number' ? rawEmpId : parseInt(rawEmpId, 10)
+
             const attendanceData = {
-                employee_id: record.employee_id || record.employeeId,
+                employee_id: empId,
                 date: record.date || new Date().toISOString().split('T')[0],
-                status: record.status || 'present'
+                status: (record.status || 'present').toLowerCase(),
+                check_in_time: record.check_in_time || record.check_in || (record.status?.toLowerCase() === 'present' ? new Date().toTimeString().slice(0, 5) : null),
+                notes: record.notes || null
             }
             
             const result = await dataService.markAttendance(attendanceData)
-            if (result.data?.success || result.status === 201) {
+            if (result.status === 200 || result.status === 201 || result.data?.message) {
                 await fetchAttendance()
-                return true
+                return { success: true, data: result.data }
             }
-            return false
+            return { success: false, error: 'Unexpected response from server' }
         } catch (error) {
-            console.error('Error marking attendance:', error)
-            return false
+            const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Error marking attendance'
+            attendanceError.value = errorMessage
+            console.error('Error marking attendance via backend API:', error)
+            return { success: false, error: errorMessage }
+        } finally {
+            attendanceLoading.value = false
         }
     }
 
     const activeEmployees = computed(() => employees.value.filter(e => e.status === 'active'))
 
+    /**
+     * Helper to find attendance record for an employee on a specific date (YYYY-MM-DD)
+     */
+    function getEmployeeAttendanceRecord(employeeId, dateStr) {
+        if (!employeeId || !dateStr) return null
+        return attendance.value.find(a => {
+            const matchEmp = String(a.employee_id) === String(employeeId)
+            const recDate = typeof a.date === 'string' ? a.date.split('T')[0] : ''
+            return matchEmp && recDate === dateStr
+        }) || null
+    }
+
     return {
         employees,
         attendance,
         loading,
+        attendanceLoading,
+        attendanceError,
         fetchEmployees,
         addEmployee,
         fetchAttendance,
         markAttendance,
-        activeEmployees
+        activeEmployees,
+        getEmployeeAttendanceRecord
     }
 })
