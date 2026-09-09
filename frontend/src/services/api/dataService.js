@@ -3,6 +3,7 @@ import apiClient from './apiClient';
 export const dataService = {
     // PRODUCTS
     getProducts: () => apiClient.get('/products'),
+    lookupByBarcode: (barcode) => apiClient.get(`/products/barcode/${encodeURIComponent(barcode)}`),
     addProduct: (product) => apiClient.post('/products', product),
     updateProduct: (product) => {
         const productId = product.id || product._id;

@@ -1,11 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { usePosStore } from '../store/posStore'
 import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle } from 'lucide-vue-next'
+import BarcodeScanner from '../components/BarcodeScanner.vue'
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle, Camera, X } from 'lucide-vue-next'
 
 const router = useRouter()
 const store = usePosStore()
@@ -19,6 +20,9 @@ const lastTransaction = ref(null)
 const processing = ref(false)
 const printStatus = ref('')
 const printMessage = ref('')
+const showScanner = ref(false)
+const scanMessage = ref('')
+const scanError = ref('')
 
 const VAT_RATE = 0.165
 
@@ -38,6 +42,10 @@ onMounted(() => {
   document.getElementById('barcode-input')?.focus()
 })
 
+onUnmounted(() => {
+  if (scanMessageTimer) clearTimeout(scanMessageTimer)
+})
+
 // Filter products based on search and category
 const filteredProducts = computed(() => {
   return store.products.filter(p => {
@@ -49,19 +57,97 @@ const filteredProducts = computed(() => {
 })
 
 // Handle barcode scan (Enter pressed in barcode input)
-const handleBarcodeScan = () => {
-  if (!barcodeInput.value) return
-  const product = store.products.find(p => 
-    p.batchNumber?.toLowerCase() === barcodeInput.value.toLowerCase() ||
-    p._id === barcodeInput.value
-  )
-  if (product) {
+const handleBarcodeScan = async () => {
+  const code = (barcodeInput.value || '').trim()
+  if (!code) return
+
+  scanMessage.value = ''
+  scanError.value = ''
+
+  // Optimistic local match by barcode first (no round-trip needed)
+  const localMatch = store.products.find(p => p.barcode && String(p.barcode).toLowerCase() === code.toLowerCase())
+  let product = localMatch
+
+  // If not found locally, query the backend barcode endpoint
+  if (!product) {
+    product = store.products.find(p =>
+      p.batchNumber?.toLowerCase() === code.toLowerCase() ||
+      p._id === code
+    )
+  }
+
+  // If still not found locally and online, do a server-side barcode lookup
+  if (!product && navigator.onLine) {
+    try {
+      const res = await dataService.lookupByBarcode(code)
+      const found = res?.data?.data
+      if (found) {
+        const fromList = await dataOrchestrator
+          .fetchCollection('products', dataService.getProducts)
+          .then(list => list.find(p =>
+            String(p.barcode).toLowerCase() === code.toLowerCase()
+          ))
+        if (fromList) {
+          product = fromList
+        } else {
+          // Normalize the single-product API response so it works with the store
+          product = {
+            ...found,
+            _id: String(found.id),
+            id: found.id,
+            name: found.name,
+            price: found.sellingPrice ?? found.unitPrice ?? 0,
+            stock: found.quantity ?? 0,
+            minStockLevel: found.reorderLevel ?? 10,
+            batchNumber: found.batchNumber,
+            barcode: found.barcode,
+            expiryDate: found.expiryDate,
+            category: found.category,
+            supplier: found.supplier
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Barcode lookup failed:', error)
+    }
+  }
+
+  if (product && product.stock > 0) {
     store.addToCart(product)
     barcodeInput.value = ''
-  } else {
-    alert('Product not found: ' + barcodeInput.value)
+    scanMessage.value = `${product.name} added to cart`
+    clearScanMessage()
+  } else if (product && product.stock <= 0) {
+    scanError.value = `${product.name} is out of stock`
     barcodeInput.value = ''
+    clearScanMessage()
+  } else {
+    scanError.value = `Product not found: ${code}`
+    barcodeInput.value = ''
+    clearScanMessage()
   }
+  showScanner.value = false
+}
+
+let scanMessageTimer = null
+const clearScanMessage = () => {
+  if (scanMessageTimer) clearTimeout(scanMessageTimer)
+  scanMessageTimer = setTimeout(() => {
+    scanMessage.value = ''
+    scanError.value = ''
+  }, 3000)
+}
+
+const openScanner = () => {
+  scanMessage.value = ''
+  scanError.value = ''
+  showScanner.value = true
+}
+
+const handleScannedCode = (code) => {
+  barcodeInput.value = code
+  showScanner.value = false
+  handleBarcodeScan()
 }
 
 // Process payment and complete transaction
@@ -237,9 +323,20 @@ const goToHelp = () => {
             <button @click="handleBarcodeScan" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
               Scan
             </button>
+            <button @click="openScanner" class="px-3 py-2 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center" title="Use camera to scan barcode">
+              <Camera class="w-5 h-5" />
+            </button>
             <button @click="goToHelp" class="px-3 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center">
               <HelpCircle class="w-5 h-5" />
             </button>
+          </div>
+
+          <!-- Scan feedback message -->
+          <div v-if="scanMessage" class="px-3 py-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg">
+            {{ scanMessage }}
+          </div>
+          <div v-else-if="scanError" class="px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+            {{ scanError }}
           </div>
 
 
@@ -457,6 +554,21 @@ const goToHelp = () => {
         </div>
       </div>
     </div>
+    <!-- Camera Barcode Scanner Modal -->
+    <div v-if="showScanner" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+        <div class="p-4 flex items-center justify-between border-b border-gray-100">
+          <h3 class="font-semibold text-gray-800">Scan Barcode with Camera</h3>
+          <button @click="showScanner = false" class="p-1 text-gray-500 hover:text-gray-700">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="p-4">
+          <BarcodeScanner @scanned="handleScannedCode" @closed="showScanner = false" />
+        </div>
+      </div>
+    </div>
+
   </MainLayout>
 </template>
 

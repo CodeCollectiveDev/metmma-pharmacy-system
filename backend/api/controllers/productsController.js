@@ -26,6 +26,35 @@ const formatProduct = (p) => ({
                p.quantity <= p.reorder_level ? 'Low Stock' : 'In Stock'
 });
 
+// --- BARCODE LOOKUP ---
+
+const lookupByBarcode = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    if (!barcode || !barcode.trim()) {
+      return res.status(400).json({ success: false, message: 'Barcode is required' });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM products WHERE barcode = $1 AND is_active = TRUE',
+      [barcode.trim()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Product not found for barcode: ' + barcode });
+    }
+
+    const product = result.rows[0];
+    res.json({
+      success: true,
+      data: formatProduct(product),
+      batches: result.rows.map(formatProduct)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Barcode lookup error', error: err.message });
+  }
+};
+
 // --- READ OPERATIONS ---
 
 const getAllProducts = async (req, res) => {
@@ -192,4 +221,4 @@ const deleteProduct = async (req, res) => {
   }
 };
 
-module.exports = { getAllProducts, getProductById, getLowStockProducts, getExpiringProducts, createProduct, updateProduct, deleteProduct };
+module.exports = { getAllProducts, getProductById, lookupByBarcode, getLowStockProducts, getExpiringProducts, createProduct, updateProduct, deleteProduct };

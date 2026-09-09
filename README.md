@@ -76,6 +76,12 @@ To configure the thermal receipt printer (hardware, `.env` setup, and troublesho
 
 ---
 
+## Barcode Scanning
+
+To run and test the POS barcode scanning feature (physical scanners, camera scanning, and adding barcodes to products), see `docs/barcode-scanning.md`.
+
+---
+
 ## Communication
 
 - GitHub Issues → tasks & bugs
