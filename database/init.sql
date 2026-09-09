@@ -18,14 +18,19 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100),
     role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'pharmacist', 'cashier', 'store_manager', 'hr_officer')),
     full_name VARCHAR(100) NOT NULL,
+    profile_image VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Keep existing databases compatible when the bootstrap script is reapplied.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image VARCHAR(255);
+
 COMMENT ON TABLE users IS 'User authentication and authorization table';
 COMMENT ON COLUMN users.password_hash IS 'Store hashed passwords (use bcrypt)';
 COMMENT ON COLUMN users.role IS 'RBAC: admin, pharmacist, cashier, store_manager, hr_officer';
+COMMENT ON COLUMN users.profile_image IS 'Reference to the user profile image; NULL uses the default avatar';
 
 -- ============================================
 -- SECTION 2: INVENTORY TABLES (Patrick's section)

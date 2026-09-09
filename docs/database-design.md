@@ -1,6 +1,8 @@
 # Database Design — METMMA Pharmacy Management System
 
 ## users
+
+- profile_image (nullable reference to the user's profile image)
 - id (PK)
 - username (unique)
 - password_hash
