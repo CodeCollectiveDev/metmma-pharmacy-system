@@ -13,9 +13,22 @@ const store = usePosStore()
 const searchQuery = ref('')
 const barcodeInput = ref('')
 const paymentMethod = ref('cash')
+const cashReceived = ref(null)
 const showReceipt = ref(false)
 const lastTransaction = ref(null)
 const processing = ref(false)
+const printStatus = ref('')
+const printMessage = ref('')
+
+const VAT_RATE = 0.165
+
+const saleTotal = computed(() => store.cartTotal * (1 + VAT_RATE))
+
+const changeDue = computed(() => {
+  if (paymentMethod.value !== 'cash' || cashReceived.value === null || cashReceived.value === '') return null
+  const paid = Number(cashReceived.value)
+  return paid >= saleTotal.value ? paid - saleTotal.value : null
+})
 
 const categories = ['All', 'Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Cold', 'First Aid', 'Diagnostics', 'Diabetes', 'Gastrointestinal']
 
@@ -59,6 +72,8 @@ const processPayment = async () => {
   }
 
   processing.value = true
+  printStatus.value = ''
+  printMessage.value = ''
   
   try {
     // Create transaction record
@@ -74,14 +89,24 @@ const processPayment = async () => {
         total: item.price * item.quantity
       })),
       subtotal: store.cartTotal,
-      tax: store.cartTotal * 0.165,
-      total: store.cartTotal * 1.165,
+      tax: store.cartTotal * VAT_RATE,
+      total: store.cartTotal * (1 + VAT_RATE),
       paymentMethod: paymentMethod.value,
       cashier: JSON.parse(localStorage.getItem('user') || '{}').name || 'Unknown'
     }
 
+    if (paymentMethod.value === 'cash' && cashReceived.value !== null && cashReceived.value !== '') {
+      transaction.amountPaid = Number(cashReceived.value)
+      transaction.change = transaction.amountPaid - transaction.total
+    }
+
     // Save transaction using orchestrator
-    await dataOrchestrator.saveItem('transactions', transaction, dataService.recordSale)
+    const saveResult = await dataOrchestrator.saveItem('transactions', transaction, dataService.recordSale)
+
+    // Capture the backend-issued receipt number when online
+    if (saveResult?.data?.receiptNumber) {
+      transaction.receiptNumber = saveResult.data.receiptNumber
+    }
 
     // Update inventory (deduct stock) using orchestrator
     for (const item of store.cart) {
@@ -99,6 +124,19 @@ const processPayment = async () => {
     lastTransaction.value = transaction
     showReceipt.value = true
 
+    // Auto-print to the thermal printer (no browser dialog unless it fails)
+    const printResult = await printToThermal(transaction)
+    if (printResult.ok) {
+      printStatus.value = 'success'
+      printMessage.value = 'Receipt sent to the thermal printer.'
+    } else if (printResult.offline) {
+      printStatus.value = 'error'
+      printMessage.value = 'Offline - receipt saved. Use Print to print a copy when back online.'
+    } else {
+      printStatus.value = 'error'
+      printMessage.value = 'Thermal printer unavailable. Click Print to use browser printing.'
+    }
+
     // Clear cart
     store.clearCart()
     
@@ -112,8 +150,58 @@ const processPayment = async () => {
   }
 }
 
-// Print receipt
-const printReceipt = () => {
+// Send a receipt to the thermal printer via the backend
+const printToThermal = async (transaction) => {
+  if (!navigator.onLine) return { ok: false, offline: true }
+
+  try {
+    const payload = {
+      receipt: {
+        receiptNumber: transaction.receiptNumber || transaction._id,
+        date: transaction.date,
+        cashier: transaction.cashier,
+        items: transaction.items.map(i => ({
+          name: i.name,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          total: i.total
+        })),
+        subtotal: transaction.subtotal,
+        tax: transaction.tax,
+        total: transaction.total,
+        paymentMethod: transaction.paymentMethod
+      },
+      amountPaid: transaction.amountPaid,
+      change: transaction.change,
+      taxRate: VAT_RATE * 100
+    }
+    await dataService.printReceipt(payload)
+    return { ok: true }
+  } catch (error) {
+    console.warn('[Print] Thermal printer unavailable:', error)
+    return { ok: false, offline: false, error }
+  }
+}
+
+// Print receipt (thermal first, browser print as fallback)
+const printReceipt = async () => {
+  if (!lastTransaction.value) return
+
+  const result = await printToThermal(lastTransaction.value)
+
+  if (result.ok) {
+    printStatus.value = 'success'
+    printMessage.value = 'Receipt sent to the thermal printer.'
+    return
+  }
+
+  if (result.offline) {
+    printStatus.value = 'error'
+    printMessage.value = 'Offline - receipt cannot reach the thermal printer.'
+  } else {
+    printStatus.value = 'error'
+    printMessage.value = 'Thermal printer unavailable. Opening browser print instead.'
+  }
   window.print()
 }
 
@@ -253,11 +341,33 @@ const goToHelp = () => {
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-gray-500">VAT (16.5%)</span>
-            <span>{{ formatCurrency(store.cartTotal * 0.165) }}</span>
+            <span>{{ formatCurrency(store.cartTotal * VAT_RATE) }}</span>
           </div>
           <div class="flex justify-between text-lg font-bold text-blue-700 pt-2 border-t">
             <span>Total</span>
-            <span>{{ formatCurrency(store.cartTotal * 1.165) }}</span>
+            <span>{{ formatCurrency(saleTotal) }}</span>
+          </div>
+
+          <!-- Cash Received & Change -->
+          <div v-if="paymentMethod === 'cash'" class="space-y-2">
+            <div class="flex items-center justify-between text-sm gap-2">
+              <span class="text-gray-500 whitespace-nowrap">Cash Received</span>
+              <input
+                v-model.number="cashReceived"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                class="w-32 px-2 py-1 border border-gray-200 rounded-md text-right focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+            </div>
+            <div class="flex justify-between text-sm" v-if="changeDue !== null">
+              <span class="text-gray-500">Change</span>
+              <span class="font-medium text-green-600">{{ formatCurrency(changeDue) }}</span>
+            </div>
+            <p v-else-if="cashReceived !== null && cashReceived !== ''" class="text-xs text-red-500 text-right">
+              Insufficient amount
+            </p>
           </div>
 
           <!-- Payment Method -->
@@ -301,10 +411,10 @@ const goToHelp = () => {
         </div>
 
         <div class="p-6 space-y-4" v-if="lastTransaction">
-          <div class="text-sm text-gray-500 text-center">
+          <div class="text-sm text-gray-500 text-center space-y-1">
             <p>Date: {{ new Date(lastTransaction.date).toLocaleString() }}</p>
             <p>Cashier: {{ lastTransaction.cashier }}</p>
-            <p>Transaction: {{ lastTransaction._id }}</p>
+            <p>Receipt: {{ lastTransaction.receiptNumber || lastTransaction._id }}</p>
           </div>
 
           <div class="border-t border-b border-dashed py-4 space-y-2">
@@ -318,14 +428,28 @@ const goToHelp = () => {
             <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(lastTransaction.subtotal) }}</span></div>
             <div class="flex justify-between"><span>VAT (16.5%)</span><span>{{ formatCurrency(lastTransaction.tax) }}</span></div>
             <div class="flex justify-between font-bold text-lg"><span>Total</span><span>{{ formatCurrency(lastTransaction.total) }}</span></div>
+            <div class="flex justify-between pt-2 border-t"><span>Payment</span><span class="uppercase">{{ lastTransaction.paymentMethod }}</span></div>
+            <div v-if="lastTransaction.amountPaid !== undefined" class="flex justify-between"><span>Paid</span><span>{{ formatCurrency(lastTransaction.amountPaid) }}</span></div>
+            <div v-if="lastTransaction.change !== undefined && lastTransaction.change >= 0" class="flex justify-between font-medium text-green-600"><span>Change</span><span>{{ formatCurrency(lastTransaction.change) }}</span></div>
+          </div>
+
+          <!-- Print Status -->
+          <div v-if="printStatus === 'success'" class="py-2 px-3 bg-green-50 text-green-700 text-sm rounded-lg text-center border border-green-200">
+            {{ printMessage }}
+          </div>
+          <div v-else-if="printStatus === 'error'" class="py-2 px-3 bg-amber-50 text-amber-700 text-sm rounded-lg text-center border border-amber-200">
+            {{ printMessage }}
+          </div>
+          <div v-else-if="printStatus === 'printing'" class="py-2 px-3 bg-blue-50 text-blue-700 text-sm rounded-lg text-center border border-blue-200">
+            Sending receipt to printer...
           </div>
 
           <p class="text-center text-sm text-gray-500 pt-4 border-t border-dashed">Thank you for your purchase!</p>
         </div>
 
         <div class="p-4 flex gap-3 print:hidden">
-          <button @click="printReceipt" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center justify-center gap-2">
-            <Printer class="w-4 h-4" /> Print
+          <button @click="printReceipt" :disabled="printStatus === 'printing'" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+            <Printer class="w-4 h-4" /> <span v-if="printStatus === 'printing'">Printing...</span><span v-else>Print</span>
           </button>
           <button @click="showReceipt = false" class="flex-1 py-2 border border-gray-200 text-gray-700 rounded-lg font-medium">
             Close
