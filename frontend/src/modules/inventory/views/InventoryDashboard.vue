@@ -18,6 +18,7 @@ const newProduct = ref({
   name: '',
   category: 'Antibiotics',
   batchNumber: '',
+  barcode: '',
   expiryDate: '',
   supplier: '',
   price: null,
@@ -44,6 +45,7 @@ const filteredProducts = computed(() => {
     products = products.filter(p =>
       p.name.toLowerCase().includes(query) ||
       p.batchNumber?.toLowerCase().includes(query) ||
+      p.barcode?.toLowerCase().includes(query) ||
       p.category?.toLowerCase().includes(query)
     )
   }
@@ -65,7 +67,7 @@ const saveProduct = async () => {
   const success = await store.addProduct({ ...newProduct.value })
   if (success) {
     showAddForm.value = false
-    newProduct.value = { name: '', category: 'Antibiotics', batchNumber: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
+    newProduct.value = { name: '', category: 'Antibiotics', batchNumber: '', barcode: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
     alert('Product added successfully!')
   }
 }
@@ -190,6 +192,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <input v-model="newProduct.name" type="text" placeholder="Product Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <input v-model="newProduct.batchNumber" type="text" placeholder="Batch Number *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <input v-model="newProduct.barcode" type="text" placeholder="Barcode (optional)" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <select v-model="newProduct.category" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <option v-for="cat in categories" :key="cat">{{ cat }}</option>
         </select>

@@ -5,6 +5,9 @@ const router = express.Router();
 const productController = require('../controllers/productsController')
 const { createProductSchema, updateProductSchema, validateProduct } = require('../validators/productValidator');
 
+// Barcode lookup (must be before /:id to avoid conflict)
+router.get('/barcode/:barcode', productController.lookupByBarcode);
+
 // Standard CRUD
 router.get('/', productController.getAllProducts);
 router.get('/low-stock', productController.getLowStockProducts);

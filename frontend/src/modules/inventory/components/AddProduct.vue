@@ -27,6 +27,11 @@
            <input v-model="form.batchNumber" type="text" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="BATCH123">
         </div>
 
+        <div>
+           <label class="block text-sm font-medium text-gray-700 mb-1">Barcode (optional)</label>
+           <input v-model="form.barcode" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 5901234123457">
+        </div>
+
          <div>
            <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
            <input v-model="form.expiryDate" type="date" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
@@ -75,6 +80,7 @@ const form = reactive({
     name: '',
     category: 'Antibiotics',
     batchNumber: '',
+    barcode: '',
     expiryDate: '',
     supplier: '',
     price: null,

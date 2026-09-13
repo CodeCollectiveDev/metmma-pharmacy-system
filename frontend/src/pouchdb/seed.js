@@ -13,8 +13,8 @@ const initialUsers = [
 ];
 
 const initialProducts = [
-    { _id: 'prod_001', name: 'Amoxicillin 500mg', batchNumber: 'BATCH001', expiryDate: '2026-12-31', supplier: 'PharmaMeds Malawi', price: 1500, stock: 120, minStockLevel: 20, category: 'Antibiotics' },
-    { _id: 'prod_002', name: 'Paracetamol 500mg', batchNumber: 'BATCH002', expiryDate: '2027-06-30', supplier: 'HealthCare Ltd', price: 500, stock: 500, minStockLevel: 50, category: 'Painkillers' },
+    { _id: 'prod_001', name: 'Amoxicillin 500mg', batchNumber: 'BATCH001', barcode: '0111109876543', expiryDate: '2026-12-31', supplier: 'PharmaMeds Malawi', price: 1500, stock: 120, minStockLevel: 20, category: 'Antibiotics' },
+    { _id: 'prod_002', name: 'Paracetamol 500mg', batchNumber: 'BATCH002', barcode: '0600004444444', expiryDate: '2027-06-30', supplier: 'HealthCare Ltd', price: 500, stock: 500, minStockLevel: 50, category: 'Painkillers' },
     { _id: 'prod_003', name: 'Ibuprofen 400mg', batchNumber: 'BATCH003', expiryDate: '2026-05-15', supplier: 'HealthCare Ltd', price: 850, stock: 200, minStockLevel: 30, category: 'Painkillers' },
     { _id: 'prod_004', name: 'Vitamin C 1000mg', batchNumber: 'BATCH004', expiryDate: '2026-11-20', supplier: 'Wellness Inc', price: 1000, stock: 50, minStockLevel: 15, category: 'Vitamins' },
     { _id: 'prod_005', name: 'Cough Syrup 100ml', batchNumber: 'BATCH005', expiryDate: '2025-08-10', supplier: 'PharmaMeds Malawi', price: 1200, stock: 30, minStockLevel: 10, category: 'Cough & Cold' },
