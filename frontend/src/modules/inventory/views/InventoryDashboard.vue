@@ -148,7 +148,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
 <template>
   <MainLayout title="Inventory Management" subtitle="Manage stock, products, and suppliers">
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6">
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
         <div class="p-3 bg-blue-50 rounded-lg">
           <Package class="w-6 h-6 text-blue-600" />
@@ -185,7 +185,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
     </div>
 
     <!-- Add Product Form -->
-    <div v-if="showAddForm" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div v-if="showAddForm" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
       <h3 class="font-semibold text-gray-800 mb-4">Add New Product</h3>
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <input v-model="newProduct.name" type="text" placeholder="Product Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
@@ -200,7 +200,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
         <input v-model.number="newProduct.minStockLevel" type="number" placeholder="Min Stock Level" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
       </div>
       <div class="flex justify-end mt-4">
-        <button @click="saveProduct" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+        <button @click="saveProduct" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
           Save Product
         </button>
       </div>
@@ -208,8 +208,8 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
 
     <!-- Filters & Search -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-      <div class="p-4 flex flex-wrap gap-4 items-center justify-between">
-        <div class="flex gap-2">
+      <div class="p-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div class="grid grid-cols-1 sm:flex gap-2">
           <button @click="filter = 'all'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
             All ({{ store.products.length }})
           </button>
@@ -220,13 +220,13 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
             Expired ({{ store.expiredProducts.length }})
           </button>
         </div>
-        <div class="flex gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:flex gap-2">
           <div class="relative">
-            <input v-model="barcodeSearch" @keyup.enter="handleBarcodeSearch" type="text" placeholder="Scan barcode..." class="pl-10 pr-4 py-2 border rounded-lg w-48 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input v-model="barcodeSearch" @keyup.enter="handleBarcodeSearch" type="text" placeholder="Scan barcode..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-48 focus:ring-2 focus:ring-blue-500 outline-none">
             <ScanBarcode class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
           <div class="relative">
-            <input v-model="searchQuery" type="text" placeholder="Search products..." class="pl-10 pr-4 py-2 border rounded-lg w-64 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input v-model="searchQuery" type="text" placeholder="Search products..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-64 focus:ring-2 focus:ring-blue-500 outline-none">
             <Search class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
           <button
@@ -242,7 +242,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
 
     <!-- Restock Modal -->
     <div v-if="showRestockModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto mx-4 p-4 sm:p-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Restock Item</h3>
         <div class="space-y-3">
           <div class="text-sm text-gray-600">
@@ -267,7 +267,8 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
 
     <!-- Products Table -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <table class="w-full">
+      <div class="overflow-x-auto">
+      <table class="w-full min-w-[850px]">
         <thead class="bg-gray-50 border-b border-gray-100">
           <tr>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
@@ -333,6 +334,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </MainLayout>
 </template>

@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  X,
   Lock
 } from 'lucide-vue-next'
 
@@ -20,10 +21,11 @@ const router = useRouter()
 const { logout: logoutRole, userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos } = useRole()
 
 const props = defineProps({
-  collapsed: { type: Boolean, default: false }
+  collapsed: { type: Boolean, default: false },
+  mobileOpen: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['toggle'])
+const emit = defineEmits(['toggle', 'close'])
 
 const user = computed(() => {
   try {
@@ -83,13 +85,14 @@ const handleLogout = () => {
 <template>
   <aside 
     :class="[
-      'h-screen bg-slate-900 text-white flex flex-col transition-all duration-300 fixed left-0 top-0 z-40',
-      collapsed ? 'w-16' : 'w-64'
+      'h-screen bg-slate-900 text-white flex flex-col transition-transform duration-300 fixed left-0 top-0 z-40 w-72 md:w-auto md:translate-x-0',
+      mobileOpen ? 'translate-x-0' : '-translate-x-full',
+      collapsed ? 'md:w-16' : 'md:w-64'
     ]"
   >
     <!-- Logo -->
     <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-      <div v-if="!collapsed" class="flex items-center gap-3">
+      <div class="flex items-center gap-3">
         <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
           <img src="@/assets/metmma_pharmacy_logo_white.svg" alt="Pharmacy Logo" class="w-7 h-7 rounded-md object-cover">
         </div>
@@ -98,9 +101,12 @@ const handleLogout = () => {
           <div class="text-xs text-slate-400">Management System</div>
         </div>
       </div>
-      <div v-else class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg mx-auto">
+      <div v-if="collapsed" class="hidden md:flex w-10 h-10 bg-blue-600 rounded-lg items-center justify-center font-bold text-lg mx-auto">
         M
       </div>
+      <button @click="emit('close')" class="ml-auto p-2 text-slate-300 hover:bg-slate-800 rounded-lg md:hidden" aria-label="Close navigation menu">
+        <X class="w-5 h-5" />
+      </button>
     </div>
 
     <!-- Menu -->
@@ -118,7 +124,7 @@ const handleLogout = () => {
             :title="item.restricted ? 'Restricted to HR Officers and Admins' : ''"
           >
             <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
-            <span v-if="!collapsed" class="text-sm font-medium flex items-center gap-2">
+            <span class="text-sm font-medium flex items-center gap-2" :class="{ 'md:hidden': collapsed }">
               {{ item.label }}
               <Lock v-if="item.restricted" class="w-3 h-3 text-amber-400" />
             </span>
@@ -129,7 +135,7 @@ const handleLogout = () => {
 
     <!-- User Info & Logout -->
     <div class="border-t border-slate-700 p-3">
-      <div v-if="!collapsed" class="flex items-center gap-3 mb-3 px-2">
+      <div class="flex items-center gap-3 mb-3 px-2" :class="{ 'md:hidden': collapsed }">
         <div class="w-9 h-9 bg-slate-700 rounded-full flex items-center justify-center text-sm font-medium">
           {{ user.name?.charAt(0) || 'U' }}
         </div>
@@ -146,14 +152,14 @@ const handleLogout = () => {
         ]"
       >
         <LogOut class="w-5 h-5" />
-        <span v-if="!collapsed" class="text-sm">Logout</span>
+        <span class="text-sm" :class="{ 'md:hidden': collapsed }">Logout</span>
       </button>
     </div>
 
     <!-- Toggle Button -->
     <button 
       @click="emit('toggle')"
-      class="absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600"
+      class="hidden md:flex absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full items-center justify-center text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600"
     >
       <ChevronLeft v-if="!collapsed" class="w-4 h-4" />
       <ChevronRight v-else class="w-4 h-4" />

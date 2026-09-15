@@ -67,8 +67,8 @@ const formatTime = (timestamp) => {
 <template>
   <MainLayout title="Dashboard" :subtitle="`Welcome back, ${userName}`">
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
+      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Total Products</p>
@@ -80,7 +80,7 @@ const formatTime = (timestamp) => {
         </div>
       </div>
 
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Low Stock Alerts</p>
@@ -92,7 +92,7 @@ const formatTime = (timestamp) => {
         </div>
       </div>
 
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Today's Sales</p>
@@ -104,7 +104,7 @@ const formatTime = (timestamp) => {
         </div>
       </div>
 
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Total Staff</p>
@@ -129,7 +129,7 @@ const formatTime = (timestamp) => {
           <div v-if="lowStockItems.length === 0" class="p-6 text-center text-gray-400">
             No low stock items
           </div>
-          <div v-for="item in lowStockItems" :key="item._id" class="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+          <div v-for="item in lowStockItems" :key="item._id" class="px-4 sm:px-6 py-4 flex items-center justify-between gap-3 hover:bg-gray-50">
             <div>
               <p class="font-medium text-gray-800">{{ item.name }}</p>
               <p class="text-sm text-gray-500">{{ item.category }}</p>
@@ -172,16 +172,16 @@ const formatTime = (timestamp) => {
     </div>
 
     <!-- Quick Actions -->
-    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
       <h3 class="font-semibold text-gray-800 mb-4">Quick Actions</h3>
-      <div class="flex flex-wrap gap-4">
-        <router-link v-if="role === 'cashier' || role === 'admin'" to="/pos" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+      <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+        <router-link v-if="role === 'cashier' || role === 'admin'" to="/pos" class="justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
           <ShoppingCart class="w-4 h-4" /> Open POS
         </router-link>
-        <router-link v-if="role !== 'cashier'" to="/inventory" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="role !== 'cashier'" to="/inventory" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
           <Package class="w-4 h-4" /> Manage Inventory
         </router-link>
-        <router-link v-if="role === 'admin' || role === 'hr_officer'" to="/hr" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="role === 'admin' || role === 'hr_officer'" to="/hr" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
           <Users class="w-4 h-4" /> HR Management
         </router-link>
       </div>

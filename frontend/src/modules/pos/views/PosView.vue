@@ -128,9 +128,9 @@ const goToHelp = () => {
 
 <template>
   <MainLayout title="Point of Sale" subtitle="Process sales transactions">
-    <div class="flex gap-6 h-[calc(100vh-180px)]">
+    <div class="flex flex-col gap-4 lg:flex-row lg:gap-6 lg:h-[calc(100vh-180px)]">
       <!-- Left: Product Selection -->
-      <div class="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="flex-1 flex flex-col min-h-[32rem] bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <!-- Search & Barcode Scanner -->
         <div class="p-4 border-b border-gray-100 space-y-3">
           <!-- Barcode Scanner & Help -->
@@ -146,7 +146,7 @@ const goToHelp = () => {
               >
               <ScanBarcode class="w-5 h-5 text-blue-500 absolute left-3 top-2.5" />
             </div>
-            <button @click="handleBarcodeScan" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button @click="handleBarcodeScan" class="shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
               Scan
             </button>
             <button @click="goToHelp" class="px-3 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center">
@@ -208,14 +208,14 @@ const goToHelp = () => {
       </div>
 
       <!-- Right: Cart -->
-      <div class="w-96 flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="w-full lg:w-96 lg:shrink-0 flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="p-4 border-b border-gray-100 bg-gray-50">
           <h3 class="font-semibold text-gray-800">Current Order</h3>
           <p class="text-sm text-gray-500">{{ store.cart.length }} items</p>
         </div>
 
         <!-- Cart Items -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="max-h-80 lg:max-h-none lg:flex-1 overflow-y-auto p-4 space-y-3">
           <div v-if="store.cart.length === 0" class="text-center text-gray-400 py-8">
             <div class="text-4xl mb-2">🛒</div>
             <p>Cart is empty</p>
@@ -294,7 +294,7 @@ const goToHelp = () => {
 
     <!-- Receipt Modal -->
     <div v-if="showReceipt" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 print:bg-white print:inset-auto">
-      <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 print:shadow-none print:rounded-none">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[calc(100vh-2rem)] overflow-y-auto print:shadow-none print:rounded-none">
         <div class="p-6 text-center border-b print:border-none">
           <h2 class="text-xl font-bold">METMMA Pharmacy</h2>
           <p class="text-sm text-gray-500">Sales Receipt</p>

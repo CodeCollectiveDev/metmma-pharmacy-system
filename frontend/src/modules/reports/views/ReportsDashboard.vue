@@ -63,7 +63,7 @@ const exportToCsv = (data, filename) => {
   <MainLayout title="Reports" subtitle="View and export system reports">
     <!-- Report Type Tabs -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-      <div class="flex border-b border-gray-100">
+      <div class="flex overflow-x-auto border-b border-gray-100">
         <button 
           @click="activeTab = 'sales'"
           :class="['px-6 py-4 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'sales' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
@@ -87,7 +87,7 @@ const exportToCsv = (data, filename) => {
 
     <!-- Sales Reports -->
     <div v-if="activeTab === 'sales'">
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div class="flex items-center gap-4">
           <select v-model="dateFilter" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             <option value="today">Today</option>
@@ -96,7 +96,7 @@ const exportToCsv = (data, filename) => {
             <option value="all">All Time</option>
           </select>
         </div>
-        <button @click="exportToCsv(salesData, 'sales-report')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+        <button @click="exportToCsv(salesData, 'sales-report')" class="justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
           <Download class="w-4 h-4" /> Export CSV
         </button>
       </div>
@@ -118,8 +118,8 @@ const exportToCsv = (data, filename) => {
       </div>
 
       <!-- Sales Table -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table class="w-full">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"><div class="overflow-x-auto">
+        <table class="w-full min-w-[600px]">
           <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -136,13 +136,13 @@ const exportToCsv = (data, filename) => {
               <td class="px-6 py-4 font-medium text-green-600">{{ formatCurrency(sale.total) }}</td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
 
     <!-- Stock Reports -->
     <div v-if="activeTab === 'stock'">
-      <div class="flex justify-end mb-6">
+      <div class="flex sm:justify-end mb-6">
         <button @click="exportToCsv(products, 'stock-report')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
           <Download class="w-4 h-4" /> Export CSV
         </button>
@@ -193,7 +193,7 @@ const exportToCsv = (data, filename) => {
 
     <!-- HR Reports -->
     <div v-if="activeTab === 'hr'">
-      <div class="flex justify-end mb-6">
+      <div class="flex sm:justify-end mb-6">
         <button @click="exportToCsv(employees, 'employees-report')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
           <Download class="w-4 h-4" /> Export CSV
         </button>
@@ -203,7 +203,7 @@ const exportToCsv = (data, filename) => {
         <div class="px-6 py-4 border-b border-gray-100">
           <h3 class="font-semibold text-gray-800">Employee List</h3>
         </div>
-        <table class="w-full">
+        <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
           <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
@@ -227,7 +227,7 @@ const exportToCsv = (data, filename) => {
               <td colspan="4" class="px-6 py-8 text-center text-gray-400">No employees found</td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   </MainLayout>

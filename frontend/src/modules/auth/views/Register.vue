@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-xl shadow-md w-full max-w-md border border-gray-200">
+    <div class="bg-white p-5 sm:p-8 rounded-xl shadow-md w-full max-w-md border border-gray-200">
       <div class="flex flex-col items-center mb-6">
         <div class="w-20 h-20 bg-blue-600 rounded-lg flex items-center justify-center text-white mb-3">
           <img src="@/assets/metmma_pharmacy_logo_white.svg" alt="Pharmacy Logo" class="w-12 h-12 rounded-md object-cover">

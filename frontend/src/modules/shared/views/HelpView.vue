@@ -75,7 +75,7 @@ const filteredTopics = () => {
 <template>
   <MainLayout title="Help Center" subtitle="System documentation and support">
     <!-- Search -->
-    <div class="max-w-2xl mx-auto mb-8">
+    <div class="max-w-2xl mx-auto mb-6 sm:mb-8">
       <div class="relative">
         <input
           v-model="searchQuery"
@@ -92,7 +92,7 @@ const filteredTopics = () => {
       <div v-for="topic in filteredTopics()" :key="topic.id" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <button
           @click="toggleSection(topic.id)"
-          class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+          class="w-full px-4 sm:px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
         >
           <h3 class="font-semibold text-lg text-gray-800">{{ topic.title }}</h3>
           <ChevronDown v-if="isOpen(topic.id) || searchQuery" class="w-5 h-5 text-gray-500" />
@@ -100,7 +100,7 @@ const filteredTopics = () => {
         </button>
 
         <div v-if="isOpen(topic.id) || searchQuery" class="border-t border-gray-100">
-          <div v-for="(item, index) in topic.items" :key="index" class="px-6 py-4 border-b border-gray-50 last:border-b-0 space-y-2">
+          <div v-for="(item, index) in topic.items" :key="index" class="px-4 sm:px-6 py-4 border-b border-gray-50 last:border-b-0 space-y-2">
             <p class="font-medium text-blue-700">{{ item.q }}</p>
             <p class="text-gray-600 text-sm leading-relaxed">{{ item.a }}</p>
           </div>
@@ -113,8 +113,8 @@ const filteredTopics = () => {
     </div>
 
     <!-- Contact Support -->
-    <div class="max-w-4xl mx-auto mt-8 bg-blue-50 border border-blue-100 rounded-xl p-8">
-      <div class="flex items-start gap-6">
+    <div class="max-w-4xl mx-auto mt-8 bg-blue-50 border border-blue-100 rounded-xl p-4 sm:p-8">
+      <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
         <div class="p-4 bg-blue-100 rounded-full text-blue-600">
           <HelpCircle class="w-8 h-8" />
         </div>
