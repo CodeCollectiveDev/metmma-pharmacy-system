@@ -204,23 +204,6 @@ INSERT INTO users (username, password_hash, role, full_name, email) VALUES
 ('hr1', 'temp_hash_hr123', 'hr_officer', 'Michael Brown', 'michael@metmma.pharmacy')
 ON CONFLICT (username) DO NOTHING;
 
--- Sample products (Patrick's data)
-INSERT INTO products (product_code, name, batch_number, expiry_date, quantity, unit_price, selling_price, category, supplier, reorder_level) VALUES
-('MED001', 'Panadol Extra', 'BATCH2024-001', '2025-06-30', 100, 50.00, 80.00, 'Pain Relief', 'GSK Pharmaceuticals', 20),
-('MED002', 'Amoxicillin 500mg', 'BATCH2024-002', '2024-12-31', 50, 120.00, 200.00, 'Antibiotics', 'Pfizer', 15),
-('MED003', 'Ventolin Inhaler', 'BATCH2024-003', '2025-03-31', 30, 450.00, 600.00, 'Respiratory', 'GSK Pharmaceuticals', 10),
-('MED004', 'Insulin Glargine', 'BATCH2024-004', '2024-11-30', 25, 1200.00, 1500.00, 'Diabetes', 'Sanofi', 5),
-('MED005', 'Paracetamol 500mg', 'BATCH2024-005', '2026-01-31', 200, 20.00, 40.00, 'Pain Relief', 'Local Pharma', 50)
-ON CONFLICT (product_code) DO NOTHING;
-
--- Sample employees (Gilbert's data)
-INSERT INTO employees (employee_id, user_id, first_name, last_name, role, position, department, salary, hire_date, phone_number) VALUES
-('EMP001', 2, 'Jane', 'Smith', 'pharmacist', 'Chief Pharmacist', 'Pharmacy', 80000.00, '2023-01-15', '+255123456789'),
-('EMP002', 3, 'John', 'Doe', 'cashier', 'Cashier', 'Sales', 30000.00, '2023-03-20', '+255987654321'),
-('EMP003', 4, 'Sarah', 'Johnson', 'store_manager', 'Store Manager', 'Inventory', 50000.00, '2023-02-10', '+255712345678'),
-('EMP004', 5, 'Michael', 'Brown', 'hr_officer', 'HR Officer', 'Human Resources', 45000.00, '2023-04-05', '+255765432109')
-ON CONFLICT (employee_id) DO NOTHING;
-
 -- ============================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================
@@ -306,9 +289,7 @@ BEGIN
     RAISE NOTICE '  - Gilbert: products, sales, sale_items';
     RAISE NOTICE '  - Patrick: employees, attendance, operation_reports, compliance_reports, financial_reports';
     RAISE NOTICE '';
-    RAISE NOTICE 'Sample data loaded:';
+    RAISE NOTICE 'Seeded accounts loaded:';
     RAISE NOTICE '  - 5 users (admin, pharmacist, cashier, manager, hr)';
-    RAISE NOTICE '  - 5 medicine products';
-    RAISE NOTICE '  - 4 employees';
     RAISE NOTICE '===========================================';
 END $$;
