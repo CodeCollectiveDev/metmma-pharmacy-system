@@ -1,9 +1,9 @@
 const express = require('express'); 
-const { Pool } = require('pg'); //pg model facilitates interaction with postgresql
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
-const port = 3000; // why do we always have to use port 3000
+const port = process.env.PORT || 3000;
 
 // Security middleware
 require('./middleware/security')(app);
@@ -12,12 +12,15 @@ require('./middleware/security')(app);
 app.use(express.json());
 
 // PSQL connection
+const isProduction = process.env.DATABASE_URL !== undefined;
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'metmma_pharmacy',
-  password: process.env.DB_PASSWORD || '', // no password by default
-  port: process.env.DB_PORT || 5432,
+  connectionString: isProduction ? process.env.DATABASE_URL : undefined,
+  host: isProduction ? undefined : (process.env.DB_HOST || 'localhost'),
+  port: isProduction ? undefined : (process.env.DB_PORT || 5432),
+  database: isProduction ? undefined : (process.env.DB_NAME || 'metmma_pharmacy'),
+  user: isProduction ? undefined : (process.env.DB_USER || 'postgres'),
+  password: isProduction ? undefined : (process.env.DB_PASSWORD || ''),
+  ssl: isProduction ? { rejectUnauthorized: false } : undefined,
 });
 
 // Test DB connection
@@ -35,7 +38,7 @@ app.get('/', (req, res) => {
 });
 
 // API routes prefix
-app.use('/api', require('./routes')); //our routes are defined in backend/routes/index.js
+app.use('/api', require('./routes'));
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);

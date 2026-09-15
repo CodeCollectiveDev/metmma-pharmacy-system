@@ -2,12 +2,15 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
+const isProduction = process.env.DATABASE_URL !== undefined;
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  connectionString: isProduction ? process.env.DATABASE_URL : undefined,
+  user: isProduction ? undefined : process.env.DB_USER,
+  host: isProduction ? undefined : process.env.DB_HOST,
+  database: isProduction ? undefined : process.env.DB_NAME,
+  password: isProduction ? undefined : process.env.DB_PASSWORD,
+  port: isProduction ? undefined : process.env.DB_PORT,
+  ssl: isProduction ? { rejectUnauthorized: false } : undefined,
 });
 
 const DB_ROLES = ['admin', 'pharmacist', 'cashier', 'store_manager', 'hr_officer'];

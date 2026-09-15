@@ -1,13 +1,9 @@
-//  CREATED BY PATRICK
-
 const express = require('express');
 const router = express.Router();
 const salesController = require('../controllers/salesController');
+const { authenticate, authorize, ROLES } = require('../../middleware/roleMiddleware');
 
-// Process a new transaction
-router.post('/checkout', salesController.processSale);
-
-// Get history for reports
-router.get('/history', salesController.getSaleHistory);
+router.post('/checkout', authenticate, authorize(ROLES.ADMIN, ROLES.CASHIER, ROLES.PHARMACIST), salesController.processSale);
+router.get('/history', authenticate, salesController.getSaleHistory);
 
 module.exports = router;

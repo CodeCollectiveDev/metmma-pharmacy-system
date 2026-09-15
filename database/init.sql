@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS employees (
     id SERIAL PRIMARY KEY,
     user_id INTEGER UNIQUE REFERENCES users(id),
     employee_id VARCHAR(50) UNIQUE NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    role VARCHAR(50),
     national_id VARCHAR(50),
     date_of_birth DATE,
     gender VARCHAR(10),
@@ -150,13 +153,13 @@ COMMENT ON TABLE attendance IS 'Daily employee attendance tracking';
 --OPERATION REPORTS TABLE
 CREATE TABLE IF NOT EXISTS operation_reports (
     id SERIAL PRIMARY KEY,
-    report_id SERIAL PRIMARY KEY,
+    report_id SERIAL,
     report_date DATE,
     total_sales NUMERIC(12,2),
     total_expenses NUMERIC(12,2),
     net_profit NUMERIC(12,2),
     metrics JSONB, -- store structured analytics data
-    created_by INT REFERENCES employees(employee_id)
+    created_by INT REFERENCES users(id)
 );
 
 COMMENT ON TABLE operation_reports IS 'Daily, weekly, monthly operational performance reports';
@@ -169,7 +172,7 @@ CREATE TABLE IF NOT EXISTS compliance_reports (
     description TEXT,
     status VARCHAR(50) CHECK (status IN ('pending', 'completed', 'in_progress')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by INT REFERENCES employees(employee_id)
+    created_by INT REFERENCES users(id)
 );
 
 COMMENT ON TABLE compliance_reports IS 'Regulatory compliance reports for audits and inspections';
@@ -177,13 +180,13 @@ COMMENT ON TABLE compliance_reports IS 'Regulatory compliance reports for audits
 -- FINANCIAL REPORTS TABLE
 CREATE TABLE IF NOT EXISTS financial_reports (
     id SERIAL PRIMARY KEY,
-    report_id SERIAL PRIMARY KEY,
+    report_id SERIAL,
     report_date DATE,
     total_revenue NUMERIC(12,2),
     total_costs NUMERIC(12,2),
     expenses_breakdown JSONB, -- detailed expenses
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by INT REFERENCES employees(employee_id)
+    created_by INT REFERENCES users(id)
 );
 
 COMMENT ON TABLE financial_reports IS 'Financial performance reports for accounting and management';
@@ -211,11 +214,11 @@ INSERT INTO products (product_code, name, batch_number, expiry_date, quantity, u
 ON CONFLICT (product_code) DO NOTHING;
 
 -- Sample employees (Gilbert's data)
-INSERT INTO employees (employee_id, user_id, position, department, salary, hire_date, phone_number) VALUES
-('EMP001', 2, 'Chief Pharmacist', 'Pharmacy', 80000.00, '2023-01-15', '+255123456789'),
-('EMP002', 3, 'Cashier', 'Sales', 30000.00, '2023-03-20', '+255987654321'),
-('EMP003', 4, 'Store Manager', 'Inventory', 50000.00, '2023-02-10', '+255712345678'),
-('EMP004', 5, 'HR Officer', 'Human Resources', 45000.00, '2023-04-05', '+255765432109')
+INSERT INTO employees (employee_id, user_id, first_name, last_name, role, position, department, salary, hire_date, phone_number) VALUES
+('EMP001', 2, 'Jane', 'Smith', 'pharmacist', 'Chief Pharmacist', 'Pharmacy', 80000.00, '2023-01-15', '+255123456789'),
+('EMP002', 3, 'John', 'Doe', 'cashier', 'Cashier', 'Sales', 30000.00, '2023-03-20', '+255987654321'),
+('EMP003', 4, 'Sarah', 'Johnson', 'store_manager', 'Store Manager', 'Inventory', 50000.00, '2023-02-10', '+255712345678'),
+('EMP004', 5, 'Michael', 'Brown', 'hr_officer', 'HR Officer', 'Human Resources', 45000.00, '2023-04-05', '+255765432109')
 ON CONFLICT (employee_id) DO NOTHING;
 
 -- ============================================
@@ -233,7 +236,7 @@ CREATE INDEX IF NOT EXISTS idx_products_expiry ON products(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 
 -- Sales indexes (Patrick)
-CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
+CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
 CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id);
 
 -- Employees indexes (Gilbert)
@@ -247,7 +250,7 @@ CREATE INDEX IF NOT EXISTS idx_attendance_employee ON attendance(employee_id);
 
 -- REPORTS INDEXES
 CREATE INDEX IF NOT EXISTS idx_operation_reports_date ON operation_reports(report_date);
-CREATE INDEX IF NO EXISTS idx_operation_reports_created_by ON operation_reports(created_by);
+CREATE INDEX IF NOT EXISTS idx_operation_reports_created_by ON operation_reports(created_by);
 CREATE INDEX IF NOT EXISTS idx_financial_reports_date ON financial_reports(report_date);
 CREATE INDEX IF NOT EXISTS idx_financial_reports_created_by ON financial_reports(created_by);
 CREATE INDEX IF NOT EXISTS idx_compliance_reports_date ON compliance_reports(report_date);
@@ -301,7 +304,7 @@ BEGIN
     RAISE NOTICE 'Tables created:';
     RAISE NOTICE '  - Joshua: users';
     RAISE NOTICE '  - Gilbert: products, sales, sale_items';
-    RAISE NOTICE '  - Patrick: employees, attendance','operation_reports, compliance_reports, financial_reports';
+    RAISE NOTICE '  - Patrick: employees, attendance, operation_reports, compliance_reports, financial_reports';
     RAISE NOTICE '';
     RAISE NOTICE 'Sample data loaded:';
     RAISE NOTICE '  - 5 users (admin, pharmacist, cashier, manager, hr)';

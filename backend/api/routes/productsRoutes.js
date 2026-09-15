@@ -1,19 +1,16 @@
-//  CREATED BY PATRICK
-
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productsController')
 const { createProductSchema, updateProductSchema, validateProduct } = require('../validators/productValidator');
+const { authenticate, authorize, ROLES } = require('../../middleware/roleMiddleware');
 
-// Standard CRUD
-router.get('/', productController.getAllProducts);
-router.get('/low-stock', productController.getLowStockProducts);
-router.get('/expiring', productController.getExpiringProducts);
-router.get('/:id', productController.getProductById);
+router.get('/', authenticate, productController.getAllProducts);
+router.get('/low-stock', authenticate, productController.getLowStockProducts);
+router.get('/expiring', authenticate, productController.getExpiringProducts);
+router.get('/:id', authenticate, productController.getProductById);
 
-// Protected writes using the Validator
-router.post('/', validateProduct(createProductSchema), productController.createProduct);
-router.put('/:id', validateProduct(updateProductSchema), productController.updateProduct);
-router.delete('/:id', productController.deleteProduct);
+router.post('/', authenticate, authorize(ROLES.ADMIN, ROLES.PHARMACIST), validateProduct(createProductSchema), productController.createProduct);
+router.put('/:id', authenticate, authorize(ROLES.ADMIN, ROLES.PHARMACIST, ROLES.STORE_MANAGER), validateProduct(updateProductSchema), productController.updateProduct);
+router.delete('/:id', authenticate, authorize(ROLES.ADMIN), productController.deleteProduct);
 
 module.exports = router;

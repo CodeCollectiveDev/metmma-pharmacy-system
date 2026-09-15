@@ -13,8 +13,8 @@ const getRecentActivity = async (req, res) => {
 
       UNION ALL
 
-      SELECT 'stock' AS type,
-             sm.created_at AS timestamp,
+SELECT 'stock' AS type,
+               sm.movement_date AS timestamp,
              CASE
                WHEN sm.movement_type = 'sale' THEN 'Stock reduced'
                WHEN sm.movement_type = 'purchase' THEN 'Stock added'
