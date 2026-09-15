@@ -94,7 +94,7 @@ const handleLogout = () => {
     <div class="p-4 border-b border-slate-700 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
-          <img src="@/assets/metmma_pharmacy_logo_white.svg" alt="Pharmacy Logo" class="w-7 h-7 rounded-md object-cover">
+          <img src="@/assets/metmma_pharmacy_logo.svg" alt="METMMA Pharmacy Logo" class="w-7 h-7 object-contain">
         </div>
         <div>
           <div class="font-bold text-sm">METMMA PHARMACY</div>

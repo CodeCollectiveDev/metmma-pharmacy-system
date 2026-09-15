@@ -3,7 +3,7 @@
     <div class="bg-white p-5 sm:p-8 rounded-xl shadow-md w-full max-w-md border border-gray-200">
       <div class="flex flex-col items-center mb-6">
         <div class="w-20 h-20 bg-blue-600 rounded-lg flex items-center justify-center text-white mb-3">
-          <img src="@/assets/metmma_pharmacy_logo_white.svg" alt="Pharmacy Logo" class="w-12 h-12 rounded-md object-cover">
+          <img src="@/assets/metmma_pharmacy_logo.svg" alt="METMMA Pharmacy Logo" class="w-16 h-12 object-contain">
         </div>
         <h2 class="text-2xl font-bold text-gray-800">METMMA PHARMACY</h2>
         <p class="text-gray-500 text-sm">Sign in to your account</p>

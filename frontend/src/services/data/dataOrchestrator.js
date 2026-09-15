@@ -1,4 +1,4 @@
-import { getAll, save, getById } from '@/pouchdb';
+import { getAll, save, getById, clearCollection } from '@/pouchdb';
 import { dataService } from '../api/dataService';
 
 /**
@@ -65,6 +65,7 @@ export const dataOrchestrator = {
                 const items = normalizeCollectionItems(collection, payload);
 
                 // Sync local storage with fresh data from server
+                await clearCollection(collection);
                 for (const item of items) {
                     const itemId = item.id || item._id;
                     if (itemId) {
