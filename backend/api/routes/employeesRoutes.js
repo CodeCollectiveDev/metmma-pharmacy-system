@@ -41,47 +41,47 @@ const validateSchema = (schema, prop = 'body') => (req, res, next) => {
  * Routes
  */
 
-// GET /api/employees - Admin & HR
+// GET /api/employees - Super Admin & HR
 router.get(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.HR_OFFICER),
+  authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER),
   employeesController.getEmployees
 );
 
-// GET /api/employees/:id - Admin & HR
+// GET /api/employees/:id - Super Admin & HR
 router.get(
   '/:id',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.HR_OFFICER),
+  authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER),
   validateSchema(idParam, 'params'),
   employeesController.getEmployeeById
 );
 
-// POST /api/employees - Admin only
+// POST /api/employees - Super Admin & HR
 router.post(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN),
+  authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER),
   validateSchema(employeeCreateSchema, 'body'),
   employeesController.addEmployee
 );
 
-// PUT /api/employees/:id - Admin only
+// PUT /api/employees/:id - Super Admin & HR
 router.put(
   '/:id',
   authenticate,
-  authorize(ROLES.ADMIN),
+  authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER),
   validateSchema(idParam, 'params'),
   validateSchema(employeeUpdateSchema, 'body'),
   employeesController.updateEmployee
 );
 
-// DELETE /api/employees/:id - Admin only
+// DELETE /api/employees/:id - Super Admin & HR
 router.delete(
   '/:id',
   authenticate,
-  authorize(ROLES.ADMIN),
+  authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER),
   validateSchema(idParam, 'params'),
   employeesController.deleteEmployee
 );

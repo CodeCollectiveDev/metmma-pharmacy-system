@@ -30,7 +30,7 @@ export const dataService = {
     },
 
     // ATTENDANCE
-    getAttendance: (employeeId) => apiClient.get(`/attendance/${employeeId}`),
+    getAttendance: (employeeId) => apiClient.get(`/attendance/employee/${employeeId}`),
     markAttendance: (record) => apiClient.post('/attendance', record),
 
     // REPORTS

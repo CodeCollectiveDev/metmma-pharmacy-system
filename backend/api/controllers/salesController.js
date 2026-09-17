@@ -5,6 +5,26 @@ const processSale = async (req, res) => {
   
   try {
     const { items, totalAmount, paymentMethod, customerName, userId } = req.body;
+
+    // Client-contract validation: reject malformed payloads instead of
+    // silently writing broken sales (see issues/issue2.md).
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items[] is required and must not be empty' });
+    }
+    for (const item of items) {
+      if (!Number.isInteger(item.productId) || item.productId <= 0) {
+        return res.status(400).json({ success: false, message: 'Each item must have a valid DB productId (integer)' });
+      }
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        return res.status(400).json({ success: false, message: 'Each item must have a valid quantity (positive integer)' });
+      }
+      if (typeof item.unitPrice !== 'number' || item.unitPrice < 0) {
+        return res.status(400).json({ success: false, message: 'Each item must have a valid unitPrice (number)' });
+      }
+    }
+    if (typeof totalAmount !== 'number' || totalAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'totalAmount is required and must be a positive number' });
+    }
     
     // 1. Start Transaction
     await client.query('BEGIN');

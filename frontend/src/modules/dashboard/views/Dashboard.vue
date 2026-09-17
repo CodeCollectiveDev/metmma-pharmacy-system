@@ -1,10 +1,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
+import { useRole } from '@/composables/useRole'
 import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
 import { Package, ShoppingCart, Users, AlertTriangle, TrendingUp, Clock } from 'lucide-vue-next'
 import DashboardContentSkeleton from '@/modules/shared/components/skeleton/DashboardContentSkeleton.vue'
+
+const { canAccessPos, canAccessInventory, canAccessHr } = useRole()
 
 const pageLoading = ref(true)
 const stats = ref({
@@ -50,7 +53,6 @@ onMounted(async () => {
   }
 })
 
-const role = computed(() => localStorage.getItem('role') || '')
 const userName = computed(() => {
   try {
     return JSON.parse(localStorage.getItem('user') || '{}').name || 'User'
@@ -185,13 +187,13 @@ const formatTime = (timestamp) => {
     <div class="app-card app-card-body mt-6">
       <h3 class="app-section-title mb-4">Quick Actions</h3>
       <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
-        <router-link v-if="role === 'cashier' || role === 'admin'" to="/pos" class="justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="canAccessPos" to="/pos" class="justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
           <ShoppingCart class="w-4 h-4" /> Open POS
         </router-link>
-        <router-link v-if="role !== 'cashier'" to="/inventory" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="canAccessInventory" to="/inventory" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
           <Package class="w-4 h-4" /> Manage Inventory
         </router-link>
-        <router-link v-if="role === 'admin' || role === 'hr_officer'" to="/hr" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="canAccessHr" to="/hr" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
           <Users class="w-4 h-4" /> HR Management
         </router-link>
       </div>

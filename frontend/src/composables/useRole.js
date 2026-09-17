@@ -11,30 +11,43 @@ export const useRole = () => {
     return userRole.value === role
   }
 
-  const isAdmin = computed(() => userRole.value === ROLES.ADMIN)
+  const isSuperAdmin = computed(() => userRole.value === ROLES.SUPER_ADMIN)
 
-  const isHrOfficer = computed(() => userRole.value === ROLES.HR_OFFICER)
+  const isManagingDirector = computed(() => userRole.value === ROLES.MANAGING_DIRECTOR)
 
-  const isStoreManager = computed(() => userRole.value === ROLES.STORE_MANAGER)
+  const isDirector = computed(() => userRole.value === ROLES.DIRECTOR)
+
+  const isPharmacistManager = computed(() => userRole.value === ROLES.PHARMACIST_MANAGER)
 
   const isPharmacist = computed(() => userRole.value === ROLES.PHARMACIST)
 
+  const isAssistantPharmacist = computed(() => userRole.value === ROLES.ASSISTANT_PHARMACIST)
+
+  const isStoreManager = computed(() => userRole.value === ROLES.STORE_MANAGER)
+
   const isCashier = computed(() => userRole.value === ROLES.CASHIER)
 
-  const canAccessHr = computed(() => 
-    [ROLES.ADMIN, ROLES.HR_OFFICER].includes(userRole.value)
+  const isHrOfficer = computed(() => userRole.value === ROLES.HR_OFFICER)
+
+  // Users who may provision accounts
+  const canManageUsers = computed(() =>
+    [ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR].includes(userRole.value)
+  )
+
+  const canAccessHr = computed(() =>
+    [ROLES.SUPER_ADMIN, ROLES.HR_OFFICER].includes(userRole.value)
   )
 
   const canAccessInventory = computed(() =>
-    [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST].includes(userRole.value)
+    [ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.DIRECTOR, ROLES.PHARMACIST_MANAGER, ROLES.PHARMACIST, ROLES.ASSISTANT_PHARMACIST, ROLES.STORE_MANAGER].includes(userRole.value)
   )
 
   const canAccessReports = computed(() =>
-    [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER].includes(userRole.value)
+    [ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.DIRECTOR, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.HR_OFFICER].includes(userRole.value)
   )
 
   const canAccessPos = computed(() =>
-    [ROLES.ADMIN, ROLES.CASHIER].includes(userRole.value)
+    [ROLES.SUPER_ADMIN, ROLES.PHARMACIST_MANAGER, ROLES.PHARMACIST, ROLES.ASSISTANT_PHARMACIST, ROLES.CASHIER].includes(userRole.value)
   )
 
   const hasHigherOrEqualRole = (minRole) => {
@@ -50,11 +63,16 @@ export const useRole = () => {
   return {
     userRole,
     hasRole,
-    isAdmin,
-    isHrOfficer,
-    isStoreManager,
+    isSuperAdmin,
+    isManagingDirector,
+    isDirector,
+    isPharmacistManager,
     isPharmacist,
+    isAssistantPharmacist,
+    isStoreManager,
     isCashier,
+    isHrOfficer,
+    canManageUsers,
     canAccessHr,
     canAccessInventory,
     canAccessReports,

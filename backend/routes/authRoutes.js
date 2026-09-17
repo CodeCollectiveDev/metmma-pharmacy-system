@@ -2,12 +2,13 @@ const express = require('express');
 const Joi = require('joi');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { createUser, findUserByUsername, normalizeRole, DB_ROLES } = require('../models/user');
+const { createUser, findUserByUsername, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES } = require('../models/user');
+const { authenticate, authorize, ROLES } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
 // Validation schemas
-const registerSchema = Joi.object({
+const createUserSchema = Joi.object({
   username: Joi.string().trim().min(3).max(50).required(),
   password: Joi.string().min(6).required(),
   full_name: Joi.string().trim().min(1).max(100).required(),
@@ -27,6 +28,14 @@ const registerSchema = Joi.object({
 const loginSchema = Joi.object({
   username: Joi.string().required(),
   password: Joi.string().required()
+});
+
+const setActiveSchema = Joi.object({
+  is_active: Joi.boolean().required()
+});
+
+const setPasswordSchema = Joi.object({
+  password: Joi.string().min(8).required()
 });
 
 // Login handler function (reusable)
@@ -83,41 +92,24 @@ const loginHandler = async (req, res) => {
   }
 };
 
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
-  const pool = require('../api/db').pool;
-  const client = await pool.connect();
-  
+// POST /api/auth/users
+// Protected: only a super_admin or managing_director can provision new accounts.
+// Public self-registration was removed for security (see issues/issue1.md).
+router.post('/users', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR), async (req, res) => {
   try {
     // Validate input
-    const { error, value } = registerSchema.validate(req.body);
+    const { error, value } = createUserSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
     const { username, password, role, full_name, email } = value;
 
-    await client.query('BEGIN');
-
     // Create user in users table
     const user = await createUser({ username, password, role, full_name, email });
 
-    // Also create employee record for HR system
-    // const nameParts = full_name.trim().split(' ');
-    // const firstName = nameParts[0] || full_name;
-    // const lastName = nameParts.slice(1).join(' ') || '';
-
-    // await client.query(
-    //   `INSERT INTO employees (first_name, last_name, role, hire_date, email, phone, status)
-    //    VALUES ($1, $2, $3, CURRENT_DATE, $4, '', 'active')`,
-    //   [firstName, lastName, role, email || '']
-    // );
-
-    // await client.query('COMMIT');
-
     res.status(201).json({ message: 'User created successfully', user });
   } catch (err) {
-    await client.query('ROLLBACK');
     if (err.code === '23505') { // Unique violation
       res.status(409).json({ error: 'Username already exists' });
     } else if (err.code === 'INVALID_ROLE' || err.code === 'INVALID_FULL_NAME') {
@@ -126,8 +118,60 @@ router.post('/register', async (req, res) => {
       console.error(err);
       res.status(500).json({ error: 'Internal server error' });
     }
-  } finally {
-    client.release();
+  }
+});
+
+// GET /api/auth/users
+// Protected: list all accounts for provisioning/audit.
+router.get('/users', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR), async (req, res) => {
+  try {
+    const users = await listUsers();
+    res.json({ success: true, data: users });
+  } catch (err) {
+    console.error('List users error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/auth/users/:id/active
+// Protected: enable/disable an account (offboarding).
+router.patch('/users/:id/active', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR), async (req, res) => {
+  try {
+    const { error, value } = setActiveSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+
+    const user = await setUserActive(req.params.id, value.is_active);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User status updated', user });
+  } catch (err) {
+    console.error('Set active error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/auth/users/:id/password
+// Protected: reset another user's password (offboarding/forgot password).
+router.patch('/users/:id/password', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR), async (req, res) => {
+  try {
+    const { error, value } = setPasswordSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+
+    const user = await setUserPassword(req.params.id, value.password);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User password updated', user });
+  } catch (err) {
+    console.error('Set password error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

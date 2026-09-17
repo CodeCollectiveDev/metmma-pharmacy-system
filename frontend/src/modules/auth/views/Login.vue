@@ -48,11 +48,8 @@
       </form>
 
       <div class="mt-6 pt-6 border-t border-gray-200 text-center">
-        <p class="text-sm text-gray-600">
-          Don't have an account?
-          <router-link to="/register" class="text-blue-600 hover:text-blue-700 font-medium">
-            Create one here
-          </router-link>
+        <p class="text-sm text-gray-500">
+          Accounts are provisioned by an administrator.
         </p>
       </div>
     </div>

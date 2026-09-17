@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(100),
-    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'pharmacist', 'cashier', 'store_manager', 'hr_officer')),
+    role VARCHAR(24) NOT NULL CHECK (role IN ('super_admin', 'managing_director', 'director', 'pharmacist_manager', 'pharmacist', 'assistant_pharmacist', 'store_manager', 'cashier', 'hr_officer')),
     full_name VARCHAR(100) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 COMMENT ON TABLE users IS 'User authentication and authorization table';
 COMMENT ON COLUMN users.password_hash IS 'Store hashed passwords (use bcrypt)';
-COMMENT ON COLUMN users.role IS 'RBAC: admin, pharmacist, cashier, store_manager, hr_officer';
+COMMENT ON COLUMN users.role IS 'RBAC: super_admin, managing_director, director, pharmacist_manager, pharmacist, assistant_pharmacist, store_manager, cashier, hr_officer';
 
 -- ============================================
 -- SECTION 2: INVENTORY TABLES (Patrick's section)
@@ -106,10 +106,12 @@ COMMENT ON TABLE stock_movements IS 'Audit log for all inventory changes';
 -- Add any HR-related tables here
 
 -- EMPLOYEES TABLE - Employee records
+-- employee_id auto-generated from a sequence (e.g. EMP-000001).
+CREATE SEQUENCE IF NOT EXISTS employee_id_seq START 1;
 CREATE TABLE IF NOT EXISTS employees (
     id SERIAL PRIMARY KEY,
     user_id INTEGER UNIQUE REFERENCES users(id),
-    employee_id VARCHAR(50) UNIQUE NOT NULL,
+    employee_id VARCHAR(50) UNIQUE NOT NULL DEFAULT ('EMP-' || lpad(nextval('employee_id_seq')::text, 6, '0')),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     role VARCHAR(50),
@@ -196,8 +198,10 @@ COMMENT ON TABLE financial_reports IS 'Financial performance reports for account
 -- ============================================
 
 -- Sample users (Joshua will update password hashing later)
+-- NOTE: Run `npm run create-admin` in backend to set a real bcrypt password
+-- for the super_admin account. Other dev accounts use placeholder hashes.
 INSERT INTO users (username, password_hash, role, full_name, email) VALUES
-('admin', 'temp_hash_admin123', 'admin', 'System Administrator', 'admin@metmma.pharmacy'),
+('admin', 'temp_hash_admin123', 'super_admin', 'System Administrator', 'admin@metmma.pharmacy'),
 ('pharmacist1', 'temp_hash_pharm123', 'pharmacist', 'Dr. Jane Smith', 'jane@metmma.pharmacy'),
 ('cashier1', 'temp_hash_cash123', 'cashier', 'John Doe', 'john@metmma.pharmacy'),
 ('manager1', 'temp_hash_mgr123', 'store_manager', 'Sarah Johnson', 'sarah@metmma.pharmacy'),
@@ -290,6 +294,7 @@ BEGIN
     RAISE NOTICE '  - Patrick: employees, attendance, operation_reports, compliance_reports, financial_reports';
     RAISE NOTICE '';
     RAISE NOTICE 'Seeded accounts loaded:';
-    RAISE NOTICE '  - 5 users (admin, pharmacist, cashier, manager, hr)';
+    RAISE NOTICE '  - 5 users (super_admin, pharmacist, cashier, store_manager, hr_officer)';
+    RAISE NOTICE '  - Run `npm run create-admin` in backend to set the super_admin password';
     RAISE NOTICE '===========================================';
 END $$;
