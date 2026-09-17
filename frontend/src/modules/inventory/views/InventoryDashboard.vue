@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
+import BarcodeCameraScanner from '@/modules/shared/components/BarcodeCameraScanner.vue'
 import { useInventoryStore } from '../store/inventoryStore'
 import { Plus, Search, Package, AlertTriangle, Calendar, Edit, ScanBarcode } from 'lucide-vue-next'
 import StatCardsSkeleton from '@/modules/shared/components/skeleton/StatCardsSkeleton.vue'
@@ -14,7 +15,8 @@ const restockQty = ref('')
 const restockNote = ref('')
 const filter = ref('all')
 const searchQuery = ref('')
-const barcodeSearch = ref('')
+const searchInputElement = ref(null)
+const showCameraScanner = ref(false)
 
 const newProduct = ref({
   name: '',
@@ -41,21 +43,30 @@ const filteredProducts = computed(() => {
   if (filter.value === 'expired') products = store.expiredProducts
   
   // Filter by search
-  if (searchQuery.value || barcodeSearch.value) {
-    const query = (searchQuery.value || barcodeSearch.value).toLowerCase()
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
     products = products.filter(p =>
       p.name.toLowerCase().includes(query) ||
       p.batchNumber?.toLowerCase().includes(query) ||
-      p.category?.toLowerCase().includes(query)
+      p.category?.toLowerCase().includes(query) ||
+      String(p.barcode ?? '').toLowerCase().includes(query)
     )
   }
   
   return products
 })
 
-const handleBarcodeSearch = () => {
-  searchQuery.value = barcodeSearch.value
-  barcodeSearch.value = ''
+const focusSearchInput = () => {
+  searchInputElement.value?.focus()
+}
+
+const startBarcodeSearch = () => {
+  focusSearchInput()
+}
+
+const handleCameraBarcode = (barcode) => {
+  showCameraScanner.value = false
+  searchQuery.value = barcode
 }
 
 const saveProduct = async () => {
@@ -229,12 +240,16 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
           </button>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:flex gap-2">
+          <button type="button" @click="startBarcodeSearch" class="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <ScanBarcode class="w-4 h-4" />
+            Scanner
+          </button>
+          <button type="button" @click="showCameraScanner = true" class="flex items-center justify-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors" aria-label="Scan barcode with camera" title="Scan with camera">
+            <ScanBarcode class="w-4 h-4" />
+            Camera
+          </button>
           <div class="relative">
-            <input v-model="barcodeSearch" @keyup.enter="handleBarcodeSearch" type="text" placeholder="Scan barcode..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-48 focus:ring-2 focus:ring-blue-500 outline-none">
-            <ScanBarcode class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-          </div>
-          <div class="relative">
-            <input v-model="searchQuery" type="text" placeholder="Search products..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-64 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input ref="searchInputElement" v-model="searchQuery" type="text" placeholder="Search products, barcodes, or batches..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-64 focus:ring-2 focus:ring-blue-500 outline-none">
             <Search class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
           <button
@@ -247,6 +262,12 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
         </div>
       </div>
     </div>
+
+    <BarcodeCameraScanner
+      v-if="showCameraScanner"
+      @detected="handleCameraBarcode"
+      @close="showCameraScanner = false"
+    />
 
     <!-- Restock Modal -->
     <div v-if="showRestockModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

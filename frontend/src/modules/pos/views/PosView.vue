@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
+import BarcodeCameraScanner from '@/modules/shared/components/BarcodeCameraScanner.vue'
 import { usePosStore } from '../store/posStore'
 import { dataService } from '@/services/api/dataService'
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle } from 'lucide-vue-next'
@@ -10,7 +11,8 @@ const router = useRouter()
 const store = usePosStore()
 
 const searchQuery = ref('')
-const barcodeInput = ref('')
+const barcodeInputElement = ref(null)
+const showCameraScanner = ref(false)
 const paymentMethod = ref('cash')
 const showReceipt = ref(false)
 const lastTransaction = ref(null)
@@ -21,33 +23,54 @@ const categories = ['All', 'Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Co
 onMounted(() => {
   store.fetchProducts()
   // Focus barcode input on mount
-  document.getElementById('barcode-input')?.focus()
+  barcodeInputElement.value?.focus()
 })
 
 // Filter products based on search and category
 const filteredProducts = computed(() => {
   return store.products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         p.batchNumber?.toLowerCase().includes(searchQuery.value.toLowerCase())
+                         p.batchNumber?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                         p.category?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                         String(p.barcode ?? '').toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesCategory = store.selectedCategory === 'All' || p.category === store.selectedCategory
     return matchesSearch && matchesCategory && p.stock > 0
   })
 })
 
-// Handle barcode scan (Enter pressed in barcode input)
+// Handle an exact barcode, batch number, or product ID from a scanner.
 const handleBarcodeScan = () => {
-  if (!barcodeInput.value) return
+  const scanValue = searchQuery.value.trim()
+  if (!scanValue) return
   const product = store.products.find(p => 
-    p.batchNumber?.toLowerCase() === barcodeInput.value.toLowerCase() ||
-    p._id === barcodeInput.value
+    p.batchNumber?.toLowerCase() === scanValue.toLowerCase() ||
+    String(p.barcode ?? '').toLowerCase() === scanValue.toLowerCase() ||
+    p._id === scanValue
   )
   if (product) {
     store.addToCart(product)
-    barcodeInput.value = ''
+    searchQuery.value = ''
   } else {
-    alert('Product not found: ' + barcodeInput.value)
-    barcodeInput.value = ''
+    alert('Product not found: ' + scanValue)
   }
+}
+
+const focusBarcodeInput = () => {
+  barcodeInputElement.value?.focus()
+}
+
+const startBarcodeScan = () => {
+  if (searchQuery.value.trim()) {
+    handleBarcodeScan()
+    return
+  }
+  focusBarcodeInput()
+}
+
+const handleCameraBarcode = (barcode) => {
+  showCameraScanner.value = false
+  searchQuery.value = barcode
+  handleBarcodeScan()
 }
 
 // Process payment and complete transaction
@@ -146,35 +169,28 @@ const goToHelp = () => {
           <div class="flex gap-2">
             <div class="relative flex-1">
               <input
-                id="barcode-input"
-                v-model="barcodeInput"
+                id="product-search"
+                ref="barcodeInputElement"
+                v-model="searchQuery"
                 @keyup.enter="handleBarcodeScan"
                 type="text"
-                placeholder="Scan barcode or enter batch number..."
-                class="w-full pl-10 pr-4 py-2.5 border border-blue-200 bg-blue-50 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Search products, barcodes, or batches..."
+                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
-              <ScanBarcode class="w-5 h-5 text-blue-500 absolute left-3 top-2.5" />
+              <Search class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
             </div>
-            <button @click="handleBarcodeScan" class="shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              Scan
+            <button type="button" @click="startBarcodeScan" class="shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <ScanBarcode class="h-5 w-5" />
+              <span class="hidden sm:inline">Scanner</span>
+            </button>
+            <button type="button" @click="showCameraScanner = true" class="shrink-0 px-3 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors" aria-label="Scan barcode with camera" title="Scan with camera">
+              <ScanBarcode class="h-5 w-5" />
+              <span class="hidden sm:inline">Camera</span>
             </button>
             <button @click="goToHelp" class="px-3 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center">
               <HelpCircle class="w-5 h-5" />
             </button>
           </div>
-
-
-          <!-- Search -->
-          <div class="relative">
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search products..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-            <Search class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-          </div>
-
           <!-- Categories -->
           <div class="flex flex-wrap gap-2">
             <button
@@ -192,6 +208,12 @@ const goToHelp = () => {
             </button>
           </div>
         </div>
+
+        <BarcodeCameraScanner
+          v-if="showCameraScanner"
+          @detected="handleCameraBarcode"
+          @close="showCameraScanner = false"
+        />
 
         <!-- Products Grid -->
         <div class="flex-1 p-4 overflow-y-auto">
