@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { useHrStore } from '../store/hrStore'
 import { Plus, Search, UserPlus, Calendar, DollarSign, MoreVertical } from 'lucide-vue-next'
+import TableSkeleton from '@/modules/shared/components/skeleton/TableSkeleton.vue'
 
 const store = useHrStore()
 const activeTab = ref('employees')
@@ -53,7 +54,7 @@ const formatCurrency = (amount) => {
 <template>
   <MainLayout title="HR Management" subtitle="Manage employees, attendance, and payroll">
     <!-- Tabs -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+    <div class="app-card mb-6">
       <div class="flex overflow-x-auto border-b border-gray-100">
         <button 
           @click="activeTab = 'employees'"
@@ -95,8 +96,11 @@ const formatCurrency = (amount) => {
       </div>
 
       <!-- Add Employee Form -->
-      <div v-if="showAddForm" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Add New Employee</h3>
+      <TableSkeleton v-if="store.loading" />
+
+      <template v-else>
+      <div v-if="showAddForm" class="app-card app-card-body mb-6">
+        <h3 class="app-section-title mb-4">Add New Employee</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input v-model="newEmployee.name" type="text" placeholder="Full Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <input v-model="newEmployee.position" type="text" placeholder="Position *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
@@ -119,7 +123,7 @@ const formatCurrency = (amount) => {
       </div>
 
       <!-- Employees Table -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"><div class="overflow-x-auto">
+      <div class="app-card overflow-hidden"><div class="overflow-x-auto">
         <table class="w-full min-w-[750px]">
           <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -164,11 +168,12 @@ const formatCurrency = (amount) => {
           </tbody>
         </table></div>
       </div>
+      </template>
     </div>
 
     <!-- Attendance Tab -->
-    <div v-if="activeTab === 'attendance'" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h3 class="font-semibold text-gray-800 mb-4">Attendance Management</h3>
+    <div v-if="activeTab === 'attendance'" class="app-card app-card-body">
+      <h3 class="app-section-title mb-4">Attendance Management</h3>
       <p class="text-gray-500">Mark daily attendance for employees</p>
       <div class="mt-6 grid gap-4">
         <div v-for="emp in store.activeEmployees" :key="emp._id" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-gray-100 rounded-lg">
@@ -190,9 +195,9 @@ const formatCurrency = (amount) => {
     </div>
 
     <!-- Payroll Tab -->
-    <div v-if="activeTab === 'payroll'" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100">
-        <h3 class="font-semibold text-gray-800">Payroll Summary</h3>
+    <div v-if="activeTab === 'payroll'" class="app-card overflow-hidden">
+      <div class="border-b border-gray-100 px-5 py-4">
+        <h3 class="app-section-title">Payroll Summary</h3>
       </div>
       <div class="overflow-x-auto"><table class="w-full min-w-[650px]">
         <thead class="bg-gray-50 border-b border-gray-100">

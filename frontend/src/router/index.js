@@ -2,6 +2,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/modules/auth/views/Login.vue'
 import Register from '@/modules/auth/views/Register.vue'
+import { setRouteLoading } from '@/composables/useRouteLoading'
 
 // Lazy-load dashboard view
 const Dashboard = () => import('@/modules/dashboard/views/Dashboard.vue')
@@ -113,6 +114,10 @@ router.setPermissionDeniedCallback = (callback) => {
 }
 
 router.beforeEach((to, from, next) => {
+  if (to.path !== from.path) {
+    setRouteLoading(true)
+  }
+
   const token = localStorage.getItem('token')
   const role = localStorage.getItem('role')
 
@@ -134,11 +139,16 @@ router.beforeEach((to, from, next) => {
     if (permissionDeniedCallback) {
       permissionDeniedCallback(role, to.meta.label)
     }
+    setRouteLoading(false)
     next(false)
     return
   }
 
   next()
+})
+
+router.afterEach(() => {
+  setRouteLoading(false)
 })
 
 export default router

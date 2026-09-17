@@ -2,8 +2,11 @@
 import { ref } from 'vue'
 import router from './router'
 import PermissionDeniedModal from '@/components/PermissionDeniedModal.vue'
+import RoutePageSkeleton from '@/modules/shared/components/skeleton/RoutePageSkeleton.vue'
+import { useRouteLoading } from '@/composables/useRouteLoading'
 
 const permissionModal = ref(null)
+const { routeLoading } = useRouteLoading()
 
 // Set the callback for permission denied
 router.setPermissionDeniedCallback((role, pageLabel) => {
@@ -15,7 +18,8 @@ router.setPermissionDeniedCallback((role, pageLabel) => {
 
 <template>
   <PermissionDeniedModal ref="permissionModal" />
-  <router-view />
+  <RoutePageSkeleton v-if="routeLoading" />
+  <router-view v-else />
 </template>
 
   
