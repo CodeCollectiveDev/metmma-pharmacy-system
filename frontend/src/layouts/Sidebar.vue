@@ -80,8 +80,8 @@ const menuItems = computed(() => {
 
 const isActive = (path) => route.path === path || route.path.startsWith(path + '/')
 
-const handleLogout = () => {
-  logoutRole()
+const handleLogout = async () => {
+  await logoutRole()
   router.push('/login')
 }
 </script>

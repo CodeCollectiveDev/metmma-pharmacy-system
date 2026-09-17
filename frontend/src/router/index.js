@@ -147,8 +147,12 @@ router.beforeEach((to, from, next) => {
     return
   }
 
+  // Offline fallback placeholder tokens (pouchdb-session-*) were removed;
+  // only real server-issued JWTs grant access.
+  const isPlaceholder = (t) => !t || t.startsWith('pouchdb-session')
+
   // Check authentication
-  if (!token) {
+  if (isPlaceholder(token)) {
     next('/login')
     return
   }
