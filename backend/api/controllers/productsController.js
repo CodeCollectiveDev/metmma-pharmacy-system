@@ -76,8 +76,11 @@ const getLowStockProducts = async (req, res) => {
 
 const getExpiringProducts = async (req, res) => {
   try {
-    const { days = 90 } = req.query;
-    const result = await pool.query(`SELECT * FROM products WHERE expiry_date <= CURRENT_DATE + INTERVAL '${days} days' AND quantity > 0 AND is_active = TRUE ORDER BY expiry_date ASC`);
+    const { days } = req.validatedExpiringProductsQuery;
+    const result = await pool.query(
+      "SELECT * FROM products WHERE expiry_date <= CURRENT_DATE + (INTERVAL '1 day' * $1) AND quantity > 0 AND is_active = TRUE ORDER BY expiry_date ASC",
+      [days]
+    );
     res.json({ success: true, count: result.rows.length, data: result.rows.map(formatProduct) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
