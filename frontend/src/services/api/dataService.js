@@ -1,8 +1,28 @@
 import apiClient from './apiClient';
+import { toSalePayload } from './salePayload';
 
 export const dataService = {
     // PRODUCTS
-    getProducts: () => apiClient.get('/products'),
+    getProductPage: (params = {}) => apiClient.get('/products', { params }),
+    // Existing views and offline search need the complete catalogue. Keep each
+    // request at the backend's normal page size and publish only a full result.
+    getProducts: async () => {
+        const products = [];
+        let page = 1;
+        let response;
+        do {
+            response = await dataService.getProductPage({ page });
+            const { data, pagination } = response.data;
+            if (!Array.isArray(data) || !pagination || pagination.page !== page || typeof pagination.hasMore !== 'boolean' ||
+                (pagination.hasMore && data.length === 0)) {
+                throw new Error('Incomplete product pagination response');
+            }
+            products.push(...data);
+            if (!pagination.hasMore) break;
+            page++;
+        } while (true);
+        return { ...response, data: { success: true, count: products.length, data: products } };
+    },
     addProduct: (product) => apiClient.post('/products', product),
     updateProduct: (product) => {
         const productId = product.id || product._id;
@@ -14,7 +34,7 @@ export const dataService = {
     },
 
     // SALES
-    recordSale: (saleData) => apiClient.post('/sales/checkout', saleData),
+    recordSale: (saleData) => apiClient.post('/sales/checkout', toSalePayload(saleData)),
     getSalesHistory: () => apiClient.get('/sales/history'),
 
     // EMPLOYEES

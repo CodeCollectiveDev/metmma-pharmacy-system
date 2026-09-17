@@ -8,6 +8,7 @@ export const useHrStore = defineStore('hr', () => {
     const employees = ref([])
     const attendance = ref([])
     const loading = ref(false)
+    const employeeError = ref('')
 
     async function fetchEmployees() {
         loading.value = true
@@ -21,27 +22,31 @@ export const useHrStore = defineStore('hr', () => {
     }
 
     async function addEmployee(employee) {
+        employeeError.value = ''
         try {
             // Normalize employee data to match backend schema
             const employeeData = {
                 first_name: employee.first_name || employee.name?.split(' ')[0] || '',
                 last_name: employee.last_name || employee.name?.split(' ').slice(1).join(' ') || '',
-                role: employee.position || employee.role || 'employee',
+                job_title: employee.position || employee.job_title,
+                department: employee.department,
+                ...(employee.role ? { role: employee.role } : {}),
                 hire_date: employee.startDate || employee.hire_date || new Date().toISOString().split('T')[0],
                 salary: employee.salary || 0,
                 email: employee.email || '',
-                phone: employee.phone || '',
-                status: employee.status || 'active'
+                ...(employee.phone ? { phone: employee.phone } : {})
             }
             
             const result = await dataService.addEmployee(employeeData)
             if (result.data?.success || result.status === 201) {
                 await fetchEmployees()
-                return true
+                return result.data.data
             }
             return false
         } catch (error) {
             console.error('Error adding employee:', error)
+            employeeError.value = error.response?.data?.details?.map(detail => detail.message).join('; ') ||
+                error.response?.data?.error || error.message
             return false
         }
     }
@@ -82,6 +87,7 @@ export const useHrStore = defineStore('hr', () => {
         employees,
         attendance,
         loading,
+        employeeError,
         fetchEmployees,
         addEmployee,
         fetchAttendance,

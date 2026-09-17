@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { randomUUID } = require('node:crypto');
 
 exports.getEmployees = async (req, res) => {
     try {
@@ -23,13 +24,15 @@ exports.getEmployeeById = async (req, res) => {
 };
 
 exports.addEmployee = async (req, res) => {
-    const { first_name, last_name, role, hire_date, salary } = req.body;
+    const { first_name, last_name, role, hire_date, salary, email, department, job_title, phone } = req.body;
     try {
-        await pool.query(
-            'INSERT INTO employees (first_name, last_name, role, hire_date, salary) VALUES ($1, $2, $3, $4, $5)',
-            [first_name, last_name, role, hire_date, salary]
+        const result = await pool.query(
+            `INSERT INTO employees
+             (employee_id, first_name, last_name, role, hire_date, salary, email, department, position, phone_number)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [`EMP-${randomUUID()}`, first_name, last_name, role, hire_date, salary, email, department, job_title, phone]
         );
-        res.status(201).json({ message: 'Employee added successfully' });
+        res.status(201).json({ message: 'Employee added successfully', data: result.rows[0] });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }       

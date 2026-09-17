@@ -3,8 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { usePosStore } from '../store/posStore'
-import { dataOrchestrator } from '@/services/data/dataOrchestrator'
-import { dataService } from '@/services/api/dataService'
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -61,52 +59,16 @@ const processPayment = async () => {
   processing.value = true
   
   try {
-    // Create transaction record
-    const transaction = {
-      _id: `txn_${Date.now()}`,
-      date: new Date().toISOString(),
-      items: store.cart.map(item => ({
-        productId: item._id,
-        name: item.name,
-        batchNumber: item.batchNumber,
-        quantity: item.quantity,
-        unitPrice: item.price,
-        total: item.price * item.quantity
-      })),
-      subtotal: store.cartTotal,
-      tax: store.cartTotal * 0.165,
-      total: store.cartTotal * 1.165,
-      paymentMethod: paymentMethod.value,
-      cashier: JSON.parse(localStorage.getItem('user') || '{}').name || 'Unknown'
+    const result = await store.checkout(paymentMethod.value)
+    if (result.offline) {
+      alert('Sale saved offline and awaiting synchronization. A server receipt is not yet available.')
+    } else {
+      lastTransaction.value = result.transaction
+      showReceipt.value = true
     }
-
-    // Save transaction using orchestrator
-    await dataOrchestrator.saveItem('transactions', transaction, dataService.recordSale)
-
-    // Update inventory (deduct stock) using orchestrator
-    for (const item of store.cart) {
-      const product = store.products.find(p => p._id === item._id)
-      if (product) {
-        const updatedProduct = {
-          ...product,
-          stock: product.stock - item.quantity
-        }
-        await dataOrchestrator.saveItem('products', updatedProduct, dataService.addProduct)
-      }
-    }
-
-    // Store for receipt
-    lastTransaction.value = transaction
-    showReceipt.value = true
-
-    // Clear cart
-    store.clearCart()
-    
-    // Refresh products to reflect new stock
-    await store.fetchProducts()
   } catch (error) {
     console.error('Payment error:', error)
-    alert('Payment failed: ' + error.message)
+    alert('Payment failed: ' + (error.response?.data?.errors?.map(e => e.message).join('; ') || error.response?.data?.message || error.message))
   } finally {
     processing.value = false
   }
@@ -304,20 +266,20 @@ const goToHelp = () => {
           <div class="text-sm text-gray-500 text-center">
             <p>Date: {{ new Date(lastTransaction.date).toLocaleString() }}</p>
             <p>Cashier: {{ lastTransaction.cashier }}</p>
-            <p>Transaction: {{ lastTransaction._id }}</p>
+            <p>Transaction: {{ lastTransaction.receiptNumber || lastTransaction._id }}</p>
           </div>
 
           <div class="border-t border-b border-dashed py-4 space-y-2">
             <div v-for="item in lastTransaction.items" :key="item.productId" class="flex justify-between text-sm">
               <span>{{ item.name }} x{{ item.quantity }}</span>
-              <span>{{ formatCurrency(item.total) }}</span>
+              <span>{{ formatCurrency(item.subtotal) }}</span>
             </div>
           </div>
 
           <div class="space-y-1 text-sm">
             <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(lastTransaction.subtotal) }}</span></div>
             <div class="flex justify-between"><span>VAT (16.5%)</span><span>{{ formatCurrency(lastTransaction.tax) }}</span></div>
-            <div class="flex justify-between font-bold text-lg"><span>Total</span><span>{{ formatCurrency(lastTransaction.total) }}</span></div>
+            <div class="flex justify-between font-bold text-lg"><span>Total</span><span>{{ formatCurrency(lastTransaction.totalAmount) }}</span></div>
           </div>
 
           <p class="text-center text-sm text-gray-500 pt-4 border-t border-dashed">Thank you for your purchase!</p>

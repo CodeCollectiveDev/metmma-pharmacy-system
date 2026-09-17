@@ -2,7 +2,7 @@ const Joi = require('joi');
 
 /**
  * Validates the body for adding a new attendance record
- * Fields: employee_id, date, status (e.g., Present, Absent), and optional notes
+ * Fields: employee_id, date, status (matching the database), and optional notes
  */
 const attendanceSchema = Joi.object({
   employee_id: Joi.number().integer().required()
@@ -17,16 +17,16 @@ const attendanceSchema = Joi.object({
       'any.required': 'Date is required'
     }),
   
-  status: Joi.string().valid('Present', 'Absent', 'Late', 'Excused').required()
+  status: Joi.string().lowercase().valid('present', 'absent', 'late', 'leave', 'holiday').required()
     .messages({
-      'any.only': 'Status must be one of: Present, Absent, Late, or Excused'
+      'any.only': 'Status must be one of: present, absent, late, leave, or holiday'
     }),
     
   check_in: Joi.string().regex(/^([0-9]{2}):([0-9]{2})$/).optional()
     .description('Time in HH:mm format'),
 
   notes: Joi.string().max(255).allow('', null).optional()
-});
+}).required();
 
 /**
  * Validates the URL parameters (e.g., /employee/123)
