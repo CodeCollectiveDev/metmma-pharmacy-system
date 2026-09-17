@@ -9,6 +9,10 @@
 -- Fresh installs get the same model from database/init.sql.
 -- ============================================
 
+-- Migrate the old 'admin' role before adding the new constraint so existing
+-- databases can accept the constraint replacement without a validation error.
+UPDATE users SET role = 'super_admin' WHERE role = 'admin';
+
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (
@@ -24,8 +28,3 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (
     'hr_officer'
   )
 );
-
--- Migrate the old 'admin' role to the new 'super_admin' role.
--- Only safe for pre-production databases. Verify any remaining 'admin'
--- rows first with: SELECT * FROM users WHERE role = 'admin';
-UPDATE users SET role = 'super_admin' WHERE role = 'admin';
