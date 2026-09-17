@@ -37,7 +37,7 @@ const employeeCreateSchema = Joi.object({
   department: employeeFields.department.required(),
   job_title: employeeFields.job_title.required(),
   role: employeeFields.role.optional(),
-  hire_date: Joi.date().iso().default(() => new Date()),
+  hire_date: employeeFields.hire_date.default(() => new Date()),
   salary: employeeFields.salary.required()
 }).required();
 
