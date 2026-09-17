@@ -157,6 +157,22 @@ CREATE TABLE IF NOT EXISTS attendance (
 
 COMMENT ON TABLE attendance IS 'Daily employee attendance tracking';
 
+-- EMPLOYEE LEAVE TABLE - Current and historical leave records
+CREATE TABLE IF NOT EXISTS employee_leave (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    leave_type VARCHAR(50) NOT NULL,
+    reason TEXT,
+    start_date DATE NOT NULL,
+    expected_return_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'completed', 'cancelled')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (expected_return_date >= start_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_employee_leave_current
+    ON employee_leave (status, start_date, expected_return_date);
+
 --OPERATION REPORTS TABLE
 CREATE TABLE IF NOT EXISTS operation_reports (
     id SERIAL PRIMARY KEY,

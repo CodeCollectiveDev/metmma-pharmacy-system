@@ -53,6 +53,11 @@ export const dataService = {
 
     // ATTENDANCE
     getAttendance: (employeeId) => apiClient.get(`/attendance/employee/${employeeId}`),
+    getAttendanceByDate: (date) => apiClient.get('/attendance/by-date', { params: { date } }),
+    getCurrentLeave: () => apiClient.get('/attendance/leave/current'),
+    getLeaveRequests: () => apiClient.get('/attendance/leave/requests'),
+    createLeave: (leave) => apiClient.post('/attendance/leave', leave),
+    updateLeaveStatus: (id, status) => apiClient.patch(`/attendance/leave/${id}/status`, { status }),
     markAttendance: (record) => apiClient.post('/attendance', record),
 
     // REPORTS

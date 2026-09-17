@@ -2,7 +2,10 @@ import { computed } from 'vue'
 import { ROLES, ROLE_HIERARCHY } from '@/router'
 
 export const useRole = () => {
-  const userRole = computed(() => localStorage.getItem('role') || '')
+  const userRole = computed(() => {
+    const role = localStorage.getItem('role') || ''
+    return role === 'admin' ? ROLES.SUPER_ADMIN : role
+  })
 
   const hasRole = (role) => {
     if (Array.isArray(role)) {
