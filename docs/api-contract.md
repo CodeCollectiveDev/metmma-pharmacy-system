@@ -2,7 +2,12 @@
 
 All endpoints are prefixed with `/api`.
 
-Authentication uses **JWT Bearer Tokens**.
+Authentication uses **JWT Bearer Tokens**. Tokens are tied to a server-side
+session (`sessions` table) so they can be revoked, rotated, and audited.
+
+- `token` — short-lived access token (default **15m**, env `ACCESS_TOKEN_TTL`), sent as `Authorization: Bearer <token>`.
+- `refreshToken` — long-lived refresh token (default **7d**, env `REFRESH_TOKEN_TTL`) used to mint new pairs.
+- `JWT_SECRET` is **required** (min 32 chars); the server fails fast at startup if it is missing — there is no fallback secret.
 
 ---
 
@@ -19,12 +24,62 @@ Authentication uses **JWT Bearer Tokens**.
 Response:
 ```json
 {
-  "token": "jwt-token",
+  "token": "jwt-access-token",
+  "refreshToken": "jwt-refresh-token",
+  "expiresIn": 900000,
   "user": {
     "id": 1,
     "username": "admin",
     "role": "super_admin"
   }
+}
+```
+
+### POST /api/auth/refresh
+Exchange a valid refresh token for a fresh access + refresh pair (rotation:
+the previous pair is invalidated server-side).
+```json
+{
+  "refreshToken": "jwt-refresh-token"
+}
+```
+Response is the same shape as `/login`. A used/revoked/expired refresh token → 401.
+
+### POST /api/auth/logout
+**Auth:** any valid access token.
+
+Revokes the calling session server-side. Tokens stop working immediately.
+
+### GET /api/auth/sessions/me
+**Auth:** any valid access token.
+
+Lists the current user's own sessions (audit / "log out other devices").
+
+### POST /api/auth/sessions/revoke-all
+**Auth:** any valid access token.
+
+Forces logout on every device for the current user.
+
+### GET /api/auth/sessions
+**Role:** super_admin, managing_director
+
+Session audit — who is logged in, from where, last active:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "sid": "uuid",
+      "user_id": 1,
+      "username": "admin",
+      "role": "super_admin",
+      "user_agent": "Mozilla/5.0...",
+      "ip_address": "1.2.3.4",
+      "issued_at": "...",
+      "expires_at": "...",
+      "last_active_at": "..."
+    }
+  ]
 }
 ```
 
@@ -59,7 +114,7 @@ Returns `{ "success": true, "data": [ ...users ] }`.
 { "is_active": true }
 ```
 
-Toggles an account on/off. Disabled accounts are rejected at login.
+Toggles an account on/off. Disabled accounts are rejected at login and **all of their sessions are revoked immediately** (offboarding).
 
 ### PATCH /api/auth/users/:id/password
 **Role:** super_admin, managing_director
