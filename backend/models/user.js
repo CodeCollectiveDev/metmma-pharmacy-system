@@ -137,6 +137,31 @@ const findUserByUsername = async (username) => {
   }
 };
 
+const findUserById = async (id) => {
+  // Try full schema first, fallback to minimal schema
+  try {
+    const query = 'SELECT id, username, password_hash, role, email, full_name, is_active FROM users WHERE id = $1';
+    const result = await pool.query(query, [id]);
+    return result.rows[0] || null;
+  } catch (err) {
+    if (err.code === '42703') {
+      // Minimal schema: only id, username, password_hash, role
+      const query = 'SELECT id, username, password_hash, role FROM users WHERE id = $1';
+      const result = await pool.query(query, [id]);
+      if (result.rows[0]) {
+        return {
+          ...result.rows[0],
+          email: null,
+          full_name: null,
+          is_active: true
+        };
+      }
+      return null;
+    }
+    throw err;
+  }
+};
+
 const listUsers = async () => {
   const query = `
     SELECT id, username, email, role, full_name, is_active, created_at
@@ -170,4 +195,4 @@ const setUserPassword = async (id, password) => {
   return result.rows[0] || null;
 };
 
-module.exports = { createUser, findUserByUsername, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES };
+module.exports = { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES };
