@@ -30,7 +30,13 @@ const formatProduct = (p) => ({
 
 const getAllProducts = async (req, res) => {
   try {
-    const { category, search, page = 1, limit = 50 } = req.query;
+    const { category, search } = req.query;
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 50);
+    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 ||
+        !Number.isSafeInteger((page - 1) * limit)) {
+      return res.status(400).json({ success: false, message: 'page and limit must be positive integers' });
+    }
     const offset = (page - 1) * limit;
     let query = 'SELECT * FROM products WHERE is_active = TRUE';
     const values = [];
@@ -44,11 +50,18 @@ const getAllProducts = async (req, res) => {
       query += ` AND (name ILIKE $${values.length} OR product_code ILIKE $${values.length} OR generic_name ILIKE $${values.length})`;
     }
 
-    query += ` ORDER BY name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
-    values.push(parseInt(limit), offset);
+    const countResult = await pool.query(query.replace('SELECT *', 'SELECT COUNT(*)'), values);
+    const total = Number(countResult.rows[0].count);
+    query += ` ORDER BY name ASC, id ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    values.push(limit, offset);
 
     const result = await pool.query(query, values);
-    res.json({ success: true, count: result.rows.length, data: result.rows.map(formatProduct) });
+    res.json({
+      success: true,
+      count: result.rows.length,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasMore: offset + result.rows.length < total },
+      data: result.rows.map(formatProduct)
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Fetch error', error: err.message });
   }

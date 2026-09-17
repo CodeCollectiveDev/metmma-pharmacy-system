@@ -1,4 +1,4 @@
-import { getAll, save } from '@/pouchdb';
+import { getAll, save, remove } from '@/pouchdb';
 import { dataService } from '../api/dataService';
 
 /**
@@ -59,10 +59,19 @@ export const syncWorker = {
                 // Remove local-only properties before sending to API
                 const { syncStatus, _id, ...apiPayload } = item;
 
-                await apiMethod(apiPayload);
+                const response = await apiMethod(apiPayload);
 
                 // Update local status to synced
-                await save(collection, { ...item, syncStatus: 'synced' });
+                const sale = collection === 'transactions' ? response.data?.data : null;
+                const syncedItem = sale ? {
+                    ...item,
+                    ...sale,
+                    items: sale.items.map((line, index) => ({ ...item.items[index], ...line })),
+                    _id: String(sale.id),
+                    syncStatus: 'synced'
+                } : { ...item, syncStatus: 'synced' };
+                await save(collection, syncedItem);
+                if (syncedItem._id !== item._id) await remove(collection, item);
             } catch (error) {
                 console.error(`[SyncWorker] Failed to sync item in ${collection}:`, error);
                 // Keep as pending for next cycle

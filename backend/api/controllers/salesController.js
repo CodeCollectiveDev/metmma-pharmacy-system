@@ -62,7 +62,17 @@ const processSale = async (req, res) => {
       success: true,
       message: 'Sale completed',
       receiptNumber,
-      saleId
+      saleId,
+      data: {
+        id: saleId,
+        receiptNumber,
+        date: saleResult.rows[0].created_at,
+        totalAmount,
+        paymentMethod: paymentMethod || 'cash',
+        customerName,
+        userId,
+        items
+      }
     });
 
   } catch (error) {

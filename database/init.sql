@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS employees (
     id SERIAL PRIMARY KEY,
     user_id INTEGER UNIQUE REFERENCES users(id),
     employee_id VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255), -- Required for new employees by the API; nullable for legacy rows
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     role VARCHAR(50),

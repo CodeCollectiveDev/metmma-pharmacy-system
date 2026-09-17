@@ -6,10 +6,11 @@ const Joi = require('joi');
 const employeeFields = {
   first_name: Joi.string().min(2).max(50).trim(),
   last_name: Joi.string().min(2).max(50).trim(),
-  email: Joi.string().email().lowercase(),
+  email: Joi.string().trim().email().max(255).lowercase(),
   phone: Joi.string().pattern(/^[0-9+-\s]{10,15}$/),
-  department: Joi.string().valid('HR', 'Engineering', 'Sales', 'Marketing', 'Finance'),
-  job_title: Joi.string().max(100),
+  department: Joi.string().trim().max(50),
+  job_title: Joi.string().trim().max(100),
+  role: Joi.string().trim().max(50),
   hire_date: Joi.date().iso().less('now'),
   salary: Joi.number().positive().precision(2)
 };
@@ -35,9 +36,10 @@ const employeeCreateSchema = Joi.object({
   phone: employeeFields.phone.optional(),
   department: employeeFields.department.required(),
   job_title: employeeFields.job_title.required(),
-  hire_date: Joi.date().iso().default(() => new Date()),
+  role: employeeFields.role.optional(),
+  hire_date: employeeFields.hire_date.default(() => new Date()),
   salary: employeeFields.salary.required()
-});
+}).required();
 
 /**
  * Schema for PUT /api/employees/:id (Update)
