@@ -66,9 +66,14 @@ CREATE TABLE IF NOT EXISTS sales (
     payment_method VARCHAR(20) DEFAULT 'cash',
     customer_name VARCHAR(100),
     user_id INTEGER, -- Removed NOT NULL for easier testing
+    local_sale_id UUID,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE sales IS 'Sales transactions with financial details';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_local_sale_id_unique
+    ON sales (local_sale_id)
+    WHERE local_sale_id IS NOT NULL;
 
 -- Individual items in a sale
 CREATE TABLE IF NOT EXISTS sale_items (

@@ -1,5 +1,20 @@
 import apiClient from './apiClient';
 
+const generateIdempotencyKey = () => {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID();
+    }
+    return `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
+const withIdempotencyKey = (saleData = {}) => {
+    const payload = { ...saleData };
+    const key = payload.localSaleId || payload.local_sale_id || payload.idempotencyKey || payload.idempotency_key || generateIdempotencyKey();
+    payload.localSaleId = key;
+    payload.idempotencyKey = key;
+    return { payload, key };
+};
+
 export const dataService = {
     // PRODUCTS
     getProducts: () => apiClient.get('/products'),
@@ -14,7 +29,14 @@ export const dataService = {
     },
 
     // SALES
-    recordSale: (saleData) => apiClient.post('/sales/checkout', saleData),
+    recordSale: (saleData) => {
+        const { payload, key } = withIdempotencyKey(saleData);
+        return apiClient.post('/sales/checkout', payload, {
+            headers: {
+                'X-Idempotency-Key': key,
+            },
+        });
+    },
     getSalesHistory: () => apiClient.get('/sales/history'),
 
     // EMPLOYEES
