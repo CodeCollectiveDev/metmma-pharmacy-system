@@ -4,7 +4,7 @@ const processSale = async (req, res) => {
   const client = await pool.connect();
   
   try {
-    const { items, totalAmount, paymentMethod, customerName, userId } = req.body;
+    const { items: verifiedItems, totalAmount: verifiedTotalAmount, paymentMethod, customerName, userId } = req.body;
     
     // 1. Start Transaction
     await client.query('BEGIN');
@@ -15,12 +15,12 @@ const processSale = async (req, res) => {
     const saleResult = await client.query(
       `INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id) 
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, userId]
+      [receiptNumber, verifiedTotalAmount, paymentMethod || 'cash', customerName, userId]
     );
     const saleId = saleResult.rows[0].id;
 
     // 3. Process each item
-    for (const item of items) {
+    for (const item of verifiedItems) {
       // Get current product details (with lock for safety)
       const productCheck = await client.query(
         'SELECT name, quantity FROM products WHERE id = $1 FOR UPDATE', 
@@ -67,11 +67,11 @@ const processSale = async (req, res) => {
         id: saleId,
         receiptNumber,
         date: saleResult.rows[0].created_at,
-        totalAmount,
+        totalAmount: verifiedTotalAmount,
         paymentMethod: paymentMethod || 'cash',
         customerName,
         userId,
-        items
+        items: verifiedItems
       }
     });
 

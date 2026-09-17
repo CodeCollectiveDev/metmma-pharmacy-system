@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
-const { saleSchema, validateSale } = require('../api/validators/salesValidator');
+const { saleSchema, verifySaleArithmetic, validateSale } = require('../api/validators/salesValidator');
 const { employeeCreateSchema, employeeUpdateSchema } = require('../api/validators/employeeValidators');
 const { attendanceSchema } = require('../api/validators/attendanceValidators');
 
@@ -24,14 +24,28 @@ test('required request bodies cannot bypass field validation', () => {
 test('checkout accepts the established contract and rejects invalid required fields', () => {
   assert.equal(saleSchema.validate(sale).error, undefined);
   for (const invalid of [
-    { ...sale, totalAmount: undefined }, { ...sale, items: [] },
+    { ...sale, totalAmount: undefined }, { ...sale, items: undefined }, { ...sale, items: [] }, { ...sale, items: {} },
     { ...sale, totalAmount: -1 }, { ...sale, totalAmount: 'wrong' },
     { ...sale, items: [{ ...sale.items[0], productId: 'products_local' }] },
     { ...sale, items: [{ ...sale.items[0], quantity: -1 }] },
     { ...sale, items: [{ ...sale.items[0], quantity: 0 }] },
     { ...sale, items: [{ ...sale.items[0], quantity: 0.5 }] },
+    { ...sale, items: [{ ...sale.items[0], quantity: 'wrong' }] },
+    { ...sale, items: [{ ...sale.items[0], unitPrice: -1 }] },
+    { ...sale, items: [{ ...sale.items[0], subtotal: -1 }] },
     { ...sale, items: [{ ...sale.items[0], subtotal: undefined }] }
   ]) assert.ok(saleSchema.validate(invalid).error);
+});
+
+test('checkout arithmetic derives line amounts and rejects inconsistent client totals', () => {
+  const verified = verifySaleArithmetic(sale);
+  assert.equal(verified.error, undefined);
+  assert.equal(verified.value.items[0].subtotal, 20);
+  assert.equal(verified.merchandiseSubtotal, 20);
+  assert.equal(verified.value.totalAmount, 23.3);
+
+  assert.equal(verifySaleArithmetic({ ...sale, items: [{ ...sale.items[0], subtotal: 3 }] }).error.field, 'items.0.subtotal');
+  assert.equal(verifySaleArithmetic({ ...sale, totalAmount: 1 }).error.field, 'totalAmount');
 });
 
 test('checkout validation returns field errors before invoking the controller', () => {
@@ -39,6 +53,9 @@ test('checkout validation returns field errors before invoking the controller', 
   const res = { status(code) { assert.equal(code, 400); return this; }, json(data) { body = data; } };
   validateSale({ body: { items: [], totalAmount: -1 } }, res, () => assert.fail('Invalid sale reached controller'));
   assert.deepEqual(body.errors.map(error => error.field), ['items', 'totalAmount']);
+
+  validateSale({ body: { ...sale, items: [{ ...sale.items[0], subtotal: 3 }] } }, res, () => assert.fail('Invalid arithmetic reached controller'));
+  assert.deepEqual(body.errors.map(error => error.field), ['items.0.subtotal']);
 });
 
 test('employee creation keeps required persistence fields, including an optional role', () => {

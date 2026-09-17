@@ -32,7 +32,7 @@ before(async () => {
   await pool.query(readFileSync(require.resolve('../../../database/init.sql'), 'utf8'));
   await pool.query(`INSERT INTO products (product_code, name, batch_number, expiry_date, quantity, unit_price, selling_price, category)
     SELECT 'TEST-' || n, 'Product ' || LPAD(n::text, 3, '0'), 'B-' || n, '2030-01-01',
-           CASE WHEN n = 103 THEN 2 ELSE 100 END, 10, 10, CASE WHEN n > 50 THEN 'Later' ELSE 'First' END
+           CASE WHEN n = 103 THEN 10 ELSE 100 END, 10, 10, CASE WHEN n > 50 THEN 'Later' ELSE 'First' END
     FROM generate_series(1, 103) n`);
   const app = express();
   app.use(express.json());
@@ -73,29 +73,30 @@ test('all catalogue pages, filters, metadata and low-stock products remain reach
 test('frontend checkout payload persists sale fields, lines and a single stock decrement', async () => {
   const { toSalePayload } = await import('../../../frontend/src/services/api/salePayload.js');
   const payload = toSalePayload({
-    totalAmount: 23.3, paymentMethod: 'card', customerName: 'Customer', userId: 1,
-    items: [{ productId: 103, name: 'Product 103', quantity: 2, unitPrice: 10, subtotal: 20 }]
+    totalAmount: 34.95, paymentMethod: 'card', customerName: 'Customer', userId: 1,
+    items: [{ productId: 103, name: 'Product 103', quantity: 3, unitPrice: 10, subtotal: 30 }]
   });
   const response = await request('/sales/checkout', { method: 'POST', body: payload, role: 'cashier' });
   assert.equal(response.status, 201, JSON.stringify(response.data));
-  assert.equal(response.data.data.totalAmount, 23.3);
+  assert.equal(response.data.data.totalAmount, 34.95);
   assert.equal(response.data.data.receiptNumber, response.data.receiptNumber);
   const sale = (await pool.query('SELECT * FROM sales WHERE id = $1', [response.data.saleId])).rows[0];
-  assert.equal(sale.total_amount, '23.30');
+  assert.equal(sale.total_amount, '34.95');
   assert.equal(sale.payment_method, 'card');
   assert.equal(sale.customer_name, 'Customer');
   assert.equal(sale.user_id, 1);
   const line = (await pool.query('SELECT * FROM sale_items WHERE sale_id = $1', [sale.id])).rows[0];
-  assert.equal(line.subtotal, '20.00');
-  assert.equal(line.quantity, 2);
-  assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 103')).rows[0].quantity, 0);
+  assert.equal(line.subtotal, '30.00');
+  assert.equal(line.quantity, 3);
+  assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 103')).rows[0].quantity, 7);
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 103')).rowCount, 1);
   const history = await request('/sales/history');
   assert.equal(history.data.data[0].items[0].product_id, 103);
 
   const retry = await request('/sales/checkout', { method: 'POST', body: {
     ...payload,
-    items: [{ productId: 1, quantity: 1, unitPrice: 10, subtotal: 10 }, ...payload.items]
+    totalAmount: 104.85,
+    items: [{ productId: 1, quantity: 1, unitPrice: 10, subtotal: 10 }, { ...payload.items[0], quantity: 8, subtotal: 80 }]
   } });
   assert.equal(retry.status, 400);
   assert.match(retry.data.message, /Insufficient stock/);
@@ -104,13 +105,46 @@ test('frontend checkout payload persists sale fields, lines and a single stock d
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 1')).rowCount, 0);
 });
 
+test('inconsistent checkout arithmetic is rejected before sale or stock mutation', async () => {
+  const saleCount = (await pool.query('SELECT COUNT(*) FROM sales')).rows[0].count;
+  const stock = (await pool.query('SELECT quantity FROM products WHERE id = 2')).rows[0].quantity;
+  const cases = [
+    { totalAmount: 100, items: [{ productId: 2, quantity: 2, unitPrice: 50, subtotal: 3 }] },
+    { totalAmount: 1, items: [{ productId: 2, quantity: 2, unitPrice: 10, subtotal: 20 }] }
+  ];
+
+  for (const body of cases) {
+    const response = await request('/sales/checkout', { method: 'POST', body });
+    assert.equal(response.status, 400);
+    assert.equal(response.data.message, 'Validation failed');
+  }
+
+  assert.equal((await pool.query('SELECT COUNT(*) FROM sales')).rows[0].count, saleCount);
+  assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 2')).rows[0].quantity, stock);
+});
+
 test('invalid checkout and unauthorized writes are rejected without inserting records', async () => {
-  const body = { totalAmount: 10, items: [{ productId: 1, quantity: -1, unitPrice: 10, subtotal: 10 }] };
-  const response = await request('/sales/checkout', { method: 'POST', body });
-  assert.equal(response.status, 400);
-  assert.equal(response.data.errors[0].field, 'items.0.quantity');
+  const invalidBodies = [
+    {},
+    { totalAmount: 0, items: [] },
+    { totalAmount: 10, items: {} },
+    { totalAmount: 10, items: [{ productId: 1, quantity: 0, unitPrice: 10, subtotal: 0 }] },
+    { totalAmount: 10, items: [{ productId: 1, quantity: -1, unitPrice: 10, subtotal: 10 }] },
+    { totalAmount: 10, items: [{ productId: 1, quantity: 1.5, unitPrice: 10, subtotal: 15 }] },
+    { totalAmount: 10, items: [{ productId: 1, quantity: 'wrong', unitPrice: 10, subtotal: 10 }] },
+    { totalAmount: 10, items: [{ productId: 1, quantity: 1, unitPrice: -10, subtotal: 10 }] },
+    { totalAmount: 10, items: [{ productId: 1, quantity: 1, unitPrice: 10, subtotal: -10 }] },
+    { totalAmount: -10, items: [{ productId: 1, quantity: 1, unitPrice: 10, subtotal: 10 }] }
+  ];
+
+  for (const body of invalidBodies) {
+    assert.equal((await request('/sales/checkout', { method: 'POST', body })).status, 400);
+  }
+
+  const body = invalidBodies[4];
   assert.equal((await request('/sales/checkout', { method: 'POST', body, authenticated: false })).status, 401);
   assert.equal((await request('/sales/checkout', { method: 'POST', body, role: 'hr_officer' })).status, 403);
+  assert.equal(Number((await pool.query('SELECT COUNT(*) FROM sales')).rows[0].count), 1);
   assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 1')).rows[0].quantity, 100);
 });
 
