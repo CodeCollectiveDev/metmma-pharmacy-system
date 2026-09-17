@@ -34,7 +34,8 @@ const normalizeCollectionItems = (collection, items) => {
             name: item.name || `${item.first_name || ''} ${item.last_name || ''}`.trim(),
             position: item.position || item.role || 'Employee',
             department: item.department || 'General',
-            status: item.status || 'active',
+            status: item.status || (item.is_active === false ? 'inactive' : 'active'),
+            startDate: item.startDate || item.hire_date || null,
             _id: (item.id || item._id)?.toString()
         }));
     }

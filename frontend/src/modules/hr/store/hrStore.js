@@ -22,27 +22,42 @@ export const useHrStore = defineStore('hr', () => {
 
     async function addEmployee(employee) {
         try {
-            // Normalize employee data to match backend schema
+            // Normalize employee data to match the backend contract
+            // (employees table stores the job title in `role`).
+            const name = employee.name || ''
+            const parts = name.trim().split(/\s+/)
             const employeeData = {
-                first_name: employee.first_name || employee.name?.split(' ')[0] || '',
-                last_name: employee.last_name || employee.name?.split(' ').slice(1).join(' ') || '',
-                role: employee.position || employee.role || 'employee',
-                hire_date: employee.startDate || employee.hire_date || new Date().toISOString().split('T')[0],
-                salary: employee.salary || 0,
+                first_name: employee.first_name || parts[0] || '',
+                last_name: employee.last_name || parts.slice(1).join(' ') || '',
+                role: employee.role || employee.position || '',
+                department: employee.department || '',
                 email: employee.email || '',
+                salary: Number(employee.salary) || 0,
+                hire_date: employee.startDate || employee.hire_date || new Date().toISOString().split('T')[0],
                 phone: employee.phone || '',
                 status: employee.status || 'active'
             }
-            
-            const result = await dataService.addEmployee(employeeData)
-            if (result.data?.success || result.status === 201) {
-                await fetchEmployees()
-                return true
+
+            // Field-level guard so the backend never rejects with a 400.
+            const required = ['first_name', 'last_name', 'role', 'department', 'email', 'salary']
+            for (const field of required) {
+                if (!employeeData[field]) {
+                    return { ok: false, error: `Missing required field: ${field}` }
+                }
             }
-            return false
+
+            const result = await dataService.addEmployee(employeeData)
+            const created = result.data
+
+            if (created && created.id) {
+                await fetchEmployees()
+                return { ok: true, data: created }
+            }
+            return { ok: false, error: 'Server did not return the created employee' }
         } catch (error) {
             console.error('Error adding employee:', error)
-            return false
+            const msg = error.response?.data?.error || error.response?.data?.message || error.message
+            return { ok: false, error: msg || 'Failed to add employee' }
         }
     }
 

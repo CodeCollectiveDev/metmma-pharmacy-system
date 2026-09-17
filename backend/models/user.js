@@ -13,7 +13,17 @@ const pool = new Pool({
   ssl: isProduction ? { rejectUnauthorized: false } : undefined,
 });
 
-const DB_ROLES = ['admin', 'pharmacist', 'cashier', 'store_manager', 'hr_officer'];
+const DB_ROLES = [
+  'super_admin',
+  'managing_director',
+  'director',
+  'pharmacist_manager',
+  'pharmacist',
+  'assistant_pharmacist',
+  'store_manager',
+  'cashier',
+  'hr_officer',
+];
 
 const normalizeRole = (role) => {
   if (role == null) return null;
@@ -24,11 +34,21 @@ const normalizeRole = (role) => {
   const compact = lc.replace(/[\s-]+/g, '_'); // "store manager" -> "store_manager"
 
   const aliases = {
-    admin: 'admin',
+    super_admin: 'super_admin',
+    superadmin: 'super_admin',
+    admin: 'super_admin',
+    managing_director: 'managing_director',
+    managingdirector: 'managing_director',
+    md: 'managing_director',
+    director: 'director',
+    pharmacist_manager: 'pharmacist_manager',
+    pharmacistmanager: 'pharmacist_manager',
     pharmacist: 'pharmacist',
-    cashier: 'cashier',
+    assistant_pharmacist: 'assistant_pharmacist',
+    assistant: 'assistant_pharmacist',
     store_manager: 'store_manager',
     storemanager: 'store_manager',
+    cashier: 'cashier',
     hr_officer: 'hr_officer',
     hrofficer: 'hr_officer',
     hr: 'hr_officer',
@@ -117,4 +137,37 @@ const findUserByUsername = async (username) => {
   }
 };
 
-module.exports = { createUser, findUserByUsername, normalizeRole, DB_ROLES };
+const listUsers = async () => {
+  const query = `
+    SELECT id, username, email, role, full_name, is_active, created_at
+    FROM users
+    ORDER BY created_at DESC
+  `;
+  const result = await pool.query(query);
+  return result.rows;
+};
+
+const setUserActive = async (id, isActive) => {
+  const query = `
+    UPDATE users
+    SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+    RETURNING id, username, email, role, full_name, is_active
+  `;
+  const result = await pool.query(query, [isActive, id]);
+  return result.rows[0] || null;
+};
+
+const setUserPassword = async (id, password) => {
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const query = `
+    UPDATE users
+    SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+    RETURNING id, username, email, role, full_name, is_active
+  `;
+  const result = await pool.query(query, [hashedPassword, id]);
+  return result.rows[0] || null;
+};
+
+module.exports = { createUser, findUserByUsername, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES };

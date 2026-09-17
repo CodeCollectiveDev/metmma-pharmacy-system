@@ -1,7 +1,6 @@
 
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/modules/auth/views/Login.vue'
-import Register from '@/modules/auth/views/Register.vue'
 import { setRouteLoading } from '@/composables/useRouteLoading'
 
 // Lazy-load dashboard view
@@ -9,24 +8,33 @@ const Dashboard = () => import('@/modules/dashboard/views/Dashboard.vue')
 
 // Role definitions for better maintainability
 const ROLES = {
-  ADMIN: 'admin',
-  STORE_MANAGER: 'store_manager',
+  SUPER_ADMIN: 'super_admin',
+  MANAGING_DIRECTOR: 'managing_director',
+  DIRECTOR: 'director',
+  PHARMACIST_MANAGER: 'pharmacist_manager',
   PHARMACIST: 'pharmacist',
-  HR_OFFICER: 'hr_officer',
-  CASHIER: 'cashier'
+  ASSISTANT_PHARMACIST: 'assistant_pharmacist',
+  STORE_MANAGER: 'store_manager',
+  CASHIER: 'cashier',
+  HR_OFFICER: 'hr_officer'
 }
 
+const ALL_ROLES = Object.values(ROLES)
+
 const ROLE_HIERARCHY = {
-  admin: 5,
-  store_manager: 4,
-  pharmacist: 3,
-  hr_officer: 2,
-  cashier: 1
+  super_admin: 10,
+  managing_director: 9,
+  director: 8,
+  pharmacist_manager: 7,
+  pharmacist: 6,
+  store_manager: 5,
+  assistant_pharmacist: 4,
+  hr_officer: 3,
+  cashier: 2
 }
 
 const routes = [
   { path: '/login', component: Login, meta: { requiresAuth: false } },
-  { path: '/register', component: Register, meta: { requiresAuth: false } },
 
   { path: '/', redirect: '/dashboard' },
   
@@ -35,7 +43,7 @@ const routes = [
     component: Dashboard,
     meta: {
       requiresAuth: true,
-      roles: [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER],
+      roles: ALL_ROLES,
       label: 'Dashboard'
     }
   },
@@ -45,7 +53,7 @@ const routes = [
     component: () => import('@/modules/pos/views/PosView.vue'),
     meta: {
       requiresAuth: true,
-      roles: [ROLES.CASHIER, ROLES.ADMIN],
+      roles: [ROLES.SUPER_ADMIN, ROLES.PHARMACIST_MANAGER, ROLES.PHARMACIST, ROLES.ASSISTANT_PHARMACIST, ROLES.CASHIER],
       label: 'Point of Sale'
     }
   },
@@ -55,7 +63,7 @@ const routes = [
     component: () => import('@/modules/shared/views/HelpView.vue'),
     meta: {
       requiresAuth: true,
-      roles: [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER, ROLES.CASHIER],
+      roles: ALL_ROLES,
       label: 'Help'
     }
   },
@@ -65,7 +73,7 @@ const routes = [
     component: () => import('@/modules/inventory/views/InventoryDashboard.vue'),
     meta: {
       requiresAuth: true,
-      roles: [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST],
+      roles: [ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.DIRECTOR, ROLES.PHARMACIST_MANAGER, ROLES.PHARMACIST, ROLES.ASSISTANT_PHARMACIST, ROLES.STORE_MANAGER],
       label: 'Inventory Management',
       requiresAdmin: false
     }
@@ -76,8 +84,19 @@ const routes = [
     component: () => import('@/modules/hr/views/HrDashboard.vue'),
     meta: {
       requiresAuth: true,
-      roles: [ROLES.ADMIN, ROLES.HR_OFFICER],
+      roles: [ROLES.SUPER_ADMIN, ROLES.HR_OFFICER],
       label: 'HR Management',
+      requiresAdmin: true
+    }
+  },
+  
+  {
+    path: '/users',
+    component: () => import('@/modules/admin/views/UserManagement.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR],
+      label: 'User Management',
       requiresAdmin: true
     }
   },
@@ -87,7 +106,7 @@ const routes = [
     component: () => import('@/modules/reports/views/ReportsDashboard.vue'),
     meta: {
       requiresAuth: true,
-      roles: [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER],
+      roles: [ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.DIRECTOR, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.HR_OFFICER],
       label: 'Reports',
       requiresAdmin: false
     }

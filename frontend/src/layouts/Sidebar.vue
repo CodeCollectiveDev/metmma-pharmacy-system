@@ -17,7 +17,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { logout: logoutRole, userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos } = useRole()
+const { logout: logoutRole, userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos, canManageUsers } = useRole()
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },
@@ -40,7 +40,7 @@ const allMenuItems = [
     path: '/dashboard', 
     label: 'Dashboard', 
     icon: LayoutDashboard, 
-    show: computed(() => ['admin', 'store_manager', 'pharmacist', 'hr_officer'].includes(userRole.value))
+    show: computed(() => true)
   },
   { 
     path: '/pos', 
@@ -59,6 +59,12 @@ const allMenuItems = [
     label: 'HR Management', 
     icon: Users, 
     show: canAccessHr
+  },
+  { 
+    path: '/users', 
+    label: 'User Management', 
+    icon: Settings, 
+    show: canManageUsers
   },
   { 
     path: '/reports', 

@@ -134,20 +134,31 @@ SELECT * FROM expiring_products;
 
 ### 1.5 Create an Admin User with Real Password
 
-The seed users have placeholder password hashes. Update the admin password:
+The seed users have placeholder password hashes. The `users.role` CHECK
+constraint now accepts the full role set
+(`super_admin`, `managing_director`, `director`, `pharmacist_manager`,
+`pharmacist`, `assistant_pharmacist`, `store_manager`, `cashier`,
+`hr_officer`) — there is **no public registration endpoint**.
 
-```sql
--- First generate a bcrypt hash at https://bcrypt-generator.com/
--- Then update the admin user (replace the hash with a real one):
-UPDATE users SET password_hash = '$2b$10$REPLACE_WITH_REAL_BCRYPT_HASH' WHERE username = 'admin';
-```
-
-Or create a fresh admin via the API once the backend is running:
+Create the super admin with the bootstrap script (hashes with bcrypt for you):
 ```bash
-curl -X POST https://your-backend.onrender.com/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"your-secure-password","full_name":"Admin User","email":"admin@metmma.pharmacy","role":"admin"}'
+cd backend
+ADMIN_USERNAME=admin ADMIN_PASSWORD='your-secure-password' ADMIN_EMAIL='admin@metmma.pharmacy' npm run create-admin
 ```
+
+> The script promotes the account to `super_admin` if the username already
+> exists, so it can also be used to reset a lost admin password.
+
+If migrating an existing database (not a fresh `init.sql`), apply the
+migrations first:
+```bash
+psql "$DATABASE_URL" -f database/migrations/001_expanded_roles.sql
+psql "$DATABASE_URL" -f database/migrations/002_employee_id_default.sql
+```
+
+After that, provision staff accounts by logging in as super admin and using
+**User Management** (`POST /api/auth/users`, restricted to
+super_admin / managing_director).
 
 ---
 

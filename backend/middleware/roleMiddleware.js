@@ -71,10 +71,14 @@ const requireRole = (...allowedRoles) => {
 
 // Role constants for consistency
 const ROLES = {
-  ADMIN: 'admin',
+  SUPER_ADMIN: 'super_admin',
+  MANAGING_DIRECTOR: 'managing_director',
+  DIRECTOR: 'director',
+  PHARMACIST_MANAGER: 'pharmacist_manager',
   PHARMACIST: 'pharmacist',
-  CASHIER: 'cashier',
+  ASSISTANT_PHARMACIST: 'assistant_pharmacist',
   STORE_MANAGER: 'store_manager',
+  CASHIER: 'cashier',
   HR_OFFICER: 'hr_officer',
 };
 

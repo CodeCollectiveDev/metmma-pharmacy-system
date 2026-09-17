@@ -9,6 +9,8 @@ const store = useHrStore()
 const activeTab = ref('employees')
 const showAddForm = ref(false)
 const searchQuery = ref('')
+const formMessage = ref(null)
+const createdEmployee = ref(null)
 
 const newEmployee = ref({
   name: '',
@@ -34,16 +36,37 @@ const filteredEmployees = () => {
   )
 }
 
+const resetForm = () => {
+  newEmployee.value = { name: '', position: '', department: '', salary: null, startDate: '', status: 'active', email: '', phone: '' }
+  createdEmployee.value = null
+}
+
 const saveEmployee = async () => {
+  formMessage.value = null
   if (!newEmployee.value.name || !newEmployee.value.position) {
-    alert('Please fill required fields')
+    formMessage.value = { type: 'error', text: 'Full name and position are required' }
     return
   }
-  const success = await store.addEmployee({ ...newEmployee.value })
-  if (success) {
+
+  const result = await store.addEmployee({ ...newEmployee.value })
+  if (result.ok) {
+    createdEmployee.value = result.data
+    formMessage.value = {
+      type: 'success',
+      text: `Employee ${result.data.first_name} ${result.data.last_name} created (${result.data.employee_id})`
+    }
     showAddForm.value = false
-    newEmployee.value = { name: '', position: '', department: '', salary: null, startDate: '', status: 'active', email: '', phone: '' }
+    resetForm()
+  } else {
+    formMessage.value = { type: 'error', text: result.error || 'Failed to add employee' }
   }
+}
+
+const formatDate = (d) => {
+  if (!d) return '-'
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return d
+  return date.toLocaleDateString('en-MW', { dateStyle: 'medium' })
 }
 
 const formatCurrency = (amount) => {
@@ -53,6 +76,25 @@ const formatCurrency = (amount) => {
 
 <template>
   <MainLayout title="HR Management" subtitle="Manage employees, attendance, and payroll">
+    <!-- Form feedback -->
+    <div v-if="formMessage" :class="['p-3 rounded-lg mb-4 text-sm border flex items-center gap-2', formMessage.type === 'error' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100']">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-circle"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+      {{ formMessage.text }}
+    </div>
+
+    <!-- Created employee details -->
+    <div v-if="createdEmployee" class="app-card app-card-body mb-6 bg-green-50/50 border-green-100">
+      <h3 class="app-section-title mb-3">Employee Created Successfully</h3>
+      <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+        <div><dt class="text-gray-500 text-xs uppercase">Name</dt><dd class="font-medium text-gray-800">{{ createdEmployee.first_name }} {{ createdEmployee.last_name }}</dd></div>
+        <div><dt class="text-gray-500 text-xs uppercase">Role / Position</dt><dd class="font-medium text-gray-800">{{ createdEmployee.role }}</dd></div>
+        <div><dt class="text-gray-500 text-xs uppercase">Employee ID</dt><dd class="font-medium text-gray-800">{{ createdEmployee.employee_id }}</dd></div>
+        <div><dt class="text-gray-500 text-xs uppercase">Department</dt><dd class="font-medium text-gray-800">{{ createdEmployee.department }}</dd></div>
+        <div><dt class="text-gray-500 text-xs uppercase">Start Date</dt><dd class="font-medium text-gray-800">{{ formatDate(createdEmployee.hire_date) }}</dd></div>
+        <div><dt class="text-gray-500 text-xs uppercase">Status</dt><dd class="font-medium text-gray-800">{{ createdEmployee.is_active === false ? 'Inactive' : 'Active' }}</dd></div>
+      </dl>
+    </div>
+
     <!-- Tabs -->
     <div class="app-card mb-6">
       <div class="flex overflow-x-auto border-b border-gray-100">
@@ -101,25 +143,30 @@ const formatCurrency = (amount) => {
       <template v-else>
       <div v-if="showAddForm" class="app-card app-card-body mb-6">
         <h3 class="app-section-title mb-4">Add New Employee</h3>
+        <form @submit.prevent="saveEmployee">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input v-model="newEmployee.name" type="text" placeholder="Full Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <input v-model="newEmployee.position" type="text" placeholder="Position *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <select v-model="newEmployee.department" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-            <option value="">Select Department</option>
+          <input v-model="newEmployee.name" type="text" placeholder="Full Name *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <input v-model="newEmployee.position" type="text" placeholder="Position / Role *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <select v-model="newEmployee.department" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="" disabled>Select Department *</option>
             <option>Pharmacy</option>
             <option>Sales</option>
             <option>Operations</option>
+            <option>Finance</option>
             <option>Human Resources</option>
             <option>Administration</option>
+            <option>IT</option>
           </select>
-          <input v-model.number="newEmployee.salary" type="number" placeholder="Salary (MWK)" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <input v-model="newEmployee.email" type="email" placeholder="Email *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <input v-model.number="newEmployee.salary" type="number" placeholder="Salary (MWK) *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <input v-model="newEmployee.startDate" type="date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <input v-model="newEmployee.phone" type="tel" placeholder="Phone Number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         </div>
         <div class="flex justify-end gap-3 mt-4">
-          <button @click="showAddForm = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-          <button @click="saveEmployee" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">Save Employee</button>
+          <button type="button" @click="showAddForm = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">Save Employee</button>
         </div>
+        </form>
       </div>
 
       <!-- Employees Table -->
@@ -150,7 +197,7 @@ const formatCurrency = (amount) => {
               </td>
               <td class="px-6 py-4 text-gray-600">{{ emp.department }}</td>
               <td class="px-6 py-4 font-medium text-gray-800">{{ formatCurrency(emp.salary) }}</td>
-              <td class="px-6 py-4 text-gray-600">{{ emp.startDate ? new Date(emp.startDate).toLocaleDateString() : '-' }}</td>
+              <td class="px-6 py-4 text-gray-600">{{ emp.startDate ? formatDate(emp.startDate) : '-' }}</td>
               <td class="px-6 py-4">
                 <span :class="['px-2 py-1 rounded-full text-xs font-medium', emp.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600']">
                   {{ emp.status }}

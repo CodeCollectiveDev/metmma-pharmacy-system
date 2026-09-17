@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { usePosStore } from '../store/posStore'
-import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle } from 'lucide-vue-next'
 
@@ -61,52 +60,62 @@ const processPayment = async () => {
   processing.value = true
   
   try {
-    // Create transaction record
-    const transaction = {
-      _id: `txn_${Date.now()}`,
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const subtotal = store.cartTotal
+    const totalAmount = Math.round(subtotal * 1.165 * 100) / 100
+
+    // Backend contract: salesController.processSale expects
+    // { items: [{ productId (DB id), quantity, unitPrice, subtotal }],
+    //   totalAmount, paymentMethod, customerName, userId }
+    const payload = {
+      items: store.cart.map(item => ({
+        productId: Number(item.id),
+        quantity: item.quantity,
+        unitPrice: item.price,
+        subtotal: Math.round(item.price * item.quantity * 100) / 100
+      })),
+      totalAmount,
+      paymentMethod: paymentMethod.value,
+      customerName: '',
+      userId: user.id
+    }
+
+    // Sale must be confirmed by the backend before we show a receipt or
+    // clear the cart. Never auto-queue a sale and claim success.
+    const response = await dataService.recordSale(payload)
+    const result = response?.data
+
+    if (!result || !result.success) {
+      throw new Error(result?.message || 'Sale could not be completed')
+    }
+
+    // Store confirmed transaction for the receipt (server-generated receipt no.)
+    lastTransaction.value = {
+      _id: result.receiptNumber || `txn_${Date.now()}`,
       date: new Date().toISOString(),
       items: store.cart.map(item => ({
-        productId: item._id,
+        productId: item.id,
         name: item.name,
         batchNumber: item.batchNumber,
         quantity: item.quantity,
         unitPrice: item.price,
-        total: item.price * item.quantity
+        total: Math.round(item.price * item.quantity * 100) / 100
       })),
-      subtotal: store.cartTotal,
-      tax: store.cartTotal * 0.165,
-      total: store.cartTotal * 1.165,
+      subtotal,
+      tax: Math.round(subtotal * 0.165 * 100) / 100,
+      total: totalAmount,
       paymentMethod: paymentMethod.value,
-      cashier: JSON.parse(localStorage.getItem('user') || '{}').name || 'Unknown'
+      cashier: user.name || 'Unknown'
     }
-
-    // Save transaction using orchestrator
-    await dataOrchestrator.saveItem('transactions', transaction, dataService.recordSale)
-
-    // Update inventory (deduct stock) using orchestrator
-    for (const item of store.cart) {
-      const product = store.products.find(p => p._id === item._id)
-      if (product) {
-        const updatedProduct = {
-          ...product,
-          stock: product.stock - item.quantity
-        }
-        await dataOrchestrator.saveItem('products', updatedProduct, dataService.addProduct)
-      }
-    }
-
-    // Store for receipt
-    lastTransaction.value = transaction
     showReceipt.value = true
 
-    // Clear cart
+    // Clear cart and reload products — stock was decremented server-side
+    // inside the sale transaction.
     store.clearCart()
-    
-    // Refresh products to reflect new stock
     await store.fetchProducts()
   } catch (error) {
     console.error('Payment error:', error)
-    alert('Payment failed: ' + error.message)
+    alert('Payment failed: ' + (error.response?.data?.message || error.message))
   } finally {
     processing.value = false
   }
