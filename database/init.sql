@@ -27,6 +27,32 @@ COMMENT ON TABLE users IS 'User authentication and authorization table';
 COMMENT ON COLUMN users.password_hash IS 'Store hashed passwords (use bcrypt)';
 COMMENT ON COLUMN users.role IS 'RBAC: super_admin, managing_director, director, pharmacist_manager, pharmacist, assistant_pharmacist, store_manager, cashier, hr_officer';
 
+-- SESSIONS TABLE - Server-side session lifecycle & audit trail
+-- Every login creates one session row (sid). Access & refresh JWTs carry the
+-- sid claim; revocation, refresh rotation (token_version) and session audit
+-- are all enforced server-side against this table.
+CREATE TABLE IF NOT EXISTS sessions (
+    id SERIAL PRIMARY KEY,
+    sid UUID UNIQUE NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_agent TEXT,
+    ip_address VARCHAR(45),
+    token_version INTEGER NOT NULL DEFAULT 1,
+    issued_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    last_active_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE sessions IS 'Server-side session store: enables token revocation, logout, refresh rotation and login audit';
+COMMENT ON COLUMN sessions.token_version IS 'Incremented on each token refresh; tokens minted with an older version are rejected';
+COMMENT ON COLUMN sessions.revoked_at IS 'Set on logout / account deactivation / force-logout; non-null means the session is dead';
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_sid ON sessions(sid);
+CREATE INDEX IF NOT EXISTS idx_sessions_revoked ON sessions(revoked_at);
+
 -- ============================================
 -- SECTION 2: INVENTORY TABLES (Patrick's section)
 -- ============================================

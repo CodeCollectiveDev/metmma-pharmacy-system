@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import { ROLES, ROLE_HIERARCHY } from '@/router'
+import { authService } from '@/services/api/authService'
 
 export const useRole = () => {
   const userRole = computed(() => localStorage.getItem('role') || '')
@@ -54,10 +55,8 @@ export const useRole = () => {
     return (ROLE_HIERARCHY[userRole.value] || 0) >= (ROLE_HIERARCHY[minRole] || 0)
   }
 
-  const logout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('role')
-    localStorage.removeItem('user')
+  const logout = async () => {
+    await authService.logout()
   }
 
   return {

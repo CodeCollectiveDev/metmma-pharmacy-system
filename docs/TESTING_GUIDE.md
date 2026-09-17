@@ -301,9 +301,11 @@ Current status: backend parses clean, frontend build passes, posStore tests pass
 
 ---
 
-## Out of scope (deferred)
+## Resolved (previously deferred)
 
-- Issue #4: JWT refresh tokens, session revocation, blacklist, and removal of
-  the `JWT_SECRET` fallback secret (`backend/middleware/roleMiddleware.js`,
-  `backend/routes/authRoutes.js`). The fallback secret still exists — set a real
-  `JWT_SECRET` in the backend env **before any production deploy**.
+- Issue #43: JWT refresh tokens, session revocation (logout), force-logout,
+  session audit, and removal of the `JWT_SECRET` fallback are now implemented.
+  `JWT_SECRET` is required at startup (fail-fast) — see `backend/config/jwt.js`.
+  Apply `database/migrations/003_session_management.sql` to existing databases.
+- Remaining security items tracked as issues: #52 (audit of hardcoded secret
+  usages), #63 (offline login design), #46/#47/#48/#49/#50 — see GitHub issues.
