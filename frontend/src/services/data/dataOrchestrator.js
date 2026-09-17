@@ -18,7 +18,7 @@ const normalizeCollectionItems = (collection, items) => {
             ...item,
             stock: item.stock ?? item.quantity ?? 0,
             minStockLevel: item.minStockLevel ?? item.reorderLevel ?? 10,
-            price: item.price ?? item.sellingPrice ?? item.unitPrice ?? 0,
+            price: Number(item.price ?? item.sellingPrice ?? item.unitPrice ?? 0),
             productCode: item.productCode ?? item.product_code,
             batchNumber: item.batchNumber ?? item.batch_number,
             expiryDate: item.expiryDate ?? item.expiry_date,

@@ -1,6 +1,13 @@
 import { getAll, save } from '@/pouchdb';
 import { dataService } from '../api/dataService';
 
+const generateLocalSaleId = () => {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID();
+    }
+    return `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
 /**
  * Sync Worker
  * Periodically synchronization pending local changes to the backend API.
@@ -100,13 +107,20 @@ export const syncWorker = {
 
         for (const item of pendingItems) {
             try {
-                // Remove local-only properties before sending to API
-                const { syncStatus, _id, ...apiPayload } = item;
+                const persistedId = item.localSaleId || item.local_sale_id || item.idempotencyKey || item.idempotency_key || generateLocalSaleId();
+                const apiPayload = {
+                    ...item,
+                    localSaleId: persistedId,
+                    idempotencyKey: persistedId,
+                };
+
+                delete apiPayload.syncStatus;
+                delete apiPayload._id;
 
                 await apiMethod(apiPayload);
 
                 // Update local status to synced
-                await save(collection, { ...item, syncStatus: 'synced' });
+                await save(collection, { ...item, localSaleId: persistedId, idempotencyKey: persistedId, syncStatus: 'synced' });
             } catch (error) {
                 console.error(`[SyncWorker] Failed to sync item in ${collection}:`, error);
                 // Keep as pending for next cycle

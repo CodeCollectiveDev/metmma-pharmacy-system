@@ -4,6 +4,7 @@ const processSale = async (req, res) => {
   const client = await pool.connect();
   
   try {
+    const idempotencyKey = req.get('x-idempotency-key') || req.body.localSaleId || req.body.local_sale_id || req.body.idempotencyKey || req.body.idempotency_key;
     const { items, totalAmount, paymentMethod, customerName, userId } = req.body;
 
     // Client-contract validation: reject malformed payloads instead of
@@ -25,6 +26,25 @@ const processSale = async (req, res) => {
     if (typeof totalAmount !== 'number' || totalAmount <= 0) {
       return res.status(400).json({ success: false, message: 'totalAmount is required and must be a positive number' });
     }
+
+    if (idempotencyKey) {
+      const existingSale = await client.query(
+        'SELECT * FROM sales WHERE local_sale_id = $1 LIMIT 1',
+        [idempotencyKey]
+      );
+
+      if (existingSale.rows.length > 0) {
+        const existing = existingSale.rows[0];
+        return res.status(200).json({
+          success: true,
+          duplicate: true,
+          message: 'Sale already processed',
+          receiptNumber: existing.receipt_number,
+          saleId: existing.id,
+          localSaleId: existing.local_sale_id
+        });
+      }
+    }
     
     // 1. Start Transaction
     await client.query('BEGIN');
@@ -33,11 +53,36 @@ const processSale = async (req, res) => {
     // Matching your SQL columns: receipt_number, total_amount, payment_method, customer_name, user_id
     const receiptNumber = `REC-${Date.now()}`;
     const saleResult = await client.query(
-      `INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, userId]
+      `INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id, local_sale_id) 
+       VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (local_sale_id) WHERE local_sale_id IS NOT NULL DO NOTHING
+       RETURNING *`,
+      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, userId, idempotencyKey || null]
     );
-    const saleId = saleResult.rows[0].id;
+
+    let saleRow = saleResult.rows[0];
+    if (!saleRow && idempotencyKey) {
+      const duplicateResult = await client.query(
+        'SELECT * FROM sales WHERE local_sale_id = $1 LIMIT 1',
+        [idempotencyKey]
+      );
+      saleRow = duplicateResult.rows[0];
+      await client.query('COMMIT');
+      return res.status(200).json({
+        success: true,
+        duplicate: true,
+        message: 'Sale already processed',
+        receiptNumber: saleRow.receipt_number,
+        saleId: saleRow.id,
+        localSaleId: saleRow.local_sale_id
+      });
+    }
+
+    if (!saleRow) {
+      throw new Error('Failed to create sales record');
+    }
+
+    const saleId = saleRow.id;
 
     // 3. Process each item
     for (const item of items) {
@@ -82,7 +127,8 @@ const processSale = async (req, res) => {
       success: true,
       message: 'Sale completed',
       receiptNumber,
-      saleId
+      saleId,
+      localSaleId: idempotencyKey || saleRow.local_sale_id
     });
 
   } catch (error) {

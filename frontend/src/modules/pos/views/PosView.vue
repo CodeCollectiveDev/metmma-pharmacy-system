@@ -91,6 +91,7 @@ const processPayment = async () => {
     // { items: [{ productId (DB id), quantity, unitPrice, subtotal }],
     //   totalAmount, paymentMethod, customerName, userId }
     const payload = {
+      localSaleId: globalThis.crypto?.randomUUID?.() || `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       items: store.cart.map(item => ({
         productId: Number(item.id),
         quantity: item.quantity,
