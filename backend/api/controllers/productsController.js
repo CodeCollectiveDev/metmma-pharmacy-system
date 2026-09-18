@@ -100,6 +100,11 @@ const getExpiringProducts = async (req, res) => {
 // --- WRITE OPERATIONS ---
 
 const createProduct = async (req, res) => {
+  const authenticatedUserId = req.user?.id;
+  if (!Number.isInteger(authenticatedUserId) || authenticatedUserId <= 0) {
+    return res.status(401).json({ error: 'Access denied. Not authenticated.' });
+  }
+
   try {
     const data = req.body; // Already validated by Joi
     
@@ -118,8 +123,8 @@ const createProduct = async (req, res) => {
 
     // Log initial stock movement
     if (data.quantity > 0) {
-      await pool.query('INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes) VALUES ($1, $2, $3, $4, $5, $6)',
-      [product.id, 'purchase', data.quantity, 0, data.quantity, 'Initial Inventory Entry']);
+      await pool.query('INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [product.id, 'purchase', data.quantity, 0, data.quantity, 'Initial Inventory Entry', authenticatedUserId]);
     }
 
     res.status(201).json({ success: true, data: formatProduct(product) });
@@ -129,6 +134,11 @@ const createProduct = async (req, res) => {
 };
 
 const updateProduct = async (req, res) => {
+  const authenticatedUserId = req.user?.id;
+  if (!Number.isInteger(authenticatedUserId) || authenticatedUserId <= 0) {
+    return res.status(401).json({ error: 'Access denied. Not authenticated.' });
+  }
+
   try {
     const { id } = req.params;
     const { reason, ...updates } = req.body; 
@@ -180,8 +190,8 @@ const updateProduct = async (req, res) => {
     if (isQuantityChanging) {
       const diff = parseInt(updates.quantity) - parseInt(current.quantity);
       await pool.query(
-        'INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes) VALUES ($1, $2, $3, $4, $5, $6)',
-        [id, diff > 0 ? 'adjustment_in' : 'adjustment_out', diff, current.quantity, updated.quantity, reason]
+        'INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [id, diff > 0 ? 'adjustment_in' : 'adjustment_out', diff, current.quantity, updated.quantity, reason, authenticatedUserId]
       );
     }
 

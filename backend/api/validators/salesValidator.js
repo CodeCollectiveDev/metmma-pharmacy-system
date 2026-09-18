@@ -10,8 +10,7 @@ const saleSchema = Joi.object({
   })).min(1).required(),
   totalAmount: money.required(),
   paymentMethod: Joi.string().trim().min(1).max(20).default('cash'),
-  customerName: Joi.string().trim().max(100).allow('', null),
-  userId: Joi.number().integer().positive().allow(null)
+  customerName: Joi.string().trim().max(100).allow('', null)
 }).required();
 
 const validateSale = (req, res, next) => {

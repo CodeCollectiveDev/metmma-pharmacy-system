@@ -1,10 +1,15 @@
 const pool = require('../db').pool;
 
 const processSale = async (req, res) => {
+  const authenticatedUserId = req.user?.id;
+  if (!Number.isInteger(authenticatedUserId) || authenticatedUserId <= 0) {
+    return res.status(401).json({ error: 'Access denied. Not authenticated.' });
+  }
+
   const client = await pool.connect();
   
   try {
-    const { items, totalAmount, paymentMethod, customerName, userId } = req.body;
+    const { items, totalAmount, paymentMethod, customerName } = req.body;
     
     // 1. Start Transaction
     await client.query('BEGIN');
@@ -15,7 +20,7 @@ const processSale = async (req, res) => {
     const saleResult = await client.query(
       `INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id) 
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, userId]
+      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, authenticatedUserId]
     );
     const saleId = saleResult.rows[0].id;
 
@@ -50,9 +55,9 @@ const processSale = async (req, res) => {
 
       // Log to stock_movements (audit trail)
       await client.query(
-        `INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes) 
-         VALUES ($1, 'sale', $2, $3, $4, $5)`,
-        [item.productId, -item.quantity, product.quantity, newQty, `Receipt: ${receiptNumber}`]
+        `INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes, user_id)
+         VALUES ($1, 'sale', $2, $3, $4, $5, $6)`,
+        [item.productId, -item.quantity, product.quantity, newQty, `Receipt: ${receiptNumber}`, authenticatedUserId]
       );
     }
 
@@ -70,7 +75,7 @@ const processSale = async (req, res) => {
         totalAmount,
         paymentMethod: paymentMethod || 'cash',
         customerName,
-        userId,
+        userId: authenticatedUserId,
         items
       }
     });

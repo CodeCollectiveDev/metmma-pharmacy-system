@@ -14,12 +14,13 @@ describe('checkout API boundary', () => {
             _id: 'local-sale', syncStatus: 'pending', date: '2026-01-01', cashier: 'User',
             items: [{ productId: 3, name: 'Product', quantity: 2, unitPrice: 10, [lineField]: 20 }],
             [lineField === 'total' ? 'total' : 'totalAmount']: 23.3,
-            paymentMethod: 'cash', userId: 1, tax: 3.3
+            paymentMethod: 'cash', userId: 2, tax: 3.3
         }
         await dataService.recordSale(sale)
         const [url, payload] = apiClient.post.mock.calls[0]
         expect(url).toBe('/sales/checkout')
-        expect(payload).toEqual({ items: [{ productId: 3, quantity: 2, unitPrice: 10, subtotal: 20 }], totalAmount: 23.3, paymentMethod: 'cash', userId: 1, customerName: undefined })
+        expect(payload).toEqual({ items: [{ productId: 3, quantity: 2, unitPrice: 10, subtotal: 20 }], totalAmount: 23.3, paymentMethod: 'cash', customerName: undefined })
+        expect(payload).not.toHaveProperty('userId')
         expect(saleSchema.validate(payload).error).toBeUndefined()
     })
 })

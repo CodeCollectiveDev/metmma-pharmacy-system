@@ -7,7 +7,7 @@ const { attendanceSchema } = require('../api/validators/attendanceValidators');
 
 const sale = {
   items: [{ productId: 1, quantity: 2, unitPrice: 10, subtotal: 20 }],
-  totalAmount: 23.30, paymentMethod: 'cash', customerName: 'Customer', userId: 1
+  totalAmount: 23.30, paymentMethod: 'cash', customerName: 'Customer'
 };
 const employee = {
   first_name: 'Jane', last_name: 'Smith', email: 'JANE@example.com',
@@ -25,6 +25,7 @@ test('checkout accepts the established contract and rejects invalid required fie
   assert.equal(saleSchema.validate(sale).error, undefined);
   for (const invalid of [
     { ...sale, totalAmount: undefined }, { ...sale, items: [] },
+    { ...sale, userId: 2 },
     { ...sale, totalAmount: -1 }, { ...sale, totalAmount: 'wrong' },
     { ...sale, items: [{ ...sale.items[0], productId: 'products_local' }] },
     { ...sale, items: [{ ...sale.items[0], quantity: -1 }] },
@@ -39,6 +40,9 @@ test('checkout validation returns field errors before invoking the controller', 
   const res = { status(code) { assert.equal(code, 400); return this; }, json(data) { body = data; } };
   validateSale({ body: { items: [], totalAmount: -1 } }, res, () => assert.fail('Invalid sale reached controller'));
   assert.deepEqual(body.errors.map(error => error.field), ['items', 'totalAmount']);
+
+  validateSale({ body: { ...sale, userId: 2 } }, res, () => assert.fail('Client identity reached controller'));
+  assert.deepEqual(body.errors.map(error => error.field), ['userId']);
 });
 
 test('employee creation keeps required persistence fields, including an optional role', () => {

@@ -9,6 +9,5 @@ export const toSalePayload = (sale) => ({
     })),
     totalAmount: sale.totalAmount ?? sale.total,
     paymentMethod: sale.paymentMethod,
-    customerName: sale.customerName,
-    userId: sale.userId
+    customerName: sale.customerName
 });

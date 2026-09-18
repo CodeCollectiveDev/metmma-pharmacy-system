@@ -109,7 +109,6 @@ export const usePosStore = defineStore('pos', () => {
             totalAmount: money(subtotal + tax),
             paymentMethod,
             customerName: null,
-            userId: user.id,
             cashier: user.name || 'Unknown'
         }
         const result = await dataOrchestrator.saveItem('transactions', transaction, dataService.recordSale)

@@ -46,7 +46,6 @@ const runTests = async () => {
     // --- 4. TEST: PROCESS A SALE ---
     console.log('▶️ Step 4: Processing a sale (Selling 10 units)...');
     const saleData = {
-      userId: 1, // Assuming a user exists
       customerName: "John Phiri",
       paymentMethod: "cash",
       totalAmount: 1500.00,

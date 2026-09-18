@@ -96,11 +96,12 @@ const saleData = {
   ],
   totalAmount: 750.00,
   paymentMethod: "cash",
-  customerName: "John Phiri",
-  userId: 1
+  customerName: "John Phiri"
 }
 const result = await dataService.recordSale(saleData)
 ```
+
+The authenticated JWT supplies the sale and stock-movement actor identity; callers do not submit a user ID.
 
 **Response**:
 ```json
