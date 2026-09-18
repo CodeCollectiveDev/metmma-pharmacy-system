@@ -59,8 +59,8 @@ A background services runs every 30 seconds to:
 ## 3. Security & RBAC
 
 ### Authentication:
-- **Online**: Authenticates against `/api/auth/login` and receives a **JWT Bearer Token**.
-- **Offline**: Supports emergency login for existing sessions by validating against locally stored user profiles.
+- **Online**: Authenticates against `/api/auth/login` and receives a **JWT Bearer Token**. Upon successful authentication, user credentials are secure-cached locally using salted PBKDF2 hashes (SHA-256, 100,000 iterations) via the standard Web Crypto API.
+- **Offline Fallback**: When the backend is unreachable or offline, previously authenticated terminal users can log in offline by validating against locally stored salted cryptographic hashes. Plaintext passwords are never stored in browser storage (eliminating CWE-256).
 - **Persistence**: Token and User Role are stored in `localStorage` for session recovery.
 
 ### Role-Based Access Control (RBAC):
@@ -70,20 +70,13 @@ Enforced via Vue Router Navigation Guards in `router/index.js`.
 
 ---
 
-## 4. Testing & Credentials
+## 4. Offline Credential Management & Security
 
-### Offline Seeding
-Upon the first initialization (or while online), the system seeds the local database with initial test data.
-
-### Test Credentials (Local DB):
-
-| Role | Email Address | Password |
-| :--- | :--- | :--- |
-| **Admin** | `admin@metmma.com` | `admin` |
-| **Pharmacist** | `pharmacist@metmma.com` | `pharm` |
-| **Cashier** | `cashier@metmma.com` | `cashier` |
-| **Manager** | `manager@metmma.com` | `manager` |
-| **HR Officer** | `hr@metmma.com` | `hr` |
+### Secure Local Credential Caching:
+- **PBKDF2 Key Derivation**: Uses `window.crypto.subtle` with SHA-256, 100,000 iterations, and a unique 16-byte cryptographically secure random salt generated per user.
+- **Zero Plaintext Storage**: Plaintext passwords are never persisted to IndexedDB or `localStorage`.
+- **Offline Authentication**: Verified by computing the candidate PBKDF2 hash against the stored salt and comparing hashes in constant time.
+- **Backend Error Handling**: Online authentication failures (401 Unauthorized) are strictly enforced without offline fallback; offline fallback only activates when network or backend connectivity is unavailable.
 
 ---
 

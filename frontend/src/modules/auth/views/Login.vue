@@ -16,7 +16,7 @@
 
       <form @submit.prevent="login" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Username or Email</label>
           <input 
             v-model="email" 
             type="text" 
@@ -62,15 +62,14 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { authService } from '@/services/api/authService';
+import { cacheUserForOffline, authenticateOffline } from '@/services/auth/offlineAuth';
 
 const email = ref("");
 const password = ref("");
 const error = ref("");
 const loading = ref(false);
 const router = useRouter();
-
-import { authService } from '@/services/api/authService';
-import { getAll } from '@/pouchdb';
 
 async function login() {
   error.value = "";
@@ -90,6 +89,13 @@ async function login() {
         role: data.user.role.toLowerCase()
       }));
 
+      // Cache user credentials securely for emergency offline access
+      try {
+        await cacheUserForOffline(data.user, password.value, email.value);
+      } catch (cacheErr) {
+        console.warn('[Login] Failed to cache user for offline login:', cacheErr);
+      }
+
       // Role-based redirect
       const role = data.user.role.toLowerCase();
       if (role === 'cashier') {
@@ -105,21 +111,26 @@ async function login() {
     if (err.response && err.response.status === 401) {
       error.value = "Invalid credentials. Please try again.";
     } else {
-      // Offline fallback: Check local storage for emergency login if backend is down
+      // Offline fallback: verify credentials locally if backend is unreachable
       try {
-        const users = await getAll('users');
-        const user = users.find(u => u.email === email.value && u.password === password.value);
-        if (user) {
-          localStorage.setItem("token", "pouchdb-session-" + user._id);
-          localStorage.setItem("role", user.role);
-          localStorage.setItem("user", JSON.stringify(user));
-          router.push(user.role === 'cashier' ? '/pos' : '/dashboard');
+        const offlineUser = await authenticateOffline(email.value, password.value);
+        if (offlineUser) {
+          const role = (offlineUser.role || '').toLowerCase();
+          localStorage.setItem("token", "pouchdb-session-" + offlineUser.id);
+          localStorage.setItem("role", role);
+          localStorage.setItem("user", JSON.stringify({
+            id: offlineUser.id,
+            name: offlineUser.username,
+            email: offlineUser.email || email.value,
+            role: role
+          }));
+          router.push(role === 'cashier' ? '/pos' : '/dashboard');
           return;
         }
       } catch (localErr) {
         console.error('[Login] Local fallback failed:', localErr);
       }
-      error.value = "Server unreachable. Only offline login for existing sessions available.";
+      error.value = "Server unreachable and no valid offline credentials found for this account on this device. Please connect to the network to sign in.";
     }
   } finally {
     loading.value = false;
