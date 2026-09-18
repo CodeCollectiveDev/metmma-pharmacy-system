@@ -13,6 +13,10 @@ const schema = `contract_test_${randomUUID().replaceAll('-', '')}`;
 const admin = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
 const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, options: `-c search_path=${schema}` });
 require.cache[require.resolve('../../api/db')] = { exports: { pool, query: (...args) => pool.query(...args) } };
+// Point the auth routes' user pool at the isolated schema so transaction-based
+// user provisioning exercises the real route <-> model path.
+const realUserModel = require('../../models/user');
+require.cache[require.resolve('../../models/user')] = { exports: { ...realUserModel, pool } };
 let server;
 let base;
 let employeeId;
@@ -67,6 +71,7 @@ before(async () => {
   app.use('/products', require('../../api/routes/productsRoutes'));
   app.use('/employees', require('../../api/routes/employeesRoutes'));
   app.use('/attendance', require('../../api/routes/attendanceRoutes'));
+  app.use('/auth', require('../../routes/authRoutes'));
   server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   base = `http://127.0.0.1:${server.address().port}`;
@@ -365,4 +370,107 @@ test('email migration preserves legacy rows and can run repeatedly', async () =>
     await client.query(`DROP SCHEMA IF EXISTS ${legacySchema} CASCADE`);
     client.release();
   }
+});
+
+test('creating a user without an employee_id auto-provisions an employee record', async () => {
+  const response = await request('/auth/users', {
+    method: 'POST',
+    body: {
+      username: 'newcashier',
+      password: 'secret123',
+      full_name: 'Jane Smith',
+      email: 'jane.smith@example.com',
+      role: 'cashier'
+    }
+  });
+  assert.equal(response.status, 201, JSON.stringify(response.data));
+  assert.ok(response.data.user.id);
+  assert.ok(response.data.employee);
+  assert.equal(response.data.employee.user_id, response.data.user.id);
+
+  const employee = (await pool.query(
+    'SELECT * FROM employees WHERE user_id = $1',
+    [response.data.user.id]
+  )).rows[0];
+  assert.ok(employee, 'employee row exists for the new user');
+  assert.equal(employee.first_name, 'Jane');
+  assert.equal(employee.last_name, 'Smith');
+  assert.equal(employee.email, 'jane.smith@example.com');
+  assert.equal(employee.role, 'Cashier');
+  assert.equal(employee.is_active, true);
+  assert.ok(employee.hire_date);
+  assert.match(employee.employee_id, /^EMP-\d{6}$/);
+});
+
+test('creating a user with an employee_id links the existing employee instead', async () => {
+  const created = await request('/employees', { method: 'POST', body: {
+    first_name: 'John', last_name: 'Doe', email: 'john.doe@example.com',
+    department: 'Sales', role: 'sales_assistant',
+    hire_date: '2026-01-15', salary: 500
+  } });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  const employeeId = created.data.id;
+
+  const response = await request('/auth/users', {
+    method: 'POST',
+    body: {
+      username: 'johnlinked',
+      password: 'secret123',
+      full_name: 'John Doe',
+      email: 'john.doe@example.com',
+      role: 'cashier',
+      employee_id: employeeId
+    }
+  });
+  assert.equal(response.status, 201, JSON.stringify(response.data));
+  assert.equal(response.data.employee.id, employeeId);
+  assert.equal(response.data.employee.user_id, response.data.user.id);
+
+  const linked = (await pool.query('SELECT * FROM employees WHERE id = $1', [employeeId])).rows[0];
+  assert.equal(linked.user_id, response.data.user.id);
+  assert.equal(linked.employee_id, created.data.employee_id, 'existing employee data preserved');
+});
+
+test('linking an already-linked employee is rejected and rolls the user back', async () => {
+  const linkedEmployee = (await pool.query(
+    `SELECT e.id FROM employees e
+     JOIN users u ON u.id = e.user_id
+     WHERE u.username = $1`,
+    ['johnlinked']
+  )).rows[0];
+
+  const response = await request('/auth/users', {
+    method: 'POST',
+    body: {
+      username: 'shouldnotexist',
+      password: 'secret123',
+      full_name: 'Jane Rollback',
+      email: 'rollback@example.com',
+      role: 'cashier',
+      employee_id: linkedEmployee.id
+    }
+  });
+  assert.equal(response.status, 409, JSON.stringify(response.data));
+  assert.match(response.data.error, /already has an account/);
+  assert.equal((await pool.query(
+    'SELECT COUNT(*) FROM users WHERE username = $1', ['shouldnotexist']
+  )).rows[0].count, '0', 'failed provisioning rolled back the user insert');
+});
+
+test('linking a nonexistent employee rejects without creating a user', async () => {
+  const response = await request('/auth/users', {
+    method: 'POST',
+    body: {
+      username: 'nope',
+      password: 'secret123',
+      full_name: 'No One',
+      email: 'nope@example.com',
+      role: 'cashier',
+      employee_id: 99999999
+    }
+  });
+  assert.equal(response.status, 404, JSON.stringify(response.data));
+  assert.equal((await pool.query(
+    'SELECT COUNT(*) FROM users WHERE username = $1', ['nope']
+  )).rows[0].count, '0');
 });

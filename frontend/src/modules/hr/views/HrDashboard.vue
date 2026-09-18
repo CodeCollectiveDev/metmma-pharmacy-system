@@ -1,11 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { useHrStore } from '../store/hrStore'
+import { useRole } from '@/composables/useRole'
 import { Plus, Search, UserPlus, Calendar, DollarSign, MoreVertical, Palmtree, RefreshCw, CheckCircle2, XCircle } from 'lucide-vue-next'
 import TableSkeleton from '@/modules/shared/components/skeleton/TableSkeleton.vue'
 
 const store = useHrStore()
+const router = useRouter()
+const { canManageUsers } = useRole()
 const activeTab = ref('employees')
 const showAddForm = ref(false)
 const searchQuery = ref('')
@@ -100,6 +104,14 @@ const formatDate = (d) => {
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK', minimumFractionDigits: 0 }).format(amount || 0)
+}
+
+// Jump to User Management with the employee preselected so an account can be
+// provisioned without retyping the employee's details.
+const grantAccount = (emp) => {
+  const id = emp.id ?? emp._id
+  if (!id) return
+  router.push({ path: '/users', query: { employee: String(id) } })
 }
 </script>
 
@@ -238,7 +250,10 @@ const formatCurrency = (amount) => {
                   {{ emp.status }}
                 </span>
               </td>
-              <td class="px-6 py-4 text-right">
+              <td class="px-6 py-4 text-right space-x-2">
+                <button v-if="canManageUsers && !emp.user_id" @click="grantAccount(emp)" class="px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center gap-1" :title="`Create a login account for ${emp.name}`">
+                  <UserPlus class="w-3.5 h-3.5" /> Create account
+                </button>
                 <button class="p-1 hover:bg-gray-100 rounded-lg transition-colors">
                   <MoreVertical class="w-4 h-4 text-gray-500" />
                 </button>
