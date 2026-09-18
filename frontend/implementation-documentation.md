@@ -59,9 +59,8 @@ A background services runs every 30 seconds to:
 ## 3. Security & RBAC
 
 ### Authentication:
-- **Online**: Authenticates against `/api/auth/login` and receives a **JWT Bearer Token**.
-- **Offline**: Supports emergency login for existing sessions by validating against locally stored user profiles.
-- **Persistence**: Token and User Role are stored in `localStorage` for session recovery.
+- **Online only**: Sign-in requires an active connection to `/api/auth/login`, which returns a **JWT Bearer Token** (and refresh token). Offline emergency login is not supported so that authentication and server-side token revocation remain enforceable.
+- **Persistence**: Access token, refresh token, and user role are stored in `localStorage` for session recovery while the tab or browser remains open. An existing session continues to work offline for cached data and queued mutations; signing in again after logout requires connectivity.
 
 ### Role-Based Access Control (RBAC):
 Enforced via Vue Router Navigation Guards in `router/index.js`.
@@ -72,18 +71,7 @@ Enforced via Vue Router Navigation Guards in `router/index.js`.
 
 ## 4. Testing & Credentials
 
-### Offline Seeding
-Upon the first initialization (or while online), the system seeds the local database with initial test data.
-
-### Test Credentials (Local DB):
-
-| Role | Email Address | Password |
-| :--- | :--- | :--- |
-| **Admin** | `admin@metmma.com` | `admin` |
-| **Pharmacist** | `pharmacist@metmma.com` | `pharm` |
-| **Cashier** | `cashier@metmma.com` | `cashier` |
-| **Manager** | `manager@metmma.com` | `manager` |
-| **HR Officer** | `hr@metmma.com` | `hr` |
+User accounts are provisioned on the server (see `DEPLOYMENT.md` and `docs/TESTING_GUIDE.md` for creating an admin via `createAdmin.js`). Local IndexedDB stores business data (products, transactions, etc.) only—not credentials.
 
 ---
 
