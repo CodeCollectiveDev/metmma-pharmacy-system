@@ -1,12 +1,14 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { BrowserMultiFormatReader } from '@zxing/browser'
+import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import { Camera, X } from 'lucide-vue-next'
 
 const emit = defineEmits(['detected', 'close'])
 
 const videoElement = ref(null)
 const errorMessage = ref('')
+const isScanning = ref(false)
 let reader
 let controls
 let scannerClosed = false
@@ -26,13 +28,28 @@ const closeScanner = () => {
 }
 
 onMounted(async () => {
-  reader = new BrowserMultiFormatReader()
+  const hints = new Map()
+  hints.set(DecodeHintType.TRY_HARDER, true)
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.ITF
+  ])
+  reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 })
 
   try {
     controls = await reader.decodeFromConstraints(
       {
         audio: false,
-        video: { facingMode: { ideal: 'environment' } }
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
       },
       videoElement.value,
       (result) => {
@@ -43,10 +60,13 @@ onMounted(async () => {
         emit('detected', barcode)
       }
     )
+    await videoElement.value?.play()
+    isScanning.value = true
     if (scannerClosed) controls?.stop()
   } catch (error) {
     console.error('Camera scanner error:', error)
     errorMessage.value = 'Camera access failed. Check browser permissions and use HTTPS or localhost.'
+    isScanning.value = false
   }
 })
 
@@ -73,7 +93,8 @@ onBeforeUnmount(stopScanning)
 
         <div class="space-y-3 px-4 py-4">
           <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
-          <p v-else class="text-sm text-gray-600">Point your rear camera at a product barcode.</p>
+          <p v-else-if="isScanning" class="text-sm text-gray-600">Searching for a barcode. Hold it inside the camera view.</p>
+          <p v-else class="text-sm text-gray-600">Starting camera...</p>
           <button type="button" @click="closeScanner" class="w-full rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 hover:bg-gray-200">
             Cancel
           </button>

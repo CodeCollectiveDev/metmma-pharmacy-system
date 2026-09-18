@@ -20,6 +20,7 @@ const showCameraScanner = ref(false)
 
 const newProduct = ref({
   name: '',
+  barcode: '',
   category: 'Antibiotics',
   batchNumber: '',
   expiryDate: '',
@@ -70,15 +71,15 @@ const handleCameraBarcode = (barcode) => {
 }
 
 const saveProduct = async () => {
-  if (!newProduct.value.name || !newProduct.value.batchNumber) {
-    alert('Please fill required fields (Name, Batch Number)')
+  if (!newProduct.value.name || !newProduct.value.batchNumber || !newProduct.value.expiryDate || !newProduct.value.supplier) {
+    alert('Please fill required fields (Name, Batch Number, Expiry Date, Supplier)')
     return
   }
   
   const success = await store.addProduct({ ...newProduct.value })
   if (success) {
     showAddForm.value = false
-    newProduct.value = { name: '', category: 'Antibiotics', batchNumber: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
+    newProduct.value = { name: '', barcode: '', category: 'Antibiotics', batchNumber: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
     alert('Product added successfully!')
   }
 }
@@ -208,14 +209,15 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
       <h3 class="app-section-title mb-4">Add New Product</h3>
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <input v-model="newProduct.name" type="text" placeholder="Product Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <input v-model="newProduct.barcode" type="text" inputmode="numeric" placeholder="Barcode" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <input v-model="newProduct.batchNumber" type="text" placeholder="Batch Number *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <select v-model="newProduct.category" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <option v-for="cat in categories" :key="cat">{{ cat }}</option>
         </select>
-        <input v-model="newProduct.expiryDate" type="date" placeholder="Expiry Date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model="newProduct.supplier" type="text" placeholder="Supplier" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.price" type="number" placeholder="Price (MWK)" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.stock" type="number" placeholder="Quantity" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <input v-model="newProduct.expiryDate" type="date" placeholder="Expiry Date" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <input v-model="newProduct.supplier" type="text" placeholder="Supplier *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <input v-model.number="newProduct.price" type="number" min="0" placeholder="Price (MWK)" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <input v-model.number="newProduct.stock" type="number" min="0" placeholder="Quantity" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <input v-model.number="newProduct.minStockLevel" type="number" placeholder="Min Stock Level" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
       </div>
       <div class="flex justify-end mt-4">
