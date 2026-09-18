@@ -57,7 +57,7 @@ const normalizeRole = (role) => {
   return aliases[compact] || null;
 };
 
-const createUser = async ({ username, password, role, full_name, email }) => {
+const createUser = async ({ username, password, role, full_name, email }, client = pool) => {
   const normalizedRole = normalizeRole(role);
   if (!normalizedRole || !DB_ROLES.includes(normalizedRole)) {
     const err = new Error('Invalid role');
@@ -83,7 +83,7 @@ const createUser = async ({ username, password, role, full_name, email }) => {
       RETURNING id, username, email, role, full_name, is_active, created_at
     `;
     values = [username, hashedPassword, email || null, normalizedRole, full_name];
-    result = await pool.query(query, values);
+    result = await client.query(query, values);
     return result.rows[0];
   } catch (err) {
     // If full_name or email columns don't exist, try minimal schema
@@ -96,7 +96,7 @@ const createUser = async ({ username, password, role, full_name, email }) => {
           RETURNING id, username, role, created_at
         `;
         values = [username, hashedPassword, normalizedRole];
-        result = await pool.query(query, values);
+        result = await client.query(query, values);
         // Add missing fields for API consistency
         return { 
           ...result.rows[0], 
@@ -195,4 +195,4 @@ const setUserPassword = async (id, password) => {
   return result.rows[0] || null;
 };
 
-module.exports = { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES };
+module.exports = { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES, pool };

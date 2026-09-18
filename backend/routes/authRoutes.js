@@ -2,8 +2,7 @@ const express = require('express');
 const Joi = require('joi');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { randomUUID } = require('crypto');
-const { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES } = require('../models/user');
+const { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES, pool } = require('../models/user');
 const { authenticate, authorize, ROLES } = require('../middleware/roleMiddleware');
 const {
   createSession,
@@ -257,6 +256,9 @@ router.get('/sessions', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGIN
 // Protected: only a super_admin or managing_director can provision new accounts.
 // Public self-registration was removed for security (see issues/issue1.md).
 router.post('/users', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR), async (req, res) => {
+  let client;
+  let transactionStarted = false;
+
   try {
     // Validate input
     const { error, value } = createUserSchema.validate(req.body);
@@ -265,12 +267,21 @@ router.post('/users', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_
     }
 
     const { username, password, role, full_name, email } = value;
+    client = await pool.connect();
+    await client.query('BEGIN');
+    transactionStarted = true;
 
     // Create user in users table
-    const user = await createUser({ username, password, role, full_name, email });
+    const user = await createUser({ username, password, role, full_name, email }, client);
+    await client.query('COMMIT');
+    transactionStarted = false;
 
     res.status(201).json({ message: 'User created successfully', user });
   } catch (err) {
+    if (client && transactionStarted) {
+      await client.query('ROLLBACK');
+    }
+
     if (err.code === '23505') { // Unique violation
       res.status(409).json({ error: 'Username already exists' });
     } else if (err.code === 'INVALID_ROLE' || err.code === 'INVALID_FULL_NAME') {
@@ -279,6 +290,8 @@ router.post('/users', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_
       console.error(err);
       res.status(500).json({ error: 'Internal server error' });
     }
+  } finally {
+    client?.release();
   }
 });
 
