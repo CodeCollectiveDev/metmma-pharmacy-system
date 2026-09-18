@@ -5,7 +5,7 @@
 import { bulkDocs, getAll } from './index';
 
 const initialUsers = [
-    { _id: 'user_admin', name: 'Admin User', email: 'admin@metmma.com', password: 'admin', role: 'admin' },
+    { _id: 'user_admin', name: 'Super Admin', email: 'admin@metmma.com', password: 'admin', role: 'super_admin' },
     { _id: 'user_pharmacist', name: 'Pharmacist Jane', email: 'pharmacist@metmma.com', password: 'pharm', role: 'pharmacist' },
     { _id: 'user_cashier', name: 'Cashier Mike', email: 'cashier@metmma.com', password: 'cashier', role: 'cashier' },
     { _id: 'user_manager', name: 'Manager Steve', email: 'manager@metmma.com', password: 'manager', role: 'store_manager' },

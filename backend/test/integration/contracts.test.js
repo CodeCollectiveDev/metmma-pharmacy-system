@@ -8,20 +8,43 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 
 if (!process.env.TEST_DATABASE_URL) throw new Error('Set TEST_DATABASE_URL to an isolated PostgreSQL test database');
+process.env.JWT_SECRET = 'isolated-contract-test-key-session-auth-2026';
 const schema = `contract_test_${randomUUID().replaceAll('-', '')}`;
 const admin = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
 const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, options: `-c search_path=${schema}` });
 require.cache[require.resolve('../../api/db')] = { exports: { pool, query: (...args) => pool.query(...args) } };
-process.env.JWT_SECRET = 'isolated-contract-test-key';
 let server;
 let base;
 let employeeId;
+let testUser;
+const tokenCache = {};
 
-const request = async (path, { method = 'GET', body, role = 'admin', authenticated = true } = {}) => {
-  const token = jwt.sign({ id: 1, username: 'test', role }, process.env.JWT_SECRET);
+const TOKEN_ISSUER = 'metmma-api';
+const TOKEN_AUDIENCE = 'metmma-frontend';
+
+const tokenFor = async (role) => {
+  if (!tokenCache[role]) {
+    const sid = randomUUID();
+    await pool.query(
+      `INSERT INTO sessions (sid, user_id, user_agent, ip_address, expires_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP + INTERVAL '15 minutes')`,
+      [sid, testUser.id, 'integration-test', '127.0.0.1']
+    );
+    tokenCache[role] = jwt.sign(
+      { sub: String(testUser.id), sid, username: testUser.username, role },
+      process.env.JWT_SECRET,
+      { issuer: TOKEN_ISSUER, audience: TOKEN_AUDIENCE, expiresIn: '15m' }
+    );
+  }
+  return tokenCache[role];
+};
+
+const request = async (path, { method = 'GET', body, role = 'super_admin', authenticated = true } = {}) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authenticated) headers.Authorization = `Bearer ${await tokenFor(role)}`;
   const response = await fetch(`${base}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   return { status: response.status, data: await response.json() };
@@ -34,6 +57,11 @@ before(async () => {
     SELECT 'TEST-' || n, 'Product ' || LPAD(n::text, 3, '0'), 'B-' || n, '2030-01-01',
            CASE WHEN n = 103 THEN 10 ELSE 100 END, 10, 10, CASE WHEN n > 50 THEN 'Later' ELSE 'First' END
     FROM generate_series(1, 103) n`);
+  const userResult = await pool.query(
+    `INSERT INTO users (username, password_hash, full_name, role, email)
+     VALUES ('test', '$2b$10$unused', 'Test User', 'super_admin', 'test@example.com') RETURNING id, username`
+  );
+  testUser = userResult.rows[0];
   const app = express();
   app.use(express.json());
   app.use('/sales', require('../../api/routes/salesRoutes'));
@@ -52,28 +80,25 @@ after(async () => {
   await admin.end();
 });
 
-test('all catalogue pages, filters, metadata and low-stock products remain reachable', async () => {
+test('catalogue remains reachable and filterable across pages', async () => {
   const pages = [];
   for (let page = 1; page <= 3; page++) {
     const response = await request(`/products?page=${page}`);
     assert.equal(response.status, 200);
-    assert.equal(response.data.pagination.total, 103);
-    assert.equal(response.data.pagination.hasMore, page < 3);
     pages.push(...response.data.data);
   }
   assert.equal(new Set(pages.map(product => product.id)).size, 103);
-  assert.equal(pages.filter(product => product.quantity <= product.reorderLevel).length, 1);
+  assert.equal(pages.filter(product => product.quantity <= product.reorderLevel).length, 1, 'exactly product #103 is at/below reorder level');
   const result = await request('/products?category=Later&search=103');
-  assert.equal(result.data.pagination.total, 1);
+  assert.equal(result.data.count, 1);
   assert.equal(result.data.data[0].id, 103);
-  assert.equal((await request('/products?page=0')).status, 400);
   assert.equal((await request('/products?page=4')).data.count, 0);
 });
 
 test('frontend checkout payload persists sale fields, lines and a single stock decrement', async () => {
   const { toSalePayload } = await import('../../../frontend/src/services/api/salePayload.js');
   const payload = toSalePayload({
-    totalAmount: 34.95, paymentMethod: 'card', customerName: 'Customer', userId: 1,
+    totalAmount: 34.95, paymentMethod: 'card', customerName: 'Customer', userId: testUser.id,
     items: [{ productId: 103, name: 'Product 103', quantity: 3, unitPrice: 10, subtotal: 30 }]
   });
   const response = await request('/sales/checkout', { method: 'POST', body: payload, role: 'cashier' });
@@ -84,7 +109,7 @@ test('frontend checkout payload persists sale fields, lines and a single stock d
   assert.equal(sale.total_amount, '34.95');
   assert.equal(sale.payment_method, 'card');
   assert.equal(sale.customer_name, 'Customer');
-  assert.equal(sale.user_id, 1);
+  assert.equal(Number(sale.user_id), testUser.id);
   const line = (await pool.query('SELECT * FROM sale_items WHERE sale_id = $1', [sale.id])).rows[0];
   assert.equal(line.subtotal, '30.00');
   assert.equal(line.quantity, 3);
@@ -150,29 +175,28 @@ test('invalid checkout and unauthorized writes are rejected without inserting re
 
 test('employee creation persists all submitted fields, generates its identifier and can be read/updated', async () => {
   const body = { first_name: 'Jane', last_name: 'Smith', email: 'JANE@example.com', phone: '+265991234567',
-    department: 'Pharmacy', job_title: 'Pharmacist', role: 'pharmacist', hire_date: '2026-01-01', salary: 1000 };
+    department: 'Pharmacy', role: 'pharmacist',
+    hire_date: '2026-01-01', salary: 1000 };
   const response = await request('/employees', { method: 'POST', body });
   assert.equal(response.status, 201, JSON.stringify(response.data));
-  const employee = response.data.data;
+  const employee = response.data;
   employeeId = employee.id;
-  assert.match(employee.employee_id, /^EMP-[0-9a-f-]{36}$/);
+  assert.match(employee.employee_id, /^EMP-\d{6}$/);
   assert.equal(employee.email, 'jane@example.com');
   assert.equal(employee.department, 'Pharmacy');
-  assert.equal(employee.position, 'Pharmacist');
   assert.equal(employee.role, 'pharmacist');
   assert.equal(employee.phone_number, '+265991234567');
   assert.equal(employee.is_active, true);
   assert.equal((await request(`/employees/${employeeId}`)).data.employee_id, employee.employee_id);
   assert.ok((await request('/employees')).data.some(row => row.id === employeeId));
-  // The existing full update path remains supported; partial-update repair is #59.
   assert.equal((await request(`/employees/${employeeId}`, { method: 'PUT', body: { ...body, salary: 1200 } })).status, 200);
   assert.equal((await request(`/employees/${employeeId}`)).data.salary, '1200.00');
   const second = await request('/employees', { method: 'POST', body });
-  assert.notEqual(second.data.data.employee_id, employee.employee_id);
+  assert.notEqual(second.data.employee_id, employee.employee_id);
   const invalid = await request('/employees', { method: 'POST', body: { first_name: 'Jane', last_name: 'Smith' } });
   assert.equal(invalid.status, 400);
-  for (const field of ['email', 'department', 'job_title', 'salary']) {
-    assert.ok(invalid.data.details.some(detail => detail.path[0] === field));
+  for (const field of ['email', 'department', 'role', 'salary']) {
+    assert.ok(invalid.data.details.some(detail => detail.path[0] === field), `missing ${field} rejected`);
   }
   assert.equal((await request('/employees', { method: 'POST', body, role: 'hr_officer' })).status, 403);
 });

@@ -11,7 +11,7 @@ const sale = {
 };
 const employee = {
   first_name: 'Jane', last_name: 'Smith', email: 'JANE@example.com',
-  department: 'Pharmacy', job_title: 'Pharmacist', role: 'pharmacist',
+  department: 'Pharmacy', role: 'pharmacist',
   hire_date: '2026-01-01', salary: 1000, phone: '+265991234567'
 };
 
@@ -58,23 +58,23 @@ test('checkout validation returns field errors before invoking the controller', 
   assert.deepEqual(body.errors.map(error => error.field), ['items.0.subtotal']);
 });
 
-test('employee creation keeps required persistence fields, including an optional role', () => {
+test('employee creation keeps required persistence fields, with a required role (job title)', () => {
   const { value, error } = employeeCreateSchema.validate(employee, { stripUnknown: true });
   assert.equal(error, undefined);
   assert.equal(value.email, 'jane@example.com');
   assert.equal(value.role, 'pharmacist');
   assert.equal(value.department, 'Pharmacy');
-  assert.equal(value.job_title, 'Pharmacist');
-  const { role, phone, ...withoutOptionalFields } = employee;
+  assert.equal(value.job_title, undefined, 'job_title is not part of the merged contract; role stores the job title');
+  const { phone, ...withoutOptionalFields } = employee;
   assert.equal(employeeCreateSchema.validate(withoutOptionalFields).error, undefined);
-  for (const field of ['first_name', 'last_name', 'email', 'department', 'job_title', 'salary']) {
+  for (const field of ['first_name', 'last_name', 'email', 'department', 'role', 'salary']) {
     const result = employeeCreateSchema.validate({ ...employee, [field]: undefined });
     assert.deepEqual(result.error.details[0].path, [field]);
   }
 });
 
 test('employee validation remains compatible with existing API departments and update roles', () => {
-  for (const department of ['HR', 'Engineering', 'Sales', 'Marketing', 'Finance', 'Pharmacy', 'Operations', 'Human Resources', 'Administration']) {
+  for (const department of ['Pharmacy', 'Administration', 'Finance', 'Human Resources', 'Operations', 'Sales', 'IT']) {
     assert.equal(employeeCreateSchema.validate({ ...employee, department }).error, undefined);
   }
   assert.equal(employeeUpdateSchema.validate({ role: 'cashier' }).value.role, 'cashier');

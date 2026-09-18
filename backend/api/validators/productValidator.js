@@ -30,6 +30,10 @@ const updateProductSchema = createProductSchema.fork(
   })
 }).min(1);
 
+const expiringProductsQuerySchema = Joi.object({
+  days: Joi.number().integer().positive().default(90)
+});
+
 const validateProduct = (schema) => {
   return (req, res, next) => {
     // stripUnknown: true will now keep 'reason' because it's in the schema
@@ -43,4 +47,25 @@ const validateProduct = (schema) => {
   };
 };
 
-module.exports = { createProductSchema, updateProductSchema, validateProduct };
+const validateExpiringProductsQuery = (req, res, next) => {
+  const { error, value } = expiringProductsQuerySchema.validate(req.query, {
+    abortEarly: false,
+    stripUnknown: true
+  });
+
+  if (error) {
+    const errors = error.details.map(d => ({ field: d.path.join('.'), message: d.message.replace(/"/g, "'") }));
+    return res.status(400).json({ success: false, message: 'Validation failed', errors });
+  }
+
+  req.validatedExpiringProductsQuery = value;
+  next();
+};
+
+module.exports = {
+  createProductSchema,
+  updateProductSchema,
+  expiringProductsQuerySchema,
+  validateProduct,
+  validateExpiringProductsQuery
+};

@@ -12,13 +12,12 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  X,
-  Lock
+  X
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
-const { logout: logoutRole, userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos } = useRole()
+const { logout: logoutRole, userRole, canAccessHr, canAccessInventory, canAccessReports, canAccessPos, canManageUsers } = useRole()
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },
@@ -41,7 +40,7 @@ const allMenuItems = [
     path: '/dashboard', 
     label: 'Dashboard', 
     icon: LayoutDashboard, 
-    show: computed(() => ['admin', 'store_manager', 'pharmacist', 'hr_officer'].includes(userRole.value))
+    show: computed(() => true)
   },
   { 
     path: '/pos', 
@@ -59,8 +58,13 @@ const allMenuItems = [
     path: '/hr', 
     label: 'HR Management', 
     icon: Users, 
-    show: canAccessHr,
-    restricted: true // Marks as sensitive/restricted feature
+    show: canAccessHr
+  },
+  { 
+    path: '/users', 
+    label: 'User Management', 
+    icon: Settings, 
+    show: canManageUsers
   },
   { 
     path: '/reports', 
@@ -76,8 +80,8 @@ const menuItems = computed(() => {
 
 const isActive = (path) => route.path === path || route.path.startsWith(path + '/')
 
-const handleLogout = () => {
-  logoutRole()
+const handleLogout = async () => {
+  await logoutRole()
   router.push('/login')
 }
 </script>
@@ -121,12 +125,10 @@ const handleLogout = () => {
                 ? 'bg-blue-600 text-white' 
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white'
             ]"
-            :title="item.restricted ? 'Restricted to HR Officers and Admins' : ''"
           >
             <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
-            <span class="text-sm font-medium flex items-center gap-2" :class="{ 'md:hidden': collapsed }">
+            <span class="text-sm font-medium" :class="{ 'md:hidden': collapsed }">
               {{ item.label }}
-              <Lock v-if="item.restricted" class="w-3 h-3 text-amber-400" />
             </span>
           </router-link>
         </li>

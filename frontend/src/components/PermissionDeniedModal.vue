@@ -55,6 +55,7 @@ const showModal = (userRole) => {
 const goToLogin = () => {
   // Clear session
   localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
   localStorage.removeItem('role');
   localStorage.removeItem('user');
   isOpen.value = false;
