@@ -104,6 +104,77 @@ test('frontend checkout payload persists sale fields, lines and a single stock d
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 1')).rowCount, 0);
 });
 
+test('inactive products are unavailable through direct checkout and mixed carts roll back', async () => {
+  const activeProductId = 10;
+  const inactiveProductId = 20;
+  const zeroStockInactiveProductId = 21;
+  const missingProductId = 999999;
+  const activeStock = (await pool.query('SELECT quantity FROM products WHERE id = $1', [activeProductId])).rows[0].quantity;
+  const inactiveStock = (await pool.query('SELECT quantity FROM products WHERE id = $1', [inactiveProductId])).rows[0].quantity;
+
+  const deletion = await request(`/products/${inactiveProductId}`, { method: 'DELETE' });
+  assert.equal(deletion.status, 200, JSON.stringify(deletion.data));
+  assert.equal((await pool.query('SELECT is_active FROM products WHERE id = $1', [inactiveProductId])).rows[0].is_active, false);
+
+  await pool.query('UPDATE products SET quantity = 0 WHERE id = $1', [zeroStockInactiveProductId]);
+  const zeroStockDeletion = await request(`/products/${zeroStockInactiveProductId}`, { method: 'DELETE' });
+  assert.equal(zeroStockDeletion.status, 200, JSON.stringify(zeroStockDeletion.data));
+
+  const saleCount = Number((await pool.query('SELECT COUNT(*) FROM sales')).rows[0].count);
+  const saleItemCount = Number((await pool.query('SELECT COUNT(*) FROM sale_items')).rows[0].count);
+  const activeMovements = (await pool.query('SELECT COUNT(*) FROM stock_movements WHERE product_id = $1', [activeProductId])).rows[0].count;
+  const inactiveMovements = (await pool.query('SELECT COUNT(*) FROM stock_movements WHERE product_id = $1', [inactiveProductId])).rows[0].count;
+
+  const cases = [
+    {
+      name: 'inactive product with stock',
+      items: [{ productId: inactiveProductId, quantity: 1, unitPrice: 10, subtotal: 10 }],
+      totalAmount: 10
+    },
+    {
+      name: 'inactive product with zero stock',
+      items: [{ productId: zeroStockInactiveProductId, quantity: 1, unitPrice: 10, subtotal: 10 }],
+      totalAmount: 10
+    },
+    {
+      name: 'active product followed by inactive product',
+      items: [
+        { productId: activeProductId, quantity: 1, unitPrice: 10, subtotal: 10 },
+        { productId: inactiveProductId, quantity: 1, unitPrice: 10, subtotal: 10 }
+      ],
+      totalAmount: 20
+    },
+    {
+      name: 'inactive product followed by active product',
+      items: [
+        { productId: inactiveProductId, quantity: 1, unitPrice: 10, subtotal: 10 },
+        { productId: activeProductId, quantity: 1, unitPrice: 10, subtotal: 10 }
+      ],
+      totalAmount: 20
+    },
+    {
+      name: 'nonexistent product',
+      items: [{ productId: missingProductId, quantity: 1, unitPrice: 10, subtotal: 10 }],
+      totalAmount: 10
+    }
+  ];
+
+  for (const checkoutCase of cases) {
+    const { name, ...body } = checkoutCase;
+    const response = await request('/sales/checkout', { method: 'POST', body });
+    assert.equal(response.status, 400, name);
+    assert.match(response.data.message, /unavailable for sale/, name);
+  }
+
+  assert.equal(Number((await pool.query('SELECT COUNT(*) FROM sales')).rows[0].count), saleCount);
+  assert.equal(Number((await pool.query('SELECT COUNT(*) FROM sale_items')).rows[0].count), saleItemCount);
+  assert.equal((await pool.query('SELECT quantity FROM products WHERE id = $1', [activeProductId])).rows[0].quantity, activeStock);
+  assert.equal((await pool.query('SELECT quantity FROM products WHERE id = $1', [inactiveProductId])).rows[0].quantity, inactiveStock);
+  assert.equal((await pool.query('SELECT quantity FROM products WHERE id = $1', [zeroStockInactiveProductId])).rows[0].quantity, 0);
+  assert.equal((await pool.query('SELECT COUNT(*) FROM stock_movements WHERE product_id = $1', [activeProductId])).rows[0].count, activeMovements);
+  assert.equal((await pool.query('SELECT COUNT(*) FROM stock_movements WHERE product_id = $1', [inactiveProductId])).rows[0].count, inactiveMovements);
+});
+
 test('invalid checkout and unauthorized writes are rejected without inserting records', async () => {
   const body = { totalAmount: 10, items: [{ productId: 1, quantity: -1, unitPrice: 10, subtotal: 10 }] };
   const response = await request('/sales/checkout', { method: 'POST', body });
