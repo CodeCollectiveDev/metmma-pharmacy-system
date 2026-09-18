@@ -1,7 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { authService } from '@/services/api/authService'
+import { dataService } from '@/services/api/dataService'
 import { UserPlus, Users, RotateCcw } from 'lucide-vue-next'
 import TableSkeleton from '@/modules/shared/components/skeleton/TableSkeleton.vue'
 
@@ -21,6 +23,12 @@ const users = ref([])
 const loading = ref(false)
 const showAddForm = ref(false)
 const message = ref(null)
+const route = useRoute()
+
+// Existing employees that do not yet have a user account; the superuser can
+// link a new account to one of them instead of retyping their details.
+const unlinkedEmployees = ref([])
+const employee_id = ref('')
 
 const formData = ref({
   username: '',
@@ -32,7 +40,40 @@ const formData = ref({
 
 const isMsgError = (msg) => msg?.type === 'error'
 
-onMounted(fetchUsers)
+const employeeLabel = (emp) =>
+  `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.email || `#${emp.id}`
+
+onMounted(() => {
+  fetchUsers()
+  loadUnlinkedEmployees().then(prefillFromRoute)
+})
+
+async function loadUnlinkedEmployees() {
+  try {
+    const res = await dataService.getEmployees()
+    const list = res.data || []
+    unlinkedEmployees.value = list.filter(e => e.user_id == null)
+  } catch (err) {
+    unlinkedEmployees.value = []
+  }
+}
+
+function selectEmployee(emp) {
+  if (!emp) return
+  employee_id.value = String(emp.id)
+  formData.value.full_name = `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
+  formData.value.email = emp.email || ''
+}
+
+function prefillFromRoute() {
+  const empId = Number(route.query.employee)
+  if (!empId) return
+  const emp = unlinkedEmployees.value.find(e => String(e.id) === String(empId))
+  if (emp) {
+    selectEmployee(emp)
+    showAddForm.value = true
+  }
+}
 
 async function fetchUsers() {
   loading.value = true
@@ -63,14 +104,20 @@ async function saveUser() {
   }
 
   try {
-    const res = await authService.createUser({ ...formData.value })
+    const payload = { ...formData.value }
+    if (employee_id.value) {
+      payload.employee_id = Number(employee_id.value)
+    }
+    const res = await authService.createUser(payload)
     showMessage(`Account created for ${res.user.username} (${res.user.role})`, 'success')
     formData.value = { username: '', full_name: '', email: '', password: '', role: 'cashier' }
+    employee_id.value = ''
     showAddForm.value = false
     await fetchUsers()
+    await loadUnlinkedEmployees()
   } catch (err) {
     if (err.response && err.response.status === 409) {
-      showMessage('Username already exists. Choose another.', 'error')
+      showMessage(err.response.data?.error || 'Username already exists. Choose another.', 'error')
     } else {
       showMessage(err.response?.data?.error || 'Failed to create account', 'error')
     }
@@ -123,7 +170,14 @@ const resetPassword = async (user) => {
     <!-- Create Account Form -->
     <div v-if="showAddForm" class="app-card app-card-body mb-6">
       <h3 class="app-section-title mb-4">Create New Account</h3>
+      <p class="text-sm text-gray-500 mb-4 -mt-2">Every new account is automatically added as an employee in HR. Optionally link an existing employee to reuse their details.</p>
       <form @submit.prevent="saveUser" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <select v-model="employee_id" @change="selectEmployee(unlinkedEmployees.find(e => String(e.id) === String(employee_id)))" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none md:col-span-3">
+          <option value="">Link to existing employee (optional)</option>
+          <option v-for="emp in unlinkedEmployees" :key="emp.id" :value="String(emp.id)">
+            {{ employeeLabel(emp) }} — {{ emp.employee_id }}
+          </option>
+        </select>
         <input v-model="formData.full_name" type="text" placeholder="Full Name *" required class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <input v-model="formData.username" type="text" placeholder="Username *" required class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <input v-model="formData.email" type="email" placeholder="Email *" required class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">

@@ -32,6 +32,10 @@ const createUserSchema = Joi.object({
   password: Joi.string().min(6).required(),
   full_name: Joi.string().trim().min(1).max(100).required(),
   email: Joi.string().trim().email().max(100).optional().empty(''),
+  // Link the new account to an existing employee (optional). Omitting it makes
+  // the server auto-provision an employee record for the user (a user is
+  // always an employee; an employee may not always be a user).
+  employee_id: Joi.number().integer().positive().optional().empty(''),
   role: Joi.string()
     .trim()
     .required()
@@ -80,6 +84,69 @@ const publicUser = (user) => ({
   username: user.username,
   role: user.role,
 });
+
+// Humanize a system role into a job title for employee records
+// ("store_manager" -> "Store Manager").
+const humanizeRole = (role) => {
+  if (!role) return null;
+  return String(role)
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
+
+// Best-effort split of a full name into first/last name.
+const splitFullName = (fullName) => {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    first_name: parts.shift() || null,
+    last_name: parts.join(' ') || null,
+  };
+};
+
+// Enforce "a user is always an employee". When employeeId is supplied the new
+// account is linked to that existing employee record (rejecting accounts that
+// are already linked). Otherwise a minimal employee record is created from the
+// account details. Runs inside the caller's transaction.
+const provisionEmployee = async ({ client, userId, fullName, email, role, employeeId }) => {
+  if (employeeId) {
+    const existing = await client.query(
+      'SELECT id, user_id FROM employees WHERE id = $1',
+      [employeeId]
+    );
+    if (existing.rows.length === 0) {
+      const err = new Error('Employee not found');
+      err.status = 404;
+      throw err;
+    }
+    if (existing.rows[0].user_id) {
+      const err = new Error('Employee already has an account');
+      err.status = 409;
+      throw err;
+    }
+    const linked = await client.query(
+      `UPDATE employees SET user_id = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND user_id IS NULL
+       RETURNING id, employee_id, user_id`,
+      [userId, employeeId]
+    );
+    if (linked.rows.length === 0) {
+      const err = new Error('Could not link the employee to this account');
+      err.status = 409;
+      throw err;
+    }
+    return linked.rows[0];
+  }
+
+  const names = splitFullName(fullName);
+  const inserted = await client.query(
+    `INSERT INTO employees (user_id, first_name, last_name, email, role, is_active, hire_date)
+     VALUES ($1, $2, $3, $4, $5, TRUE, CURRENT_DATE)
+     RETURNING id, employee_id, user_id`,
+    [userId, names.first_name, names.last_name, email || null, humanizeRole(role)]
+  );
+  return inserted.rows[0];
+};
 
 // Verify a refresh token, returning its claims or throwing a labeled error.
 const verifyRefreshToken = (token) => {
@@ -267,17 +334,28 @@ router.post('/users', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const { username, password, role, full_name, email } = value;
+    const { username, password, role, full_name, email, employee_id } = value;
     client = await pool.connect();
     await client.query('BEGIN');
     transactionStarted = true;
 
     // Create user in users table
     const user = await createUser({ username, password, role, full_name, email }, client);
+
+    // Provision the linked/corresponding employee record in the same transaction.
+    const employee = await provisionEmployee({
+      client,
+      userId: user.id,
+      fullName: full_name,
+      email,
+      role,
+      employeeId: employee_id,
+    });
+
     await client.query('COMMIT');
     transactionStarted = false;
 
-    res.status(201).json({ message: 'User created successfully', user });
+    res.status(201).json({ message: 'User created successfully', user, employee });
   } catch (err) {
     if (client && transactionStarted) {
       await client.query('ROLLBACK');
@@ -287,6 +365,8 @@ router.post('/users', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_
       res.status(409).json({ error: 'Username already exists' });
     } else if (err.code === 'INVALID_ROLE' || err.code === 'INVALID_FULL_NAME') {
       res.status(400).json({ error: err.message });
+    } else if (err.status) {
+      res.status(err.status).json({ error: err.message });
     } else {
       console.error(err);
       res.status(500).json({ error: 'Internal server error' });
