@@ -17,7 +17,7 @@ const attendanceSchema = Joi.object({
       'any.required': 'Date is required'
     }),
   
-  status: Joi.string().valid('Present', 'Absent', 'Late', 'Excused').required()
+  status: Joi.string().insensitive().valid('present', 'absent', 'late', 'leave', 'holiday').required()
     .messages({
       'any.only': 'Status must be one of: Present, Absent, Late, or Excused'
     }),

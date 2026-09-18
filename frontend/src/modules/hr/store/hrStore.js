@@ -1,20 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getAll, save, remove } from '@/pouchdb'
 import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
 
 export const useHrStore = defineStore('hr', () => {
     const employees = ref([])
     const attendance = ref([])
+    const leave = ref([])
+    const leaveRequests = ref([])
     const loading = ref(false)
+    const attendanceLoading = ref(false)
+    const leaveLoading = ref(false)
+    const error = ref(null)
 
     async function fetchEmployees() {
         loading.value = true
         try {
             employees.value = await dataOrchestrator.fetchCollection('employees', dataService.getEmployees)
-        } catch (error) {
-            console.error('Error fetching employees:', error)
+        } catch (err) {
+            console.error('Error fetching employees:', err)
+            error.value = err.message
         } finally {
             loading.value = false
         }
@@ -61,12 +66,62 @@ export const useHrStore = defineStore('hr', () => {
         }
     }
 
-    async function fetchAttendance() {
+    async function fetchAttendance(date = new Date().toISOString().split('T')[0]) {
+        attendanceLoading.value = true
+        error.value = null
         try {
-            // Fetch all attendance records or from last 30 days
-            attendance.value = await getAll('attendance')
-        } catch (error) {
-            console.error('Error fetching attendance:', error)
+            const response = await dataService.getAttendanceByDate(date)
+            attendance.value = response.data?.data || response.data || []
+        } catch (err) {
+            console.error('Error fetching attendance:', err)
+            error.value = err.message
+        } finally {
+            attendanceLoading.value = false
+        }
+    }
+
+    async function fetchLeave() {
+        leaveLoading.value = true
+        error.value = null
+        try {
+            const response = await dataService.getCurrentLeave()
+            leave.value = response.data?.data || response.data || []
+        } catch (err) {
+            console.error('Error fetching leave:', err)
+            error.value = err.message
+        } finally {
+            leaveLoading.value = false
+        }
+    }
+
+    async function fetchLeaveRequests() {
+        try {
+            const response = await dataService.getLeaveRequests()
+            leaveRequests.value = response.data?.data || []
+        } catch (err) {
+            console.error('Error fetching leave requests:', err)
+            error.value = err.message
+        }
+    }
+
+    async function createLeave(leaveData) {
+        try {
+            await dataService.createLeave(leaveData)
+            await Promise.all([fetchLeave(), fetchLeaveRequests()])
+            return { ok: true }
+        } catch (err) {
+            return { ok: false, error: err.response?.data?.error || err.message }
+        }
+    }
+
+    async function updateLeaveStatus(id, status) {
+        try {
+            await dataService.updateLeaveStatus(id, status)
+            await Promise.all([fetchLeave(), fetchLeaveRequests()])
+            return true
+        } catch (err) {
+            error.value = err.response?.data?.error || err.message
+            return false
         }
     }
 
@@ -96,10 +151,19 @@ export const useHrStore = defineStore('hr', () => {
     return {
         employees,
         attendance,
+        leave,
+        leaveRequests,
         loading,
+        attendanceLoading,
+        leaveLoading,
+        error,
         fetchEmployees,
         addEmployee,
         fetchAttendance,
+        fetchLeave,
+        fetchLeaveRequests,
+        createLeave,
+        updateLeaveStatus,
         markAttendance,
         activeEmployees
     }

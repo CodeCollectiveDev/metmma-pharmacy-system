@@ -3,7 +3,10 @@ import { ROLES, ROLE_HIERARCHY } from '@/router'
 import { authService } from '@/services/api/authService'
 
 export const useRole = () => {
-  const userRole = computed(() => localStorage.getItem('role') || '')
+  const userRole = computed(() => {
+    const role = localStorage.getItem('role') || ''
+    return role === 'admin' ? ROLES.SUPER_ADMIN : role
+  })
 
   const hasRole = (role) => {
     if (Array.isArray(role)) {

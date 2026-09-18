@@ -138,7 +138,8 @@ router.beforeEach((to, from, next) => {
   }
 
   const token = localStorage.getItem('token')
-  const role = localStorage.getItem('role')
+  const storedRole = localStorage.getItem('role')
+  const role = storedRole === 'admin' ? ROLES.SUPER_ADMIN : storedRole
 
   // Allow public routes
   if (!to.meta.requiresAuth) {

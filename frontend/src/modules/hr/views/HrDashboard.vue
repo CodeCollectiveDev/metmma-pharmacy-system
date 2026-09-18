@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { useHrStore } from '../store/hrStore'
-import { Plus, Search, UserPlus, Calendar, DollarSign, MoreVertical } from 'lucide-vue-next'
+import { Plus, Search, UserPlus, Calendar, DollarSign, MoreVertical, Palmtree, RefreshCw, CheckCircle2, XCircle } from 'lucide-vue-next'
 import TableSkeleton from '@/modules/shared/components/skeleton/TableSkeleton.vue'
 
 const store = useHrStore()
@@ -11,6 +11,9 @@ const showAddForm = ref(false)
 const searchQuery = ref('')
 const formMessage = ref(null)
 const createdEmployee = ref(null)
+const selectedDate = ref(new Date().toISOString().split('T')[0])
+const leaveMessage = ref(null)
+const newLeave = ref({ employee_id: '', leave_type: 'Annual leave', reason: '', start_date: '', expected_return_date: '' })
 
 const newEmployee = ref({
   name: '',
@@ -25,8 +28,34 @@ const newEmployee = ref({
 
 onMounted(() => {
   store.fetchEmployees()
-  store.fetchAttendance()
+  store.fetchAttendance(selectedDate.value)
+  store.fetchLeave()
+  store.fetchLeaveRequests()
 })
+
+const attendanceByEmployee = computed(() => new Map(store.attendance.map(record => [String(record.employee_id), record])))
+const attendanceRows = computed(() => store.activeEmployees.map(employee => ({
+  employee,
+  record: attendanceByEmployee.value.get(String(employee.id)),
+  status: attendanceByEmployee.value.get(String(employee.id))?.status || 'Absent'
+})))
+const presentCount = computed(() => attendanceRows.value.filter(row => ['Present', 'Late'].includes(row.status)).length)
+const absentCount = computed(() => attendanceRows.value.filter(row => row.status === 'Absent').length)
+
+const loadAttendance = () => store.fetchAttendance(selectedDate.value)
+
+const submitLeave = async () => {
+  leaveMessage.value = null
+  const result = await store.createLeave({ ...newLeave.value, employee_id: Number(newLeave.value.employee_id) })
+  leaveMessage.value = result.ok
+    ? { type: 'success', text: 'Leave request submitted for approval.' }
+    : { type: 'error', text: result.error || 'Could not submit leave request.' }
+  if (result.ok) newLeave.value = { employee_id: '', leave_type: 'Annual leave', reason: '', start_date: '', expected_return_date: '' }
+}
+
+const reviewLeave = async (request, status) => {
+  await store.updateLeaveStatus(request.id, status)
+}
 
 const filteredEmployees = () => {
   if (!searchQuery.value) return store.employees
@@ -109,6 +138,12 @@ const formatCurrency = (amount) => {
           :class="['px-6 py-4 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'attendance' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
         >
           <Calendar class="w-4 h-4" /> Attendance
+        </button>
+        <button
+          @click="activeTab = 'leave'"
+          :class="['px-6 py-4 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'leave' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
+        >
+          <Palmtree class="w-4 h-4" /> Leave
         </button>
         <button 
           @click="activeTab = 'payroll'"
@@ -219,25 +254,50 @@ const formatCurrency = (amount) => {
     </div>
 
     <!-- Attendance Tab -->
-    <div v-if="activeTab === 'attendance'" class="app-card app-card-body">
-      <h3 class="app-section-title mb-4">Attendance Management</h3>
-      <p class="text-gray-500">Mark daily attendance for employees</p>
-      <div class="mt-6 grid gap-4">
-        <div v-for="emp in store.activeEmployees" :key="emp._id" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-gray-100 rounded-lg">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-medium">
-              {{ emp.name?.charAt(0) }}
-            </div>
-            <div>
-              <p class="font-medium text-gray-800">{{ emp.name }}</p>
-              <p class="text-sm text-gray-500">{{ emp.position }}</p>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors">Present</button>
-            <button class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors">Absent</button>
-          </div>
+    <div v-if="activeTab === 'attendance'" class="space-y-6">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="app-card app-card-body"><p class="text-sm text-gray-500">Reported for work</p><p class="mt-1 text-2xl font-semibold text-green-700">{{ presentCount }}</p></div>
+        <div class="app-card app-card-body"><p class="text-sm text-gray-500">Not reported</p><p class="mt-1 text-2xl font-semibold text-red-700">{{ absentCount }}</p></div>
+        <div class="app-card app-card-body"><p class="text-sm text-gray-500">Attendance date</p><p class="mt-1 text-lg font-semibold text-gray-800">{{ formatDate(selectedDate) }}</p></div>
+      </div>
+      <div class="app-card app-card-body">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5">
+          <div><h3 class="app-section-title">Daily attendance</h3><p class="text-sm text-gray-500 mt-1">Review who reported for work on a specific date.</p></div>
+          <div class="flex items-center gap-2"><label for="attendance-date" class="text-sm text-gray-600">Date</label><input id="attendance-date" v-model="selectedDate" @change="loadAttendance" type="date" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"><button @click="loadAttendance" class="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Refresh attendance" aria-label="Refresh attendance"><RefreshCw class="w-4 h-4" /></button></div>
         </div>
+        <div v-if="store.attendanceLoading" class="space-y-3"><div v-for="n in 5" :key="n" class="h-16 rounded-lg bg-gray-100 animate-pulse"></div></div>
+        <div v-else-if="store.error" class="p-4 rounded-lg bg-red-50 text-red-700 text-sm">{{ store.error }}</div>
+        <div v-else class="overflow-x-auto"><table class="w-full min-w-[680px]"><thead class="bg-gray-50 border-b border-gray-100"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check-in</th></tr></thead><tbody class="divide-y divide-gray-100">
+          <tr v-for="row in attendanceRows" :key="row.employee._id" class="hover:bg-gray-50"><td class="px-4 py-3"><p class="font-medium text-gray-800">{{ row.employee.name }}</p><p class="text-xs text-gray-500">{{ row.employee.position }}</p></td><td class="px-4 py-3 text-sm text-gray-600">{{ row.employee.department }}</td><td class="px-4 py-3"><span :class="['inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium', row.status === 'Absent' ? 'bg-red-100 text-red-700' : row.status === 'Late' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700']"><CheckCircle2 v-if="row.status !== 'Absent'" class="w-3.5 h-3.5" /><XCircle v-else class="w-3.5 h-3.5" />{{ row.status }}</span></td><td class="px-4 py-3 text-sm text-gray-600">{{ row.record?.check_in || '-' }}</td></tr>
+          <tr v-if="attendanceRows.length === 0"><td colspan="4" class="px-4 py-10 text-center text-gray-400">No active employees found.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Leave Tab -->
+    <div v-if="activeTab === 'leave'" class="space-y-6">
+      <div class="app-card app-card-body">
+        <div class="mb-4"><h3 class="app-section-title">Give employee leave</h3><p class="text-sm text-gray-500 mt-1">Submit a request for approval. Approved leave appears when its start date arrives.</p></div>
+        <div v-if="leaveMessage" :class="['mb-4 p-3 rounded-lg text-sm', leaveMessage.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700']">{{ leaveMessage.text }}</div>
+        <form @submit.prevent="submitLeave" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <label class="text-sm text-gray-600">Employee<select v-model="newLeave.employee_id" required class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"><option value="" disabled>Select employee</option><option v-for="employee in store.activeEmployees" :key="employee.id" :value="employee.id">{{ employee.name }}</option></select></label>
+          <label class="text-sm text-gray-600">Leave type<select v-model="newLeave.leave_type" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"><option>Annual leave</option><option>Sick leave</option><option>Family leave</option><option>Study leave</option><option>Other</option></select></label>
+          <label class="text-sm text-gray-600">Start date<input v-model="newLeave.start_date" required type="date" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"></label>
+          <label class="text-sm text-gray-600">Expected return<input v-model="newLeave.expected_return_date" required type="date" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"></label>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Submit for approval</button>
+          <label class="text-sm text-gray-600 md:col-span-2 lg:col-span-4">Reason<textarea v-model="newLeave.reason" rows="2" placeholder="Reason for leave" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none"></textarea></label>
+        </form>
+      </div>
+      <div class="app-card app-card-body">
+        <div class="flex items-center justify-between mb-4"><div><h3 class="app-section-title">Pending leave requests</h3><p class="text-sm text-gray-500 mt-1">Review requests before they become active.</p></div><span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">{{ store.leaveRequests.length }} pending</span></div>
+        <div v-if="store.leaveRequests.length === 0" class="py-8 text-center text-gray-400">No pending leave requests.</div>
+        <div v-else class="space-y-3"><div v-for="request in store.leaveRequests" :key="request.id" class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-gray-100 rounded-lg p-4"><div><p class="font-medium text-gray-800">{{ request.first_name }} {{ request.last_name }} <span class="font-normal text-gray-500">· {{ request.leave_type }}</span></p><p class="text-sm text-gray-500">{{ formatDate(request.start_date) }} to {{ formatDate(request.expected_return_date) }}<span v-if="request.reason"> · {{ request.reason }}</span></p></div><div class="flex gap-2"><button @click="reviewLeave(request, 'approved')" class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200">Approve</button><button @click="reviewLeave(request, 'rejected')" class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200">Reject</button></div></div></div>
+      </div>
+      <div class="app-card app-card-body">
+      <div class="flex items-start justify-between gap-4 mb-5"><div><h3 class="app-section-title">Employees currently on leave</h3><p class="text-sm text-gray-500 mt-1">Active leave records with expected return dates and remaining days.</p></div><Palmtree class="w-5 h-5 text-emerald-600" /></div>
+      <div v-if="store.leaveLoading" class="grid gap-3 sm:grid-cols-2"><div v-for="n in 4" :key="n" class="h-32 rounded-lg bg-gray-100 animate-pulse"></div></div>
+      <div v-else-if="store.leave.length === 0" class="py-12 text-center text-gray-400">No employees are currently on leave.</div>
+      <div v-else class="grid gap-4 lg:grid-cols-2"><article v-for="person in store.leave" :key="person.id" class="rounded-lg border border-emerald-100 bg-emerald-50/40 p-4"><div class="flex items-start justify-between gap-3"><div><h4 class="font-semibold text-gray-800">{{ person.first_name }} {{ person.last_name }}</h4><p class="text-sm text-gray-500">{{ person.role }} · {{ person.department }}</p></div><span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">On leave</span></div><p class="mt-4 text-sm text-gray-700"><span class="font-medium">{{ person.leave_type }}</span><span v-if="person.reason"> · {{ person.reason }}</span></p><div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm"><div><p class="text-xs text-gray-500">Started</p><p class="font-medium text-gray-800">{{ formatDate(person.start_date) }}</p></div><div><p class="text-xs text-gray-500">Returns</p><p class="font-medium text-gray-800">{{ formatDate(person.expected_return_date) }}</p></div><div><p class="text-xs text-gray-500">Used</p><p class="font-medium text-gray-800">{{ person.days_used }} days</p></div><div><p class="text-xs text-gray-500">Remaining</p><p class="font-semibold text-emerald-700">{{ person.days_remaining }} days</p></div></div></article></div>
       </div>
     </div>
 
