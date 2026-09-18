@@ -9,8 +9,34 @@ const processSale = async (req, res) => {
   const client = await pool.connect();
   
   try {
+const idempotencyKey = req.get('x-idempotency-key') || req.body.localSaleId || req.body.local_sale_id || req.body.idempotencyKey || req.body.idempotency_key;
     const { items, totalAmount, paymentMethod, customerName } = req.body;
-    
+
+    // As additional defence-in-depth, the body is normally already verified by
+    // the salesValidator middleware (saleSchema + verifySaleArithmetic).
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items[] is required and must not be empty' });
+    }
+
+    if (idempotencyKey) {
+      const existingSale = await client.query(
+        'SELECT * FROM sales WHERE local_sale_id = $1 LIMIT 1',
+        [idempotencyKey]
+      );
+
+      if (existingSale.rows.length > 0) {
+        const existing = existingSale.rows[0];
+        return res.status(200).json({
+          success: true,
+          duplicate: true,
+          message: 'Sale already processed',
+          receiptNumber: existing.receipt_number,
+          saleId: existing.id,
+          localSaleId: existing.local_sale_id
+        });
+      }
+    }
+
     // 1. Start Transaction
     await client.query('BEGIN');
 
@@ -18,21 +44,46 @@ const processSale = async (req, res) => {
     // Matching your SQL columns: receipt_number, total_amount, payment_method, customer_name, user_id
     const receiptNumber = `REC-${Date.now()}`;
     const saleResult = await client.query(
-      `INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, authenticatedUserId]
+`INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id, local_sale_id) 
+       VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (local_sale_id) WHERE local_sale_id IS NOT NULL DO NOTHING
+       RETURNING *`,
+      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, authenticatedUserId, idempotencyKey || null]
     );
-    const saleId = saleResult.rows[0].id;
+
+    let saleRow = saleResult.rows[0];
+    if (!saleRow && idempotencyKey) {
+      const duplicateResult = await client.query(
+        'SELECT * FROM sales WHERE local_sale_id = $1 LIMIT 1',
+        [idempotencyKey]
+      );
+      saleRow = duplicateResult.rows[0];
+      await client.query('COMMIT');
+      return res.status(200).json({
+        success: true,
+        duplicate: true,
+        message: 'Sale already processed',
+        receiptNumber: saleRow.receipt_number,
+        saleId: saleRow.id,
+        localSaleId: saleRow.local_sale_id
+      });
+    }
+
+    if (!saleRow) {
+      throw new Error('Failed to create sales record');
+    }
+
+    const saleId = saleRow.id;
 
     // 3. Process each item
     for (const item of items) {
       // Get current product details (with lock for safety)
       const productCheck = await client.query(
-        'SELECT name, quantity FROM products WHERE id = $1 FOR UPDATE', 
+        'SELECT name, quantity FROM products WHERE id = $1 AND is_active = TRUE FOR UPDATE',
         [item.productId]
       );
       
-      if (productCheck.rows.length === 0) throw new Error(`Product ID ${item.productId} not found`);
+      if (productCheck.rows.length === 0) throw new Error(`Product ID ${item.productId} is unavailable for sale`);
       const product = productCheck.rows[0];
 
       if (product.quantity < item.quantity) {
@@ -68,6 +119,7 @@ const processSale = async (req, res) => {
       message: 'Sale completed',
       receiptNumber,
       saleId,
+      localSaleId: idempotencyKey || saleRow.local_sale_id,
       data: {
         id: saleId,
         receiptNumber,

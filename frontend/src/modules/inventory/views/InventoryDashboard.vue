@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
+import BarcodeCameraScanner from '@/modules/shared/components/BarcodeCameraScanner.vue'
 import { useInventoryStore } from '../store/inventoryStore'
 import { Plus, Search, Package, AlertTriangle, Calendar, Edit, ScanBarcode } from 'lucide-vue-next'
+import StatCardsSkeleton from '@/modules/shared/components/skeleton/StatCardsSkeleton.vue'
+import TableSkeleton from '@/modules/shared/components/skeleton/TableSkeleton.vue'
 
 const store = useInventoryStore()
 const showAddForm = ref(false)
@@ -12,7 +15,8 @@ const restockQty = ref('')
 const restockNote = ref('')
 const filter = ref('all')
 const searchQuery = ref('')
-const barcodeSearch = ref('')
+const searchInputElement = ref(null)
+const showCameraScanner = ref(false)
 
 const newProduct = ref({
   name: '',
@@ -39,21 +43,30 @@ const filteredProducts = computed(() => {
   if (filter.value === 'expired') products = store.expiredProducts
   
   // Filter by search
-  if (searchQuery.value || barcodeSearch.value) {
-    const query = (searchQuery.value || barcodeSearch.value).toLowerCase()
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
     products = products.filter(p =>
       p.name.toLowerCase().includes(query) ||
       p.batchNumber?.toLowerCase().includes(query) ||
-      p.category?.toLowerCase().includes(query)
+      p.category?.toLowerCase().includes(query) ||
+      String(p.barcode ?? '').toLowerCase().includes(query)
     )
   }
   
   return products
 })
 
-const handleBarcodeSearch = () => {
-  searchQuery.value = barcodeSearch.value
-  barcodeSearch.value = ''
+const focusSearchInput = () => {
+  searchInputElement.value?.focus()
+}
+
+const startBarcodeSearch = () => {
+  focusSearchInput()
+}
+
+const handleCameraBarcode = (barcode) => {
+  showCameraScanner.value = false
+  searchQuery.value = barcode
 }
 
 const saveProduct = async () => {
@@ -147,46 +160,52 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
 
 <template>
   <MainLayout title="Inventory Management" subtitle="Manage stock, products, and suppliers">
+    <div v-if="store.loading" class="space-y-6">
+      <StatCardsSkeleton />
+      <TableSkeleton :columns="8" />
+    </div>
+
+    <template v-else>
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6">
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-        <div class="p-3 bg-blue-50 rounded-lg">
-          <Package class="w-6 h-6 text-blue-600" />
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4">
+      <div class="app-card app-card-body flex items-center gap-4">
+        <div class="rounded-lg bg-blue-50 p-3">
+          <Package class="h-6 w-6 text-blue-600" />
         </div>
         <div>
-          <p class="text-sm text-gray-500">Total Products</p>
-          <p class="text-2xl font-bold text-gray-800">{{ store.products.length }}</p>
+          <p class="app-stat-label">Total Products</p>
+          <p class="app-stat-value">{{ store.products.length }}</p>
         </div>
       </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-orange-100 flex items-center gap-4">
-        <div class="p-3 bg-orange-50 rounded-lg">
-          <AlertTriangle class="w-6 h-6 text-orange-600" />
+      <div class="app-card app-card-body flex items-center gap-4 border-orange-100">
+        <div class="rounded-lg bg-orange-50 p-3">
+          <AlertTriangle class="h-6 w-6 text-orange-600" />
         </div>
         <div>
-          <p class="text-sm text-gray-500">Low Stock</p>
-          <p class="text-2xl font-bold text-orange-600">{{ store.lowStockProducts.length }}</p>
+          <p class="app-stat-label">Low Stock</p>
+          <p class="app-stat-value text-orange-600">{{ store.lowStockProducts.length }}</p>
         </div>
       </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 flex items-center gap-4">
-        <div class="p-3 bg-red-50 rounded-lg">
-          <Calendar class="w-6 h-6 text-red-600" />
+      <div class="app-card app-card-body flex items-center gap-4 border-red-100">
+        <div class="rounded-lg bg-red-50 p-3">
+          <Calendar class="h-6 w-6 text-red-600" />
         </div>
         <div>
-          <p class="text-sm text-gray-500">Expired</p>
-          <p class="text-2xl font-bold text-red-600">{{ store.expiredProducts.length }}</p>
+          <p class="app-stat-label">Expired</p>
+          <p class="app-stat-value text-red-600">{{ store.expiredProducts.length }}</p>
         </div>
       </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <button @click="showAddForm = !showAddForm" class="w-full h-full flex items-center justify-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
-          <Plus class="w-5 h-5" />
+      <div class="app-card app-card-body flex min-h-[5.5rem] items-center justify-center">
+        <button @click="showAddForm = !showAddForm" class="flex items-center justify-center gap-2 font-medium text-blue-600 hover:text-blue-700">
+          <Plus class="h-5 w-5" />
           <span>{{ showAddForm ? 'Cancel' : 'Add Product' }}</span>
         </button>
       </div>
     </div>
 
     <!-- Add Product Form -->
-    <div v-if="showAddForm" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
-      <h3 class="font-semibold text-gray-800 mb-4">Add New Product</h3>
+    <div v-if="showAddForm" class="app-card app-card-body mb-6">
+      <h3 class="app-section-title mb-4">Add New Product</h3>
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <input v-model="newProduct.name" type="text" placeholder="Product Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         <input v-model="newProduct.batchNumber" type="text" placeholder="Batch Number *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
@@ -207,8 +226,8 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
     </div>
 
     <!-- Filters & Search -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-      <div class="p-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <div class="app-card mb-6">
+      <div class="flex flex-col gap-4 p-4 xl:flex-row xl:items-center xl:justify-between">
         <div class="grid grid-cols-1 sm:flex gap-2">
           <button @click="filter = 'all'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
             All ({{ store.products.length }})
@@ -221,12 +240,16 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
           </button>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:flex gap-2">
+          <button type="button" @click="startBarcodeSearch" class="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <ScanBarcode class="w-4 h-4" />
+            Scanner
+          </button>
+          <button type="button" @click="showCameraScanner = true" class="flex items-center justify-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors" aria-label="Scan barcode with camera" title="Scan with camera">
+            <ScanBarcode class="w-4 h-4" />
+            Camera
+          </button>
           <div class="relative">
-            <input v-model="barcodeSearch" @keyup.enter="handleBarcodeSearch" type="text" placeholder="Scan barcode..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-48 focus:ring-2 focus:ring-blue-500 outline-none">
-            <ScanBarcode class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-          </div>
-          <div class="relative">
-            <input v-model="searchQuery" type="text" placeholder="Search products..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-64 focus:ring-2 focus:ring-blue-500 outline-none">
+            <input ref="searchInputElement" v-model="searchQuery" type="text" placeholder="Search products, barcodes, or batches..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-64 focus:ring-2 focus:ring-blue-500 outline-none">
             <Search class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
           <button
@@ -239,6 +262,12 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
         </div>
       </div>
     </div>
+
+    <BarcodeCameraScanner
+      v-if="showCameraScanner"
+      @detected="handleCameraBarcode"
+      @close="showCameraScanner = false"
+    />
 
     <!-- Restock Modal -->
     <div v-if="showRestockModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -266,7 +295,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
     </div>
 
     <!-- Products Table -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="app-card overflow-hidden">
       <div class="overflow-x-auto">
       <table class="w-full min-w-[850px]">
         <thead class="bg-gray-50 border-b border-gray-100">
@@ -336,5 +365,6 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
       </table>
       </div>
     </div>
+    </template>
   </MainLayout>
 </template>

@@ -1,5 +1,12 @@
-import { getAll, save, remove } from '@/pouchdb';
+import { getAll, save } from '@/pouchdb';
 import { dataService } from '../api/dataService';
+
+const generateLocalSaleId = () => {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID();
+    }
+    return `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
 
 /**
  * Sync Worker
@@ -32,7 +39,7 @@ export const syncWorker = {
         console.log('[SyncWorker] Synchronization cycle started');
 
         try {
-            await syncWorker.syncCollection('products', dataService.addProduct);
+            await syncWorker.syncProducts();
             await syncWorker.syncCollection('transactions', dataService.recordSale);
             // Add other collections as needed
         } catch (error) {
@@ -40,6 +47,50 @@ export const syncWorker = {
         } finally {
             syncWorker.isSyncing = false;
             console.log('[SyncWorker] Synchronization cycle complete');
+        }
+    },
+
+    /**
+     * Sync pending product changes.
+     * Existing products (have a DB id) are updated via PUT /products/:id.
+     * Only genuinely new products (no DB id) are created via POST /products.
+     * Never use POST to apply stock adjustments — it creates duplicates.
+     */
+    syncProducts: async () => {
+        const items = await getAll('products');
+        const pendingItems = items.filter(item => item.syncStatus === 'pending');
+
+        if (pendingItems.length === 0) return;
+
+        console.log(`[SyncWorker] Syncing ${pendingItems.length} products`);
+
+        for (const item of pendingItems) {
+            try {
+                // Remove local-only properties before sending to API
+                const { syncStatus, _id, stock, ...rest } = item;
+                const hasDbId = item.id !== undefined && item.id !== null;
+
+                // Normalize to the API contract the backend expects
+                const apiPayload = {
+                    ...rest,
+                    productCode: rest.productCode ?? rest.product_code,
+                    quantity: Number(stock ?? rest.quantity ?? 0),
+                    reorderLevel: rest.reorderLevel ?? rest.minStockLevel ?? 10,
+                    sellingPrice: rest.sellingPrice ?? rest.unitPrice ?? rest.price ?? 0,
+                };
+
+                if (hasDbId && apiPayload.productCode) {
+                    await dataService.updateProduct({ id: item.id, ...apiPayload });
+                } else {
+                    await dataService.addProduct(apiPayload);
+                }
+
+                // Update local status to synced
+                await save('products', { ...item, syncStatus: 'synced' });
+            } catch (error) {
+                console.error(`[SyncWorker] Failed to sync product ${item.name || item._id}:`, error);
+                // Keep as pending for next cycle
+            }
         }
     },
 
@@ -56,22 +107,20 @@ export const syncWorker = {
 
         for (const item of pendingItems) {
             try {
-                // Remove local-only properties before sending to API
-                const { syncStatus, _id, ...apiPayload } = item;
+                const persistedId = item.localSaleId || item.local_sale_id || item.idempotencyKey || item.idempotency_key || generateLocalSaleId();
+                const apiPayload = {
+                    ...item,
+                    localSaleId: persistedId,
+                    idempotencyKey: persistedId,
+                };
 
-                const response = await apiMethod(apiPayload);
+                delete apiPayload.syncStatus;
+                delete apiPayload._id;
+
+                await apiMethod(apiPayload);
 
                 // Update local status to synced
-                const sale = collection === 'transactions' ? response.data?.data : null;
-                const syncedItem = sale ? {
-                    ...item,
-                    ...sale,
-                    items: sale.items.map((line, index) => ({ ...item.items[index], ...line })),
-                    _id: String(sale.id),
-                    syncStatus: 'synced'
-                } : { ...item, syncStatus: 'synced' };
-                await save(collection, syncedItem);
-                if (syncedItem._id !== item._id) await remove(collection, item);
+                await save(collection, { ...item, localSaleId: persistedId, idempotencyKey: persistedId, syncStatus: 'synced' });
             } catch (error) {
                 console.error(`[SyncWorker] Failed to sync item in ${collection}:`, error);
                 // Keep as pending for next cycle

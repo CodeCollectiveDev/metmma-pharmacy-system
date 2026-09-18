@@ -1,28 +1,23 @@
 import apiClient from './apiClient';
-import { toSalePayload } from './salePayload';
+
+const generateIdempotencyKey = () => {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID();
+    }
+    return `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
+const withIdempotencyKey = (saleData = {}) => {
+    const payload = { ...saleData };
+    const key = payload.localSaleId || payload.local_sale_id || payload.idempotencyKey || payload.idempotency_key || generateIdempotencyKey();
+    payload.localSaleId = key;
+    payload.idempotencyKey = key;
+    return { payload, key };
+};
 
 export const dataService = {
     // PRODUCTS
-    getProductPage: (params = {}) => apiClient.get('/products', { params }),
-    // Existing views and offline search need the complete catalogue. Keep each
-    // request at the backend's normal page size and publish only a full result.
-    getProducts: async () => {
-        const products = [];
-        let page = 1;
-        let response;
-        do {
-            response = await dataService.getProductPage({ page });
-            const { data, pagination } = response.data;
-            if (!Array.isArray(data) || !pagination || pagination.page !== page || typeof pagination.hasMore !== 'boolean' ||
-                (pagination.hasMore && data.length === 0)) {
-                throw new Error('Incomplete product pagination response');
-            }
-            products.push(...data);
-            if (!pagination.hasMore) break;
-            page++;
-        } while (true);
-        return { ...response, data: { success: true, count: products.length, data: products } };
-    },
+    getProducts: () => apiClient.get('/products'),
     addProduct: (product) => apiClient.post('/products', product),
     updateProduct: (product) => {
         const productId = product.id || product._id;
@@ -34,7 +29,14 @@ export const dataService = {
     },
 
     // SALES
-    recordSale: (saleData) => apiClient.post('/sales/checkout', toSalePayload(saleData)),
+    recordSale: (saleData) => {
+        const { payload, key } = withIdempotencyKey(saleData);
+        return apiClient.post('/sales/checkout', payload, {
+            headers: {
+                'X-Idempotency-Key': key,
+            },
+        });
+    },
     getSalesHistory: () => apiClient.get('/sales/history'),
 
     // EMPLOYEES
@@ -50,7 +52,12 @@ export const dataService = {
     },
 
     // ATTENDANCE
-    getAttendance: (employeeId) => apiClient.get(`/attendance/${employeeId}`),
+    getAttendance: (employeeId) => apiClient.get(`/attendance/employee/${employeeId}`),
+    getAttendanceByDate: (date) => apiClient.get('/attendance/by-date', { params: { date } }),
+    getCurrentLeave: () => apiClient.get('/attendance/leave/current'),
+    getLeaveRequests: () => apiClient.get('/attendance/leave/requests'),
+    createLeave: (leave) => apiClient.post('/attendance/leave', leave),
+    updateLeaveStatus: (id, status) => apiClient.patch(`/attendance/leave/${id}/status`, { status }),
     markAttendance: (record) => apiClient.post('/attendance', record),
 
     // REPORTS

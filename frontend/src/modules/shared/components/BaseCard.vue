@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white shadow-md rounded p-4">
+  <div class="app-card app-card-body">
     <slot />
   </div>
 </template>

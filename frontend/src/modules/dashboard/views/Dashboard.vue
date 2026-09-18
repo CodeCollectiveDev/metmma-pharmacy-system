@@ -1,10 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
+import { useRole } from '@/composables/useRole'
 import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
 import { Package, ShoppingCart, Users, AlertTriangle, TrendingUp, Clock } from 'lucide-vue-next'
+import DashboardContentSkeleton from '@/modules/shared/components/skeleton/DashboardContentSkeleton.vue'
 
+const { canAccessPos, canAccessInventory, canAccessHr } = useRole()
+
+const pageLoading = ref(true)
 const stats = ref({
   totalProducts: 0,
   lowStockCount: 0,
@@ -16,6 +21,8 @@ const lowStockItems = ref([])
 const recentActivity = ref([])
 
 onMounted(async () => {
+  pageLoading.value = true
+  try {
   // Fetch products
   const products = await dataOrchestrator.fetchCollection('products', dataService.getProducts)
   stats.value.totalProducts = products.length
@@ -41,9 +48,11 @@ onMounted(async () => {
     console.warn('Failed to load recent activity:', err)
     recentActivity.value = []
   }
+  } finally {
+    pageLoading.value = false
+  }
 })
 
-const role = computed(() => localStorage.getItem('role') || '')
 const userName = computed(() => {
   try {
     return JSON.parse(localStorage.getItem('user') || '{}').name || 'User'
@@ -66,63 +75,66 @@ const formatTime = (timestamp) => {
 
 <template>
   <MainLayout title="Dashboard" :subtitle="`Welcome back, ${userName}`">
+    <DashboardContentSkeleton v-if="pageLoading" />
+
+    <template v-else>
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
-      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
-        <div class="flex items-center justify-between">
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4">
+      <div class="app-card app-card-body">
+        <div class="flex items-center justify-between gap-4">
           <div>
-            <p class="text-sm font-medium text-gray-500">Total Products</p>
-            <p class="text-3xl font-bold text-gray-800 mt-1">{{ stats.totalProducts }}</p>
+            <p class="app-stat-label">Total Products</p>
+            <p class="app-stat-value">{{ stats.totalProducts }}</p>
           </div>
-          <div class="p-3 bg-blue-50 rounded-lg">
-            <Package class="w-6 h-6 text-blue-600" />
+          <div class="rounded-lg bg-blue-50 p-3">
+            <Package class="h-6 w-6 text-blue-600" />
           </div>
         </div>
       </div>
 
-      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
-        <div class="flex items-center justify-between">
+      <div class="app-card app-card-body">
+        <div class="flex items-center justify-between gap-4">
           <div>
-            <p class="text-sm font-medium text-gray-500">Low Stock Alerts</p>
-            <p class="text-3xl font-bold text-orange-600 mt-1">{{ stats.lowStockCount }}</p>
+            <p class="app-stat-label">Low Stock Alerts</p>
+            <p class="app-stat-value text-orange-600">{{ stats.lowStockCount }}</p>
           </div>
-          <div class="p-3 bg-orange-50 rounded-lg">
-            <AlertTriangle class="w-6 h-6 text-orange-600" />
+          <div class="rounded-lg bg-orange-50 p-3">
+            <AlertTriangle class="h-6 w-6 text-orange-600" />
           </div>
         </div>
       </div>
 
-      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
-        <div class="flex items-center justify-between">
+      <div class="app-card app-card-body">
+        <div class="flex items-center justify-between gap-4">
           <div>
-            <p class="text-sm font-medium text-gray-500">Today's Sales</p>
-            <p class="text-3xl font-bold text-green-600 mt-1">{{ formatCurrency(stats.todaySales) }}</p>
+            <p class="app-stat-label">Today's Sales</p>
+            <p class="app-stat-value text-green-600">{{ formatCurrency(stats.todaySales) }}</p>
           </div>
-          <div class="p-3 bg-green-50 rounded-lg">
-            <TrendingUp class="w-6 h-6 text-green-600" />
+          <div class="rounded-lg bg-green-50 p-3">
+            <TrendingUp class="h-6 w-6 text-green-600" />
           </div>
         </div>
       </div>
 
-      <div class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
-        <div class="flex items-center justify-between">
+      <div class="app-card app-card-body">
+        <div class="flex items-center justify-between gap-4">
           <div>
-            <p class="text-sm font-medium text-gray-500">Total Staff</p>
-            <p class="text-3xl font-bold text-purple-600 mt-1">{{ stats.totalEmployees }}</p>
+            <p class="app-stat-label">Total Staff</p>
+            <p class="app-stat-value text-purple-600">{{ stats.totalEmployees }}</p>
           </div>
-          <div class="p-3 bg-purple-50 rounded-lg">
-            <Users class="w-6 h-6 text-purple-600" />
+          <div class="rounded-lg bg-purple-50 p-3">
+            <Users class="h-6 w-6 text-purple-600" />
           </div>
         </div>
       </div>
     </div>
 
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
       <!-- Low Stock Alerts -->
-      <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 class="font-semibold text-gray-800">Low Stock Items</h3>
+      <div class="app-card lg:col-span-2 overflow-hidden">
+        <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <h3 class="app-section-title">Low Stock Items</h3>
           <router-link to="/inventory" class="text-sm text-blue-600 hover:underline">View All</router-link>
         </div>
         <div class="divide-y divide-gray-100">
@@ -143,9 +155,9 @@ const formatTime = (timestamp) => {
       </div>
 
       <!-- Recent Activity -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100">
-          <h3 class="font-semibold text-gray-800">Recent Activity</h3>
+      <div class="app-card overflow-hidden">
+        <div class="border-b border-gray-100 px-5 py-4">
+          <h3 class="app-section-title">Recent Activity</h3>
         </div>
         <div class="divide-y divide-gray-100">
           <div v-if="recentActivity.length === 0" class="p-6 text-center text-gray-400">
@@ -172,19 +184,20 @@ const formatTime = (timestamp) => {
     </div>
 
     <!-- Quick Actions -->
-    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
-      <h3 class="font-semibold text-gray-800 mb-4">Quick Actions</h3>
+    <div class="app-card app-card-body mt-6">
+      <h3 class="app-section-title mb-4">Quick Actions</h3>
       <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
-        <router-link v-if="role === 'cashier' || role === 'admin'" to="/pos" class="justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="canAccessPos" to="/pos" class="justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
           <ShoppingCart class="w-4 h-4" /> Open POS
         </router-link>
-        <router-link v-if="role !== 'cashier'" to="/inventory" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="canAccessInventory" to="/inventory" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
           <Package class="w-4 h-4" /> Manage Inventory
         </router-link>
-        <router-link v-if="role === 'admin' || role === 'hr_officer'" to="/hr" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+        <router-link v-if="canAccessHr" to="/hr" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
           <Users class="w-4 h-4" /> HR Management
         </router-link>
       </div>
     </div>
+    </template>
   </MainLayout>
 </template>

@@ -16,7 +16,12 @@ const validateSchema = (schema, prop = 'body') => (req, res, next) => {
   next();
 };
 
-router.get('/employee/:employee_id', authenticate, authorize(ROLES.ADMIN, ROLES.HR_OFFICER, ROLES.STORE_MANAGER, ROLES.PHARMACIST), validateSchema(employeeIdParam, 'params'), attendanceController.getAttendanceByEmployee);
-router.post('/', authenticate, authorize(ROLES.ADMIN, ROLES.HR_OFFICER, ROLES.STORE_MANAGER), validateSchema(attendanceSchema, 'body'), attendanceController.addAttendance);
+router.get('/employee/:employee_id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER, ROLES.STORE_MANAGER, ROLES.PHARMACIST_MANAGER, ROLES.PHARMACIST), validateSchema(employeeIdParam, 'params'), attendanceController.getAttendanceByEmployee);
+router.get('/by-date', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER), attendanceController.getAttendanceByDate);
+router.get('/leave/current', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER), attendanceController.getCurrentLeave);
+router.get('/leave/requests', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER), attendanceController.getLeaveRequests);
+router.post('/leave', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER), attendanceController.createLeave);
+router.patch('/leave/:id/status', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER), attendanceController.updateLeaveStatus);
+router.post('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.HR_OFFICER, ROLES.STORE_MANAGER, ROLES.PHARMACIST_MANAGER), validateSchema(attendanceSchema, 'body'), attendanceController.addAttendance);
 
 module.exports = router;

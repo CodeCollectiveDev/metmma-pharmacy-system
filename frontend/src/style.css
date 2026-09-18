@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-800 leading-normal;
+  }
+}
+
+@layer components {
+  .app-card {
+    @apply rounded-xl border border-gray-100 bg-white shadow-sm;
+  }
+
+  .app-card-body {
+    @apply p-5;
+  }
+
+  .app-stat-label {
+    @apply text-sm font-medium text-gray-500;
+  }
+
+  .app-stat-value {
+    @apply mt-0.5 text-2xl font-bold tracking-tight text-gray-900;
+  }
+
+  .app-section-title {
+    @apply text-base font-semibold text-gray-800;
+  }
+}

@@ -2,6 +2,16 @@ const express = require('express');
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// Fail fast: JWT_SECRET is required (no fallback secret is ever allowed).
+// This keeps a misconfigured deployment from silently accepting forged tokens.
+try {
+  require('./config/jwt');
+} catch (err) {
+  console.error('Configuration error:', err.message);
+  console.error('Set a strong JWT_SECRET in backend/.env (openssl rand -hex 32) and restart.');
+  process.exit(1);
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 

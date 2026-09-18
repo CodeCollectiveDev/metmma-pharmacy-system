@@ -1,4 +1,4 @@
-import { getAll, save, getById, clearCollection, remove } from '@/pouchdb';
+import { getAll, save, getById, clearCollection } from '@/pouchdb';
 import { dataService } from '../api/dataService';
 
 /**
@@ -18,7 +18,7 @@ const normalizeCollectionItems = (collection, items) => {
             ...item,
             stock: item.stock ?? item.quantity ?? 0,
             minStockLevel: item.minStockLevel ?? item.reorderLevel ?? 10,
-            price: item.price ?? item.sellingPrice ?? item.unitPrice ?? 0,
+            price: Number(item.price ?? item.sellingPrice ?? item.unitPrice ?? 0),
             productCode: item.productCode ?? item.product_code,
             batchNumber: item.batchNumber ?? item.batch_number,
             expiryDate: item.expiryDate ?? item.expiry_date,
@@ -34,8 +34,8 @@ const normalizeCollectionItems = (collection, items) => {
             name: item.name || `${item.first_name || ''} ${item.last_name || ''}`.trim(),
             position: item.position || item.role || 'Employee',
             department: item.department || 'General',
-            status: item.status || 'active',
-            startDate: item.startDate || item.hire_date,
+            status: item.status || (item.is_active === false ? 'inactive' : 'active'),
+            startDate: item.startDate || item.hire_date || null,
             _id: (item.id || item._id)?.toString()
         }));
     }
@@ -43,20 +43,6 @@ const normalizeCollectionItems = (collection, items) => {
     if (collection === 'transactions') {
         return items.map((item) => ({
             ...item,
-            totalAmount: item.totalAmount ?? item.total_amount ?? item.total,
-            // Existing dashboard/report readers still use `total`.
-            total: item.totalAmount ?? item.total_amount ?? item.total,
-            paymentMethod: item.paymentMethod ?? item.payment_method,
-            customerName: item.customerName ?? item.customer_name,
-            userId: item.userId ?? item.user_id,
-            receiptNumber: item.receiptNumber ?? item.receipt_number,
-            date: item.date ?? item.created_at,
-            items: item.items?.map(line => ({
-                ...line,
-                productId: line.productId ?? line.product_id,
-                unitPrice: line.unitPrice ?? line.unit_price,
-                subtotal: line.subtotal ?? line.total
-            })),
             _id: (item.id || item._id || item.sale_id || item.receipt_number)?.toString()
         }));
     }
@@ -79,15 +65,8 @@ export const dataOrchestrator = {
                 const payload = response?.data?.data ?? response?.data ?? [];
                 const items = normalizeCollectionItems(collection, payload);
 
-                // Leave pending sales in place: restoring a snapshot after a
-                // concurrent replay could queue an already-confirmed sale again.
-                if (collection === 'transactions') {
-                    for (const item of await getAll(collection)) {
-                        if (item.syncStatus !== 'pending') await remove(collection, item);
-                    }
-                } else {
-                    await clearCollection(collection);
-                }
+                // Sync local storage with fresh data from server
+                await clearCollection(collection);
                 for (const item of items) {
                     const itemId = item.id || item._id;
                     if (itemId) {
@@ -117,8 +96,6 @@ export const dataOrchestrator = {
                 const response = await apiMethod(item);
                 result = { ok: true, data: response.data };
             } catch (error) {
-                // A rejected checkout is not an offline sale.
-                if (collection === 'transactions' && (error.response || !error.request)) throw error;
                 console.warn(`[Orchestrator] API save failed for ${collection}, queueing:`, error);
                 syncStatus = 'pending';
             }
@@ -127,16 +104,10 @@ export const dataOrchestrator = {
         }
 
         // Always update local storage (normalize before saving)
-        const serverSale = collection === 'transactions' ? result.data?.data : null;
-        const savedItem = serverSale ? {
-            ...item,
-            ...serverSale,
-            items: serverSale.items.map((line, index) => ({ ...item.items[index], ...line }))
-        } : item;
-        const normalized = normalizeCollectionItems(collection, [savedItem])[0] || savedItem;
+        const normalized = normalizeCollectionItems(collection, [item])[0] || item;
         const localItem = { ...normalized, syncStatus };
         const saved = await save(collection, localItem);
 
-        return { ...saved, data: localItem, offline: syncStatus === 'pending' };
+        return { ...saved, offline: syncStatus === 'pending' };
     }
 };

@@ -89,8 +89,11 @@ const getLowStockProducts = async (req, res) => {
 
 const getExpiringProducts = async (req, res) => {
   try {
-    const { days = 90 } = req.query;
-    const result = await pool.query(`SELECT * FROM products WHERE expiry_date <= CURRENT_DATE + INTERVAL '${days} days' AND quantity > 0 AND is_active = TRUE ORDER BY expiry_date ASC`);
+    const { days } = req.validatedExpiringProductsQuery;
+    const result = await pool.query(
+      "SELECT * FROM products WHERE expiry_date <= CURRENT_DATE + (INTERVAL '1 day' * $1) AND quantity > 0 AND is_active = TRUE ORDER BY expiry_date ASC",
+      [days]
+    );
     res.json({ success: true, count: result.rows.length, data: result.rows.map(formatProduct) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -105,12 +108,19 @@ const createProduct = async (req, res) => {
     return res.status(401).json({ error: 'Access denied. Not authenticated.' });
   }
 
+  const client = await pool.connect();
+
   try {
     const data = req.body; // Already validated by Joi
+
+    await client.query('BEGIN');
     
     // Check for unique product code
-    const existing = await pool.query('SELECT id FROM products WHERE product_code = $1', [data.productCode]);
-    if (existing.rows.length > 0) return res.status(409).json({ success: false, message: 'Product code already exists' });
+    const existing = await client.query('SELECT id FROM products WHERE product_code = $1', [data.productCode]);
+    if (existing.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Product code already exists' });
+    }
 
     const query = `
       INSERT INTO products (product_code, name, generic_name, batch_number, expiry_date, quantity, unit_price, selling_price, cost_price, supplier, category, reorder_level, location, barcode)
@@ -118,18 +128,22 @@ const createProduct = async (req, res) => {
     
     const values = [data.productCode, data.name, data.genericName, data.batchNumber, data.expiryDate, data.quantity, data.unitPrice, data.sellingPrice, data.costPrice, data.supplier, data.category, data.reorderLevel, data.location, data.barcode];
     
-    const result = await pool.query(query, values);
+    const result = await client.query(query, values);
     const product = result.rows[0];
 
     // Log initial stock movement
     if (data.quantity > 0) {
-      await pool.query('INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+await client.query('INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
       [product.id, 'purchase', data.quantity, 0, data.quantity, 'Initial Inventory Entry', authenticatedUserId]);
     }
 
+    await client.query('COMMIT');
     res.status(201).json({ success: true, data: formatProduct(product) });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ success: false, message: 'Creation failed', error: err.message });
+  } finally {
+    client.release();
   }
 };
 
@@ -139,18 +153,26 @@ const updateProduct = async (req, res) => {
     return res.status(401).json({ error: 'Access denied. Not authenticated.' });
   }
 
+  const client = await pool.connect();
+
   try {
     const { id } = req.params;
     const { reason, ...updates } = req.body; 
 
-    const currentResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
-    if (currentResult.rows.length === 0) return res.status(404).json({ success: false, message: 'Product not found' });
+    await client.query('BEGIN');
+
+    const currentResult = await client.query('SELECT * FROM products WHERE id = $1 FOR UPDATE', [id]);
+    if (currentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
     const current = currentResult.rows[0];
 
     // FIXED: Ensure we are comparing numbers accurately
     const isQuantityChanging = updates.quantity !== undefined && parseInt(updates.quantity) !== parseInt(current.quantity);
 
     if (isQuantityChanging && !reason) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ success: false, message: 'Reason required for stock adjustment' });
     }
 
@@ -179,25 +201,32 @@ const updateProduct = async (req, res) => {
       }
     }
 
-    if (setClauses.length === 0) return res.status(400).json({ success: false, message: 'No fields to update' });
+    if (setClauses.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'No fields to update' });
+    }
 
     values.push(id);
     const query = `UPDATE products SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${i} RETURNING *`;
-    const result = await pool.query(query, values);
+    const result = await client.query(query, values);
     const updated = result.rows[0];
 
     // Log the movement if quantity changed
     if (isQuantityChanging) {
       const diff = parseInt(updates.quantity) - parseInt(current.quantity);
-      await pool.query(
+await client.query(
         'INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [id, diff > 0 ? 'adjustment_in' : 'adjustment_out', diff, current.quantity, updated.quantity, reason, authenticatedUserId]
       );
     }
 
+    await client.query('COMMIT');
     res.json({ success: true, data: formatProduct(updated) });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ success: false, message: 'Update failed', error: err.message });
+  } finally {
+    client.release();
   }
 };
 
