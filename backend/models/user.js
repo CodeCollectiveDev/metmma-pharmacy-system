@@ -13,7 +13,17 @@ const pool = new Pool({
   ssl: isProduction ? { rejectUnauthorized: false } : undefined,
 });
 
-const DB_ROLES = ['admin', 'pharmacist', 'cashier', 'store_manager', 'hr_officer'];
+const DB_ROLES = [
+  'super_admin',
+  'managing_director',
+  'director',
+  'pharmacist_manager',
+  'pharmacist',
+  'assistant_pharmacist',
+  'store_manager',
+  'cashier',
+  'hr_officer',
+];
 
 const normalizeRole = (role) => {
   if (role == null) return null;
@@ -24,11 +34,21 @@ const normalizeRole = (role) => {
   const compact = lc.replace(/[\s-]+/g, '_'); // "store manager" -> "store_manager"
 
   const aliases = {
-    admin: 'admin',
+    super_admin: 'super_admin',
+    superadmin: 'super_admin',
+    admin: 'super_admin',
+    managing_director: 'managing_director',
+    managingdirector: 'managing_director',
+    md: 'managing_director',
+    director: 'director',
+    pharmacist_manager: 'pharmacist_manager',
+    pharmacistmanager: 'pharmacist_manager',
     pharmacist: 'pharmacist',
-    cashier: 'cashier',
+    assistant_pharmacist: 'assistant_pharmacist',
+    assistant: 'assistant_pharmacist',
     store_manager: 'store_manager',
     storemanager: 'store_manager',
+    cashier: 'cashier',
     hr_officer: 'hr_officer',
     hrofficer: 'hr_officer',
     hr: 'hr_officer',
@@ -37,7 +57,7 @@ const normalizeRole = (role) => {
   return aliases[compact] || null;
 };
 
-const createUser = async ({ username, password, role, full_name, email }) => {
+const createUser = async ({ username, password, role, full_name, email }, client = pool) => {
   const normalizedRole = normalizeRole(role);
   if (!normalizedRole || !DB_ROLES.includes(normalizedRole)) {
     const err = new Error('Invalid role');
@@ -63,7 +83,7 @@ const createUser = async ({ username, password, role, full_name, email }) => {
       RETURNING id, username, email, role, full_name, is_active, created_at
     `;
     values = [username, hashedPassword, email || null, normalizedRole, full_name];
-    result = await pool.query(query, values);
+    result = await client.query(query, values);
     return result.rows[0];
   } catch (err) {
     // If full_name or email columns don't exist, try minimal schema
@@ -76,7 +96,7 @@ const createUser = async ({ username, password, role, full_name, email }) => {
           RETURNING id, username, role, created_at
         `;
         values = [username, hashedPassword, normalizedRole];
-        result = await pool.query(query, values);
+        result = await client.query(query, values);
         // Add missing fields for API consistency
         return { 
           ...result.rows[0], 
@@ -117,4 +137,62 @@ const findUserByUsername = async (username) => {
   }
 };
 
-module.exports = { createUser, findUserByUsername, normalizeRole, DB_ROLES };
+const findUserById = async (id) => {
+  // Try full schema first, fallback to minimal schema
+  try {
+    const query = 'SELECT id, username, password_hash, role, email, full_name, is_active FROM users WHERE id = $1';
+    const result = await pool.query(query, [id]);
+    return result.rows[0] || null;
+  } catch (err) {
+    if (err.code === '42703') {
+      // Minimal schema: only id, username, password_hash, role
+      const query = 'SELECT id, username, password_hash, role FROM users WHERE id = $1';
+      const result = await pool.query(query, [id]);
+      if (result.rows[0]) {
+        return {
+          ...result.rows[0],
+          email: null,
+          full_name: null,
+          is_active: true
+        };
+      }
+      return null;
+    }
+    throw err;
+  }
+};
+
+const listUsers = async () => {
+  const query = `
+    SELECT id, username, email, role, full_name, is_active, created_at
+    FROM users
+    ORDER BY created_at DESC
+  `;
+  const result = await pool.query(query);
+  return result.rows;
+};
+
+const setUserActive = async (id, isActive) => {
+  const query = `
+    UPDATE users
+    SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+    RETURNING id, username, email, role, full_name, is_active
+  `;
+  const result = await pool.query(query, [isActive, id]);
+  return result.rows[0] || null;
+};
+
+const setUserPassword = async (id, password) => {
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const query = `
+    UPDATE users
+    SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+    RETURNING id, username, email, role, full_name, is_active
+  `;
+  const result = await pool.query(query, [hashedPassword, id]);
+  return result.rows[0] || null;
+};
+
+module.exports = { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES, pool };

@@ -48,11 +48,8 @@
       </form>
 
       <div class="mt-6 pt-6 border-t border-gray-200 text-center">
-        <p class="text-sm text-gray-600">
-          Don't have an account?
-          <router-link to="/register" class="text-blue-600 hover:text-blue-700 font-medium">
-            Create one here
-          </router-link>
+        <p class="text-sm text-gray-500">
+          Accounts are provisioned by an administrator.
         </p>
       </div>
     </div>
@@ -70,7 +67,6 @@ const loading = ref(false);
 const router = useRouter();
 
 import { authService } from '@/services/api/authService';
-import { getAll } from '@/pouchdb';
 
 async function login() {
   error.value = "";
@@ -105,21 +101,9 @@ async function login() {
     if (err.response && err.response.status === 401) {
       error.value = "Invalid credentials. Please try again.";
     } else {
-      // Offline fallback: Check local storage for emergency login if backend is down
-      try {
-        const users = await getAll('users');
-        const user = users.find(u => u.email === email.value && u.password === password.value);
-        if (user) {
-          localStorage.setItem("token", "pouchdb-session-" + user._id);
-          localStorage.setItem("role", user.role);
-          localStorage.setItem("user", JSON.stringify(user));
-          router.push(user.role === 'cashier' ? '/pos' : '/dashboard');
-          return;
-        }
-      } catch (localErr) {
-        console.error('[Login] Local fallback failed:', localErr);
-      }
-      error.value = "Server unreachable. Only offline login for existing sessions available.";
+      // No offline fallback: a valid session requires server connectivity so
+      // that authentication and token revocation stay enforceable server-side.
+      error.value = "Server unreachable. Login requires an active connection.";
     }
   } finally {
     loading.value = false;

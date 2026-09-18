@@ -25,8 +25,8 @@ const currentDate = computed(() => {
         <Menu class="w-5 h-5" />
       </button>
       <div class="min-w-0">
-      <h1 class="truncate text-lg sm:text-xl font-bold text-gray-800">{{ title }}</h1>
-      <p v-if="subtitle" class="text-sm text-gray-500 mt-0.5">{{ subtitle }}</p>
+      <h1 class="truncate text-base font-semibold text-gray-900 sm:text-lg">{{ title }}</h1>
+      <p v-if="subtitle" class="mt-0.5 text-sm text-gray-500">{{ subtitle }}</p>
       </div>
     </div>
 

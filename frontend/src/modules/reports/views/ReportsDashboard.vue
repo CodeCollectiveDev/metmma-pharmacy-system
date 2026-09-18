@@ -4,7 +4,10 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
 import { FileText, Download, Filter, TrendingUp, Package, Users, Calendar } from 'lucide-vue-next'
+import StatCardsSkeleton from '@/modules/shared/components/skeleton/StatCardsSkeleton.vue'
+import TableSkeleton from '@/modules/shared/components/skeleton/TableSkeleton.vue'
 
+const pageLoading = ref(true)
 const activeTab = ref('sales')
 const products = ref([])
 const employees = ref([])
@@ -12,20 +15,23 @@ const salesData = ref([])
 const dateFilter = ref('today')
 
 onMounted(async () => {
-  // Fetch from backend APIs instead of local storage
-  products.value = await dataOrchestrator.fetchCollection('products', dataService.getProducts)
-  employees.value = await dataOrchestrator.fetchCollection('employees', dataService.getEmployees)
-  
-  // Fetch sales history and normalize
-  const transactions = await dataOrchestrator.fetchCollection('transactions', dataService.getSalesHistory)
-  salesData.value = transactions.map(t => ({
-    id: t.id,
-    date: (t.created_at || t.date || '').toString().slice(0, 10),
-    product: t.product_name || t.product || 'Unknown',
-    qty: t.quantity || t.qty || 0,
-    total: t.total_amount || t.total || 0,
-    customer: t.customer_name || 'Walk-in'
-  }))
+  pageLoading.value = true
+  try {
+    products.value = await dataOrchestrator.fetchCollection('products', dataService.getProducts)
+    employees.value = await dataOrchestrator.fetchCollection('employees', dataService.getEmployees)
+
+    const transactions = await dataOrchestrator.fetchCollection('transactions', dataService.getSalesHistory)
+    salesData.value = transactions.map(t => ({
+      id: t.id,
+      date: (t.created_at || t.date || '').toString().slice(0, 10),
+      product: t.product_name || t.product || 'Unknown',
+      qty: t.quantity || t.qty || 0,
+      total: t.total_amount || t.total || 0,
+      customer: t.customer_name || 'Walk-in'
+    }))
+  } finally {
+    pageLoading.value = false
+  }
 })
 
 const lowStockProducts = computed(() => products.value.filter(p => p.stock <= (p.minStockLevel || 10) && !p.lowStockIgnored))
@@ -61,8 +67,15 @@ const exportToCsv = (data, filename) => {
 
 <template>
   <MainLayout title="Reports" subtitle="View and export system reports">
+    <div v-if="pageLoading" class="space-y-6">
+      <div class="app-card h-14 animate-pulse bg-gray-100/50" />
+      <StatCardsSkeleton :count="3" />
+      <TableSkeleton />
+    </div>
+
+    <template v-else>
     <!-- Report Type Tabs -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+    <div class="app-card mb-6">
       <div class="flex overflow-x-auto border-b border-gray-100">
         <button 
           @click="activeTab = 'sales'"
@@ -102,23 +115,23 @@ const exportToCsv = (data, filename) => {
       </div>
 
       <!-- Sales Summary Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <p class="text-sm text-gray-500">Total Sales</p>
-          <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatCurrency(totalSales) }}</p>
+      <div class="mb-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div class="app-card app-card-body">
+          <p class="app-stat-label">Total Sales</p>
+          <p class="app-stat-value">{{ formatCurrency(totalSales) }}</p>
         </div>
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <p class="text-sm text-gray-500">Transactions</p>
-          <p class="text-2xl font-bold text-gray-800 mt-1">{{ salesData.length }}</p>
+        <div class="app-card app-card-body">
+          <p class="app-stat-label">Transactions</p>
+          <p class="app-stat-value">{{ salesData.length }}</p>
         </div>
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <p class="text-sm text-gray-500">Avg. Transaction</p>
-          <p class="text-2xl font-bold text-gray-800 mt-1">{{ formatCurrency(avgTransaction) }}</p>
+        <div class="app-card app-card-body">
+          <p class="app-stat-label">Avg. Transaction</p>
+          <p class="app-stat-value">{{ formatCurrency(avgTransaction) }}</p>
         </div>
       </div>
 
       <!-- Sales Table -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"><div class="overflow-x-auto">
+      <div class="app-card overflow-hidden"><div class="overflow-x-auto">
         <table class="w-full min-w-[600px]">
           <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -150,9 +163,9 @@ const exportToCsv = (data, filename) => {
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Low Stock -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div class="px-6 py-4 border-b border-gray-100 bg-orange-50">
-            <h3 class="font-semibold text-orange-800">Low Stock Items ({{ lowStockProducts.length }})</h3>
+        <div class="app-card overflow-hidden">
+          <div class="border-b border-gray-100 bg-orange-50 px-5 py-4">
+            <h3 class="app-section-title text-orange-800">Low Stock Items ({{ lowStockProducts.length }})</h3>
           </div>
           <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
             <div v-for="product in lowStockProducts" :key="product._id" class="px-6 py-4 flex justify-between">
@@ -170,9 +183,9 @@ const exportToCsv = (data, filename) => {
         </div>
 
         <!-- Expired Stock -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div class="px-6 py-4 border-b border-gray-100 bg-red-50">
-            <h3 class="font-semibold text-red-800">Expired Items ({{ expiredProducts.length }})</h3>
+        <div class="app-card overflow-hidden">
+          <div class="border-b border-gray-100 bg-red-50 px-5 py-4">
+            <h3 class="app-section-title text-red-800">Expired Items ({{ expiredProducts.length }})</h3>
           </div>
           <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
             <div v-for="product in expiredProducts" :key="product._id" class="px-6 py-4 flex justify-between">
@@ -199,9 +212,9 @@ const exportToCsv = (data, filename) => {
         </button>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100">
-          <h3 class="font-semibold text-gray-800">Employee List</h3>
+      <div class="app-card overflow-hidden">
+        <div class="border-b border-gray-100 px-5 py-4">
+          <h3 class="app-section-title">Employee List</h3>
         </div>
         <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
           <thead class="bg-gray-50 border-b border-gray-100">
@@ -230,5 +243,6 @@ const exportToCsv = (data, filename) => {
         </table></div>
       </div>
     </div>
+    </template>
   </MainLayout>
 </template>

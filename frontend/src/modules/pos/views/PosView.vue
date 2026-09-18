@@ -2,14 +2,17 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
+import BarcodeCameraScanner from '@/modules/shared/components/BarcodeCameraScanner.vue'
 import { usePosStore } from '../store/posStore'
+import { dataService } from '@/services/api/dataService'
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle } from 'lucide-vue-next'
 
 const router = useRouter()
 const store = usePosStore()
 
 const searchQuery = ref('')
-const barcodeInput = ref('')
+const barcodeInputElement = ref(null)
+const showCameraScanner = ref(false)
 const paymentMethod = ref('cash')
 const showReceipt = ref(false)
 const lastTransaction = ref(null)
@@ -20,33 +23,54 @@ const categories = ['All', 'Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Co
 onMounted(() => {
   store.fetchProducts()
   // Focus barcode input on mount
-  document.getElementById('barcode-input')?.focus()
+  barcodeInputElement.value?.focus()
 })
 
 // Filter products based on search and category
 const filteredProducts = computed(() => {
   return store.products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         p.batchNumber?.toLowerCase().includes(searchQuery.value.toLowerCase())
+                         p.batchNumber?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                         p.category?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                         String(p.barcode ?? '').toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesCategory = store.selectedCategory === 'All' || p.category === store.selectedCategory
     return matchesSearch && matchesCategory && p.stock > 0
   })
 })
 
-// Handle barcode scan (Enter pressed in barcode input)
+// Handle an exact barcode, batch number, or product ID from a scanner.
 const handleBarcodeScan = () => {
-  if (!barcodeInput.value) return
+  const scanValue = searchQuery.value.trim()
+  if (!scanValue) return
   const product = store.products.find(p => 
-    p.batchNumber?.toLowerCase() === barcodeInput.value.toLowerCase() ||
-    p._id === barcodeInput.value
+    p.batchNumber?.toLowerCase() === scanValue.toLowerCase() ||
+    String(p.barcode ?? '').toLowerCase() === scanValue.toLowerCase() ||
+    p._id === scanValue
   )
   if (product) {
     store.addToCart(product)
-    barcodeInput.value = ''
+    searchQuery.value = ''
   } else {
-    alert('Product not found: ' + barcodeInput.value)
-    barcodeInput.value = ''
+    alert('Product not found: ' + scanValue)
   }
+}
+
+const focusBarcodeInput = () => {
+  barcodeInputElement.value?.focus()
+}
+
+const startBarcodeScan = () => {
+  if (searchQuery.value.trim()) {
+    handleBarcodeScan()
+    return
+  }
+  focusBarcodeInput()
+}
+
+const handleCameraBarcode = (barcode) => {
+  showCameraScanner.value = false
+  searchQuery.value = barcode
+  handleBarcodeScan()
 }
 
 // Process payment and complete transaction
@@ -59,16 +83,63 @@ const processPayment = async () => {
   processing.value = true
   
   try {
-    const result = await store.checkout(paymentMethod.value)
-    if (result.offline) {
-      alert('Sale saved offline and awaiting synchronization. A server receipt is not yet available.')
-    } else {
-      lastTransaction.value = result.transaction
-      showReceipt.value = true
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const subtotal = store.cartTotal
+    const totalAmount = Math.round(subtotal * 1.165 * 100) / 100
+
+    // Backend contract: salesController.processSale expects
+    // { items: [{ productId (DB id), quantity, unitPrice, subtotal }],
+    //   totalAmount, paymentMethod, customerName, userId }
+    const payload = {
+      localSaleId: globalThis.crypto?.randomUUID?.() || `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      items: store.cart.map(item => ({
+        productId: Number(item.id),
+        quantity: item.quantity,
+        unitPrice: item.price,
+        subtotal: Math.round(item.price * item.quantity * 100) / 100
+      })),
+      totalAmount,
+      paymentMethod: paymentMethod.value,
+      customerName: '',
+      userId: user.id
     }
+
+    // Sale must be confirmed by the backend before we show a receipt or
+    // clear the cart. Never auto-queue a sale and claim success.
+    const response = await dataService.recordSale(payload)
+    const result = response?.data
+
+    if (!result || !result.success) {
+      throw new Error(result?.message || 'Sale could not be completed')
+    }
+
+    // Store confirmed transaction for the receipt (server-generated receipt no.)
+    lastTransaction.value = {
+      _id: result.receiptNumber || `txn_${Date.now()}`,
+      date: new Date().toISOString(),
+      items: store.cart.map(item => ({
+        productId: item.id,
+        name: item.name,
+        batchNumber: item.batchNumber,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        total: Math.round(item.price * item.quantity * 100) / 100
+      })),
+      subtotal,
+      tax: Math.round(subtotal * 0.165 * 100) / 100,
+      total: totalAmount,
+      paymentMethod: paymentMethod.value,
+      cashier: user.name || 'Unknown'
+    }
+    showReceipt.value = true
+
+    // Clear cart and reload products — stock was decremented server-side
+    // inside the sale transaction.
+    store.clearCart()
+    await store.fetchProducts()
   } catch (error) {
     console.error('Payment error:', error)
-    alert('Payment failed: ' + (error.response?.data?.errors?.map(e => e.message).join('; ') || error.response?.data?.message || error.message))
+    alert('Payment failed: ' + (error.response?.data?.message || error.message))
   } finally {
     processing.value = false
   }
@@ -99,35 +170,28 @@ const goToHelp = () => {
           <div class="flex gap-2">
             <div class="relative flex-1">
               <input
-                id="barcode-input"
-                v-model="barcodeInput"
+                id="product-search"
+                ref="barcodeInputElement"
+                v-model="searchQuery"
                 @keyup.enter="handleBarcodeScan"
                 type="text"
-                placeholder="Scan barcode or enter batch number..."
-                class="w-full pl-10 pr-4 py-2.5 border border-blue-200 bg-blue-50 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Search products, barcodes, or batches..."
+                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
-              <ScanBarcode class="w-5 h-5 text-blue-500 absolute left-3 top-2.5" />
+              <Search class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
             </div>
-            <button @click="handleBarcodeScan" class="shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              Scan
+            <button type="button" @click="startBarcodeScan" class="shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <ScanBarcode class="h-5 w-5" />
+              <span class="hidden sm:inline">Scanner</span>
+            </button>
+            <button type="button" @click="showCameraScanner = true" class="shrink-0 px-3 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors" aria-label="Scan barcode with camera" title="Scan with camera">
+              <ScanBarcode class="h-5 w-5" />
+              <span class="hidden sm:inline">Camera</span>
             </button>
             <button @click="goToHelp" class="px-3 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center">
               <HelpCircle class="w-5 h-5" />
             </button>
           </div>
-
-
-          <!-- Search -->
-          <div class="relative">
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search products..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-            <Search class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-          </div>
-
           <!-- Categories -->
           <div class="flex flex-wrap gap-2">
             <button
@@ -145,6 +209,12 @@ const goToHelp = () => {
             </button>
           </div>
         </div>
+
+        <BarcodeCameraScanner
+          v-if="showCameraScanner"
+          @detected="handleCameraBarcode"
+          @close="showCameraScanner = false"
+        />
 
         <!-- Products Grid -->
         <div class="flex-1 p-4 overflow-y-auto">
@@ -266,20 +336,20 @@ const goToHelp = () => {
           <div class="text-sm text-gray-500 text-center">
             <p>Date: {{ new Date(lastTransaction.date).toLocaleString() }}</p>
             <p>Cashier: {{ lastTransaction.cashier }}</p>
-            <p>Transaction: {{ lastTransaction.receiptNumber || lastTransaction._id }}</p>
+            <p>Transaction: {{ lastTransaction._id }}</p>
           </div>
 
           <div class="border-t border-b border-dashed py-4 space-y-2">
             <div v-for="item in lastTransaction.items" :key="item.productId" class="flex justify-between text-sm">
               <span>{{ item.name }} x{{ item.quantity }}</span>
-              <span>{{ formatCurrency(item.subtotal) }}</span>
+              <span>{{ formatCurrency(item.total) }}</span>
             </div>
           </div>
 
           <div class="space-y-1 text-sm">
             <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(lastTransaction.subtotal) }}</span></div>
             <div class="flex justify-between"><span>VAT (16.5%)</span><span>{{ formatCurrency(lastTransaction.tax) }}</span></div>
-            <div class="flex justify-between font-bold text-lg"><span>Total</span><span>{{ formatCurrency(lastTransaction.totalAmount) }}</span></div>
+            <div class="flex justify-between font-bold text-lg"><span>Total</span><span>{{ formatCurrency(lastTransaction.total) }}</span></div>
           </div>
 
           <p class="text-center text-sm text-gray-500 pt-4 border-t border-dashed">Thank you for your purchase!</p>

@@ -19,12 +19,12 @@ const validateSchema = (schema, prop = 'body') => (req, res, next) => {
   next();
 };
 
-router.get('/financial', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER), financialController.getFinancialReports);
-router.post('/financial', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER), validateSchema(financialReportSchema, 'body'), financialController.createFinancialReport);
+router.get('/financial', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.DIRECTOR, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.HR_OFFICER), financialController.getFinancialReports);
+router.post('/financial', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.STORE_MANAGER), validateSchema(financialReportSchema, 'body'), financialController.createFinancialReport);
 
-router.get('/compliance', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER), complianceController.getComplianceReports);
-router.post('/compliance', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER), validateSchema(complianceReportSchema, 'body'), complianceController.createComplianceReport);
+router.get('/compliance', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.DIRECTOR, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.HR_OFFICER), complianceController.getComplianceReports);
+router.post('/compliance', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.STORE_MANAGER), validateSchema(complianceReportSchema, 'body'), complianceController.createComplianceReport);
 
-router.get('/recent-activity', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER, ROLES.CASHIER), getRecentActivity);
+router.get('/recent-activity', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.MANAGING_DIRECTOR, ROLES.DIRECTOR, ROLES.PHARMACIST_MANAGER, ROLES.PHARMACIST, ROLES.ASSISTANT_PHARMACIST, ROLES.STORE_MANAGER, ROLES.HR_OFFICER, ROLES.CASHIER), getRecentActivity);
 
 module.exports = router;
