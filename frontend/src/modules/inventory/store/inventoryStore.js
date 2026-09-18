@@ -25,7 +25,18 @@ export const useInventoryStore = defineStore('inventory', () => {
         try {
             const res = await dataOrchestrator.saveItem('products', product, dataService.addProduct);
             if (res.ok) {
-                await fetchProducts(); // Refresh list
+                if (res.offline) {
+                    const localProduct = {
+                        ...product,
+                        _id: res.id,
+                        syncStatus: 'pending',
+                        stock: Number(product.stock ?? product.quantity ?? 0),
+                        price: Number(product.price ?? product.sellingPrice ?? product.unitPrice ?? 0)
+                    };
+                    products.value = [...products.value, localProduct];
+                } else {
+                    await fetchProducts(); // Refresh list from the server
+                }
                 return true;
             }
             return false;

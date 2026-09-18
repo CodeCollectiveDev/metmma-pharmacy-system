@@ -23,6 +23,11 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Barcode</label>
+          <input v-model="form.barcode" type="text" inputmode="numeric" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Scan or enter barcode">
+        </div>
+
+        <div>
            <label class="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
            <input v-model="form.batchNumber" type="text" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="BATCH123">
         </div>
@@ -73,6 +78,7 @@ const loading = ref(false);
 
 const form = reactive({
     name: '',
+  barcode: '',
     category: 'Antibiotics',
     batchNumber: '',
     expiryDate: '',
