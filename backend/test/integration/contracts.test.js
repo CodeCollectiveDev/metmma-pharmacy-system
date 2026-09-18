@@ -18,7 +18,6 @@ let base;
 let employeeId;
 let testUser;
 const tokenCache = {};
-
 const TOKEN_ISSUER = 'metmma-api';
 const TOKEN_AUDIENCE = 'metmma-frontend';
 
@@ -101,10 +100,18 @@ test('frontend checkout payload persists sale fields, lines and a single stock d
     totalAmount: 34.95, paymentMethod: 'card', customerName: 'Customer', userId: testUser.id,
     items: [{ productId: 103, name: 'Product 103', quantity: 3, unitPrice: 10, subtotal: 30 }]
   });
+  assert.equal(Object.hasOwn(payload, 'userId'), false);
+
+  const spoof = await request('/sales/checkout', { method: 'POST', body: { ...payload, userId: 2 }, role: 'cashier' });
+  assert.equal(spoof.status, 400);
+  assert.ok(spoof.data.errors.some(error => error.field === 'userId'));
+  assert.equal((await pool.query('SELECT COUNT(*) FROM sales')).rows[0].count, '0');
+
   const response = await request('/sales/checkout', { method: 'POST', body: payload, role: 'cashier' });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   assert.equal(response.data.data.totalAmount, 34.95);
   assert.equal(response.data.data.receiptNumber, response.data.receiptNumber);
+  assert.equal(response.data.data.userId, testUser.id);
   const sale = (await pool.query('SELECT * FROM sales WHERE id = $1', [response.data.saleId])).rows[0];
   assert.equal(sale.total_amount, '34.95');
   assert.equal(sale.payment_method, 'card');
@@ -115,19 +122,57 @@ test('frontend checkout payload persists sale fields, lines and a single stock d
   assert.equal(line.quantity, 3);
   assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 103')).rows[0].quantity, 7);
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 103')).rowCount, 1);
+  const saleMovement = (await pool.query('SELECT * FROM stock_movements WHERE product_id = 103')).rows[0];
+  assert.equal(saleMovement.user_id, testUser.id);
   const history = await request('/sales/history');
   assert.equal(history.data.data[0].items[0].product_id, 103);
 
   const retry = await request('/sales/checkout', { method: 'POST', body: {
     ...payload,
-    totalAmount: 104.85,
-    items: [{ productId: 1, quantity: 1, unitPrice: 10, subtotal: 10 }, { ...payload.items[0], quantity: 8, subtotal: 80 }]
+    totalAmount: 80,
+    items: [{ ...payload.items[0], quantity: 8, subtotal: 80 }]
   } });
   assert.equal(retry.status, 400);
   assert.match(retry.data.message, /Insufficient stock/);
   assert.equal((await pool.query('SELECT * FROM sales')).rowCount, 1, 'failed checkout rolled back');
   assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 1')).rows[0].quantity, 100);
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 1')).rowCount, 0);
+});
+
+test('authenticated product inventory writes attribute movements to the JWT actor', async () => {
+  const adjustment = await request('/products/10', { method: 'PUT', body: {
+    quantity: 90,
+    reason: 'Audit attribution test',
+    userId: 2,
+    user_id: 2
+  } });
+  assert.equal(adjustment.status, 200, JSON.stringify(adjustment.data));
+  const adjustmentMovement = (await pool.query(
+    'SELECT * FROM stock_movements WHERE product_id = 10 ORDER BY id DESC LIMIT 1'
+  )).rows[0];
+  assert.equal(adjustmentMovement.movement_type, 'adjustment_out');
+  assert.equal(adjustmentMovement.user_id, testUser.id);
+
+  const creation = await request('/products', { method: 'POST', body: {
+    productCode: 'AUDIT-ATTRIBUTION',
+    name: 'Audit Product',
+    batchNumber: 'AUDIT-BATCH',
+    expiryDate: '2030-01-01',
+    quantity: 4,
+    unitPrice: 10,
+    sellingPrice: 12,
+    supplier: 'Audit Supplier',
+    category: 'Audit Category',
+    userId: 2,
+    user_id: 2
+  } });
+  assert.equal(creation.status, 201, JSON.stringify(creation.data));
+  const creationMovement = (await pool.query(
+    'SELECT * FROM stock_movements WHERE product_id = $1 ORDER BY id DESC LIMIT 1',
+    [creation.data.data.id]
+  )).rows[0];
+  assert.equal(creationMovement.movement_type, 'purchase');
+  assert.equal(creationMovement.user_id, testUser.id);
 });
 
 test('inactive products are unavailable through direct checkout and mixed carts roll back', async () => {
@@ -240,8 +285,21 @@ test('invalid checkout and unauthorized writes are rejected without inserting re
   const body = invalidBodies[4];
   assert.equal((await request('/sales/checkout', { method: 'POST', body, authenticated: false })).status, 401);
   assert.equal((await request('/sales/checkout', { method: 'POST', body, role: 'hr_officer' })).status, 403);
+
+  const missingSession = jwt.sign(
+    { sub: String(testUser.id), sid: randomUUID(), username: testUser.username, role: 'cashier' },
+    process.env.JWT_SECRET,
+    { issuer: TOKEN_ISSUER, audience: TOKEN_AUDIENCE, expiresIn: '15m' }
+  );
+  const reinterpreted = await fetch(`${base}/sales/checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${missingSession}` },
+    body: JSON.stringify({ totalAmount: 10, items: [{ productId: 1, quantity: 1, unitPrice: 10, subtotal: 10 }] })
+  });
+  assert.equal(reinterpreted.status, 401);
   assert.equal(Number((await pool.query('SELECT COUNT(*) FROM sales')).rows[0].count), 1);
   assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 1')).rows[0].quantity, 100);
+  assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 1')).rowCount, 0);
 });
 
 test('employee creation persists all submitted fields, generates its identifier and can be read/updated', async () => {

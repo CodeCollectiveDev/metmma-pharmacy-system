@@ -1,11 +1,16 @@
 const pool = require('../db').pool;
 
 const processSale = async (req, res) => {
+  const authenticatedUserId = req.user?.id;
+  if (!Number.isInteger(authenticatedUserId) || authenticatedUserId <= 0) {
+    return res.status(401).json({ error: 'Access denied. Not authenticated.' });
+  }
+
   const client = await pool.connect();
   
   try {
-    const idempotencyKey = req.get('x-idempotency-key') || req.body.localSaleId || req.body.local_sale_id || req.body.idempotencyKey || req.body.idempotency_key;
-    const { items, totalAmount, paymentMethod, customerName, userId } = req.body;
+const idempotencyKey = req.get('x-idempotency-key') || req.body.localSaleId || req.body.local_sale_id || req.body.idempotencyKey || req.body.idempotency_key;
+    const { items, totalAmount, paymentMethod, customerName } = req.body;
 
     // As additional defence-in-depth, the body is normally already verified by
     // the salesValidator middleware (saleSchema + verifySaleArithmetic).
@@ -31,7 +36,7 @@ const processSale = async (req, res) => {
         });
       }
     }
-    
+
     // 1. Start Transaction
     await client.query('BEGIN');
 
@@ -39,11 +44,11 @@ const processSale = async (req, res) => {
     // Matching your SQL columns: receipt_number, total_amount, payment_method, customer_name, user_id
     const receiptNumber = `REC-${Date.now()}`;
     const saleResult = await client.query(
-      `INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id, local_sale_id) 
+`INSERT INTO sales (receipt_number, total_amount, payment_method, customer_name, user_id, local_sale_id) 
        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (local_sale_id) WHERE local_sale_id IS NOT NULL DO NOTHING
        RETURNING *`,
-      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, userId, idempotencyKey || null]
+      [receiptNumber, totalAmount, paymentMethod || 'cash', customerName, authenticatedUserId, idempotencyKey || null]
     );
 
     let saleRow = saleResult.rows[0];
@@ -101,9 +106,9 @@ const processSale = async (req, res) => {
 
       // Log to stock_movements (audit trail)
       await client.query(
-        `INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes) 
-         VALUES ($1, 'sale', $2, $3, $4, $5)`,
-        [item.productId, -item.quantity, product.quantity, newQty, `Receipt: ${receiptNumber}`]
+        `INSERT INTO stock_movements (product_id, movement_type, quantity_change, previous_quantity, new_quantity, notes, user_id)
+         VALUES ($1, 'sale', $2, $3, $4, $5, $6)`,
+        [item.productId, -item.quantity, product.quantity, newQty, `Receipt: ${receiptNumber}`, authenticatedUserId]
       );
     }
 
@@ -122,7 +127,7 @@ const processSale = async (req, res) => {
         totalAmount,
         paymentMethod: paymentMethod || 'cash',
         customerName,
-        userId,
+        userId: authenticatedUserId,
         items
       }
     });

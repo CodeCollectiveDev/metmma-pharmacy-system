@@ -86,7 +86,8 @@ describe('POS Store', () => {
         const [collection, sale, method] = dataOrchestrator.saveItem.mock.calls[0]
         expect(collection).toBe('transactions')
         expect(method).toBe(dataService.recordSale)
-        expect(sale).toMatchObject({ totalAmount: 11.65, userId: 3, paymentMethod: 'card' })
+        expect(sale).toMatchObject({ totalAmount: 11.65, paymentMethod: 'card' })
+        expect(sale).not.toHaveProperty('userId')
         expect(sale.items[0]).toMatchObject({ productId: 1, unitPrice: 10, subtotal: 10, quantity: 1 })
         expect(result.transaction.receiptNumber).toBe('REC-9')
         expect(save).not.toHaveBeenCalled()
