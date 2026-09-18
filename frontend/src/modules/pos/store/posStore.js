@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getAll } from '@/pouchdb'
+import { v4 as uuidv4 } from 'uuid'
+import { save } from '@/pouchdb'
 import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { dataService } from '@/services/api/dataService'
 
@@ -79,6 +80,58 @@ export const usePosStore = defineStore('pos', () => {
         cart.value = []
     }
 
+    async function checkout(paymentMethod) {
+        if (!cart.value.length) throw new Error('Cart is empty')
+        const user = JSON.parse(localStorage.getItem('user') || '{}')
+        const money = amount => Math.round((amount + Number.EPSILON) * 100) / 100
+        const items = cart.value.map(item => {
+            const productId = Number(item.id || item._id)
+            if (!Number.isSafeInteger(productId) || productId <= 0) {
+                throw new Error(`${item.name} must be synchronized before it can be sold`)
+            }
+            return {
+                productId,
+                name: item.name,
+                batchNumber: item.batchNumber,
+                quantity: item.quantity,
+                unitPrice: Number(item.price),
+                subtotal: money(item.price * item.quantity)
+            }
+        })
+        const subtotal = money(items.reduce((sum, item) => sum + item.subtotal, 0))
+        const tax = money(subtotal * 0.165)
+        const transaction = {
+            _id: `txn_${uuidv4()}`,
+            date: new Date().toISOString(),
+            items,
+            subtotal,
+            tax,
+            totalAmount: money(subtotal + tax),
+            paymentMethod,
+            customerName: null,
+            userId: user.id,
+            cashier: user.name || 'Unknown'
+        }
+        const result = await dataOrchestrator.saveItem('transactions', transaction, dataService.recordSale)
+        if (!result.ok) throw new Error('Sale could not be saved')
+
+        // The checkout endpoint owns persisted stock changes. Offline stock is
+        // only a local projection; it must never be replayed as a product write.
+        if (result.offline) {
+            for (const item of cart.value) {
+                const product = products.value.find(p => p._id === item._id)
+                if (product) {
+                    product.stock -= item.quantity
+                    product.quantity = product.stock
+                    await save('products', { ...product })
+                }
+            }
+        }
+        clearCart()
+        if (!result.offline) await fetchProducts()
+        return { transaction: result.data, offline: result.offline }
+    }
+
     return {
         cart,
         products,
@@ -90,6 +143,7 @@ export const usePosStore = defineStore('pos', () => {
         addToCart,
         removeFromCart,
         updateQuantity,
-        clearCart
+        clearCart,
+        checkout
     }
 })

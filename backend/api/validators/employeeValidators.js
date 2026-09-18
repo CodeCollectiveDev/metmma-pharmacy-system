@@ -51,7 +51,7 @@ const employeeCreateSchema = Joi.object({
   hire_date: Joi.date().iso().less('now').default(() => new Date().toISOString().split('T')[0]),
   salary: employeeFields.salary.required(),
   status: employeeFields.status.optional()
-});
+}).required();
 
 /**
  * Schema for PUT /api/employees/:id (Update)

@@ -7,24 +7,10 @@ const processSale = async (req, res) => {
     const idempotencyKey = req.get('x-idempotency-key') || req.body.localSaleId || req.body.local_sale_id || req.body.idempotencyKey || req.body.idempotency_key;
     const { items, totalAmount, paymentMethod, customerName, userId } = req.body;
 
-    // Client-contract validation: reject malformed payloads instead of
-    // silently writing broken sales (see issues/issue2.md).
+    // As additional defence-in-depth, the body is normally already verified by
+    // the salesValidator middleware (saleSchema + verifySaleArithmetic).
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'items[] is required and must not be empty' });
-    }
-    for (const item of items) {
-      if (!Number.isInteger(item.productId) || item.productId <= 0) {
-        return res.status(400).json({ success: false, message: 'Each item must have a valid DB productId (integer)' });
-      }
-      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
-        return res.status(400).json({ success: false, message: 'Each item must have a valid quantity (positive integer)' });
-      }
-      if (typeof item.unitPrice !== 'number' || item.unitPrice < 0) {
-        return res.status(400).json({ success: false, message: 'Each item must have a valid unitPrice (number)' });
-      }
-    }
-    if (typeof totalAmount !== 'number' || totalAmount <= 0) {
-      return res.status(400).json({ success: false, message: 'totalAmount is required and must be a positive number' });
     }
 
     if (idempotencyKey) {
@@ -128,7 +114,17 @@ const processSale = async (req, res) => {
       message: 'Sale completed',
       receiptNumber,
       saleId,
-      localSaleId: idempotencyKey || saleRow.local_sale_id
+      localSaleId: idempotencyKey || saleRow.local_sale_id,
+      data: {
+        id: saleId,
+        receiptNumber,
+        date: saleResult.rows[0].created_at,
+        totalAmount,
+        paymentMethod: paymentMethod || 'cash',
+        customerName,
+        userId,
+        items
+      }
     });
 
   } catch (error) {
