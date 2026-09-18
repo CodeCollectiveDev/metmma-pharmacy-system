@@ -17,7 +17,7 @@ exports.getAttendanceByDate = async (req, res) => {
     const { date } = req.query;
     try {
         const result = await pool.query(
-            `SELECT a.*, a.check_in_time AS check_in, e.employee_id, e.first_name, e.last_name, e.role, e.department
+            `SELECT a.*, a.check_in_time AS check_in, e.employee_id AS employee_code, e.first_name, e.last_name, e.role, e.department
              FROM attendance a
              JOIN employees e ON e.id = a.employee_id
              WHERE a.date = COALESCE($1::date, CURRENT_DATE)

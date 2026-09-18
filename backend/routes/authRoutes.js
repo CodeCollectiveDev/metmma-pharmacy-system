@@ -2,7 +2,7 @@ const express = require('express');
 const Joi = require('joi');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { createUser, findUserByUsername, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES, pool } = require('../models/user');
+const { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES, pool } = require('../models/user');
 const { authenticate, authorize, ROLES } = require('../middleware/roleMiddleware');
 const {
   createSession,
