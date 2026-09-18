@@ -7,7 +7,6 @@ import localforage from 'localforage';
 // Configure LocalForage instances for each collection
 const stores = {
     products: localforage.createInstance({ name: 'mpms', storeName: 'products' }),
-    users: localforage.createInstance({ name: 'mpms', storeName: 'users' }),
     transactions: localforage.createInstance({ name: 'mpms', storeName: 'transactions' }),
     employees: localforage.createInstance({ name: 'mpms', storeName: 'employees' }),
     attendance: localforage.createInstance({ name: 'mpms', storeName: 'attendance' })
@@ -71,7 +70,7 @@ export const remove = async (collection, doc) => {
 };
 
 /**
- * Bulk insert documents (for seeding)
+ * Bulk insert documents into a collection
  */
 export const bulkDocs = async (collection, docs) => {
     try {
