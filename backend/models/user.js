@@ -195,4 +195,4 @@ const setUserPassword = async (id, password) => {
   return result.rows[0] || null;
 };
 
-module.exports = { createUser, findUserByUsername, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES, pool };
+module.exports = { createUser, findUserByUsername, findUserById, listUsers, setUserActive, setUserPassword, normalizeRole, DB_ROLES, pool };
