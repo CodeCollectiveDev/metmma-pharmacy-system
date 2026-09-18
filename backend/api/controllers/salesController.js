@@ -74,11 +74,11 @@ const processSale = async (req, res) => {
     for (const item of items) {
       // Get current product details (with lock for safety)
       const productCheck = await client.query(
-        'SELECT name, quantity FROM products WHERE id = $1 FOR UPDATE', 
+        'SELECT name, quantity FROM products WHERE id = $1 AND is_active = TRUE FOR UPDATE',
         [item.productId]
       );
       
-      if (productCheck.rows.length === 0) throw new Error(`Product ID ${item.productId} not found`);
+      if (productCheck.rows.length === 0) throw new Error(`Product ID ${item.productId} is unavailable for sale`);
       const product = productCheck.rows[0];
 
       if (product.quantity < item.quantity) {
