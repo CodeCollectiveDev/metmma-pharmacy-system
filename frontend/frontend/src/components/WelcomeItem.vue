@@ -85,3 +85,22 @@ h3 {
   }
 }
 </style>
+Fill out all fields and press Send
+
+Name*
+￼
+Email*
+￼
+Student Number*
+￼
+13 of 20 max characters
+Gender*
+￼ Female
+￼ Male
+I am a student in an undergraduate degree programme under the Computer Science Department at Chancellor College in*
+￼ 1st year
+￼ 2nd year
+￼ 3rd year
+How did you hear about this scholarship?*
+￼
+Brief description of me, my goals, leadership qualities, financial need, and how I am contributing to the lives of my fellow Malawians:*
