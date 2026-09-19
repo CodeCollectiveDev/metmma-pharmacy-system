@@ -59,6 +59,7 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { storeSession } from '@/services/api/apiClient';
 
 const email = ref("");
 const password = ref("");
@@ -77,14 +78,17 @@ async function login() {
     
     if (data && data.token) {
       // Create session from backend response
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("role", data.user.role.toLowerCase());
-      localStorage.setItem("user", JSON.stringify({ 
-        id: data.user.id,
-        name: data.user.username, 
-        email: email.value, 
-        role: data.user.role.toLowerCase()
-      }));
+      storeSession({
+        token: data.token,
+        refreshToken: data.refreshToken,
+        role: data.user.role.toLowerCase(),
+        user: {
+          id: data.user.id,
+          name: data.user.username,
+          email: email.value,
+          role: data.user.role.toLowerCase()
+        }
+      });
 
       // Role-based redirect
       const role = data.user.role.toLowerCase();

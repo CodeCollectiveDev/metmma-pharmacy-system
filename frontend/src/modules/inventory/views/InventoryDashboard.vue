@@ -22,6 +22,7 @@ const searchQuery = ref('')
 const searchInputElement = ref(null)
 const showCameraScanner = ref(false)
 const cameraScanTarget = ref('search')
+const savingProduct = ref(false)
 
 const newProduct = ref({
   name: '',
@@ -89,6 +90,7 @@ const handleCameraBarcode = (barcode) => {
 }
 
 const saveProduct = async () => {
+  if (savingProduct.value) return
   if (existingBarcodeProduct.value) {
     alert('This barcode already belongs to an existing product. Use Restock on that product instead.')
     return
@@ -97,14 +99,18 @@ const saveProduct = async () => {
     alert('Please fill the required fields (Product Name, Category, Selling Price)')
     return
   }
-  
-  const success = await store.addProduct({ ...newProduct.value })
-  if (success) {
-    showAddForm.value = false
-    newProduct.value = { name: '', barcode: '', category: 'Antibiotics', supplier: '', price: null, stock: null, minStockLevel: 10 }
-    alert('Product added successfully!')
-  } else {
-    alert(store.lastError || 'Product could not be saved. Check the required fields and try again.')
+  savingProduct.value = true
+  try {
+    const success = await store.addProduct({ ...newProduct.value })
+    if (success) {
+      showAddForm.value = false
+      newProduct.value = { name: '', barcode: '', category: 'Antibiotics', supplier: '', price: null, stock: null, minStockLevel: 10 }
+      alert('Product added successfully!')
+    } else {
+      alert(store.lastError || 'Product could not be saved. Check the required fields and try again.')
+    }
+  } finally {
+    savingProduct.value = false
   }
 }
 
@@ -278,8 +284,8 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
       </div>
       <p class="mt-4 text-sm text-gray-500">Batch numbers, expiry dates, purchase prices, and suppliers belong to stock receiving. Add the product first, then use Restock when stock arrives.</p>
       <div class="flex justify-end mt-4">
-        <button @click="saveProduct" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-          Save Product
+        <button @click="saveProduct" :disabled="savingProduct" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 text-white rounded-lg font-medium transition-colors">
+          {{ savingProduct ? 'Saving Product...' : 'Save Product' }}
         </button>
       </div>
     </div>

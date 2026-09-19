@@ -39,8 +39,6 @@ onMounted(async () => {
     BarcodeFormat.CODE_39,
     BarcodeFormat.ITF,
     BarcodeFormat.CODABAR,
-    BarcodeFormat.RSS_14,
-    BarcodeFormat.RSS_EXPANDED,
     BarcodeFormat.DATA_MATRIX,
     BarcodeFormat.QR_CODE,
     BarcodeFormat.PDF_417,
@@ -72,7 +70,9 @@ onMounted(async () => {
     if (scannerClosed) controls?.stop()
   } catch (error) {
     console.error('Camera scanner error:', error)
-    errorMessage.value = 'Camera access failed. Check browser permissions and use HTTPS or localhost.'
+    errorMessage.value = error.name === 'NotAllowedError'
+      ? 'Camera permission was blocked. Allow camera access for this site, then close and reopen the scanner.'
+      : 'Camera access failed. Check browser permissions and use HTTPS or localhost.'
     isScanning.value = false
   }
 })
