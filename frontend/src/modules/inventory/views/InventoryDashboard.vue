@@ -17,9 +17,11 @@ const filter = ref('all')
 const searchQuery = ref('')
 const searchInputElement = ref(null)
 const showCameraScanner = ref(false)
+const cameraScanTarget = ref('search')
 
 const newProduct = ref({
   name: '',
+  productCode: '',
   barcode: '',
   category: 'Antibiotics',
   batchNumber: '',
@@ -65,22 +67,33 @@ const startBarcodeSearch = () => {
   focusSearchInput()
 }
 
+const openCameraScanner = (target = 'search') => {
+  cameraScanTarget.value = target
+  showCameraScanner.value = true
+}
+
 const handleCameraBarcode = (barcode) => {
   showCameraScanner.value = false
-  searchQuery.value = barcode
+  if (cameraScanTarget.value === 'product') {
+    newProduct.value.barcode = barcode
+  } else {
+    searchQuery.value = barcode
+  }
 }
 
 const saveProduct = async () => {
-  if (!newProduct.value.name || !newProduct.value.batchNumber || !newProduct.value.expiryDate || !newProduct.value.supplier) {
-    alert('Please fill required fields (Name, Batch Number, Expiry Date, Supplier)')
+  if (!newProduct.value.name || !newProduct.value.productCode || !newProduct.value.batchNumber || !newProduct.value.expiryDate || !newProduct.value.supplier || newProduct.value.price === null) {
+    alert('Please fill required fields (Product Code, Name, Batch Number, Expiry Date, Supplier, Price)')
     return
   }
   
   const success = await store.addProduct({ ...newProduct.value })
   if (success) {
     showAddForm.value = false
-    newProduct.value = { name: '', barcode: '', category: 'Antibiotics', batchNumber: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
+    newProduct.value = { name: '', productCode: '', barcode: '', category: 'Antibiotics', batchNumber: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
     alert('Product added successfully!')
+  } else {
+    alert(store.lastError || 'Product could not be saved. Check the required fields and try again.')
   }
 }
 
@@ -208,17 +221,55 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
     <div v-if="showAddForm" class="app-card app-card-body mb-6">
       <h3 class="app-section-title mb-4">Add New Product</h3>
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input v-model="newProduct.name" type="text" placeholder="Product Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model="newProduct.barcode" type="text" inputmode="numeric" placeholder="Barcode" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model="newProduct.batchNumber" type="text" placeholder="Batch Number *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <select v-model="newProduct.category" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <option v-for="cat in categories" :key="cat">{{ cat }}</option>
-        </select>
-        <input v-model="newProduct.expiryDate" type="date" placeholder="Expiry Date" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model="newProduct.supplier" type="text" placeholder="Supplier *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.price" type="number" min="0" placeholder="Price (MWK)" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.stock" type="number" min="0" placeholder="Quantity" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.minStockLevel" type="number" placeholder="Min Stock Level" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Product Code / SKU <strong class="text-red-600">*</strong></span>
+          <input v-model="newProduct.productCode" type="text" required placeholder="Internal code, e.g. AMOX-500" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase">
+          <small class="text-xs text-gray-500">Your internal code for this product. Use letters, numbers, and hyphens.</small>
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Barcode</span>
+          <div class="flex gap-2">
+            <input v-model="newProduct.barcode" type="text" inputmode="numeric" placeholder="EAN/UPC number on the package" class="min-w-0 flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            <button type="button" @click="openCameraScanner('product')" class="shrink-0 rounded-lg border border-blue-200 px-3 text-blue-700 hover:bg-blue-50" aria-label="Scan product barcode" title="Scan product barcode with camera">
+              <ScanBarcode class="h-5 w-5" />
+            </button>
+          </div>
+          <small class="text-xs text-gray-500">The numbered barcode printed on the medicine package. Optional.</small>
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Product Name <strong class="text-red-600">*</strong></span>
+          <input v-model="newProduct.name" type="text" required placeholder="e.g. Amoxicillin 500mg" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Batch / Lot Number <strong class="text-red-600">*</strong></span>
+          <input v-model="newProduct.batchNumber" type="text" required placeholder="Printed batch or lot number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Category <strong class="text-red-600">*</strong></span>
+          <select v-model="newProduct.category" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            <option v-for="cat in categories" :key="cat">{{ cat }}</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Expiry Date <strong class="text-red-600">*</strong></span>
+          <input v-model="newProduct.expiryDate" type="date" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Supplier <strong class="text-red-600">*</strong></span>
+          <input v-model="newProduct.supplier" type="text" required placeholder="Supplier name" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Selling Price (MWK) <strong class="text-red-600">*</strong></span>
+          <input v-model.number="newProduct.price" type="number" min="0" placeholder="Price charged to customer" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Opening Stock Quantity</span>
+          <input v-model.number="newProduct.stock" type="number" min="0" placeholder="Units currently available" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <span>Reorder Alert Level</span>
+          <input v-model.number="newProduct.minStockLevel" type="number" min="0" placeholder="Alert when stock reaches this number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </label>
       </div>
       <div class="flex justify-end mt-4">
         <button @click="saveProduct" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
@@ -246,7 +297,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
             <ScanBarcode class="w-4 h-4" />
             Scanner
           </button>
-          <button type="button" @click="showCameraScanner = true" class="flex items-center justify-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors" aria-label="Scan barcode with camera" title="Scan with camera">
+          <button type="button" @click="openCameraScanner('search')" class="flex items-center justify-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors" aria-label="Scan barcode with camera" title="Scan with camera">
             <ScanBarcode class="w-4 h-4" />
             Camera
           </button>

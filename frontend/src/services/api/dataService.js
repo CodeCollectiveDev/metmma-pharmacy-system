@@ -17,7 +17,10 @@ const withIdempotencyKey = (saleData = {}) => {
 
 const toProductApiPayload = (product = {}) => ({
     ...product,
-    productCode: product.productCode || product.product_code || product.barcode || `PROD-${Date.now()}`,
+    productCode: String(product.productCode || product.product_code || product.barcode || `PROD-${Date.now()}`)
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '-'),
     quantity: Number(product.quantity ?? product.stock ?? 0),
     unitPrice: Number(product.unitPrice ?? product.price ?? product.sellingPrice ?? 0),
     sellingPrice: Number(product.sellingPrice ?? product.price ?? product.unitPrice ?? 0),

@@ -37,7 +37,14 @@ onMounted(async () => {
     BarcodeFormat.UPC_E,
     BarcodeFormat.CODE_128,
     BarcodeFormat.CODE_39,
-    BarcodeFormat.ITF
+    BarcodeFormat.ITF,
+    BarcodeFormat.CODABAR,
+    BarcodeFormat.RSS_14,
+    BarcodeFormat.RSS_EXPANDED,
+    BarcodeFormat.DATA_MATRIX,
+    BarcodeFormat.QR_CODE,
+    BarcodeFormat.PDF_417,
+    BarcodeFormat.AZTEC
   ])
   reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 })
 

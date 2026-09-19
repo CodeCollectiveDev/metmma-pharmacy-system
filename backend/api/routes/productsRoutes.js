@@ -14,8 +14,8 @@ router.get('/low-stock', authenticate, productController.getLowStockProducts);
 router.get('/expiring', authenticate, validateExpiringProductsQuery, productController.getExpiringProducts);
 router.get('/:id', authenticate, productController.getProductById);
 
-router.post('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.PHARMACIST), validateProduct(createProductSchema), productController.createProduct);
-router.put('/:id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.PHARMACIST), validateProduct(updateProductSchema), productController.updateProduct);
-router.delete('/:id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.PHARMACIST_MANAGER), productController.deleteProduct);
+router.post('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.LEGACY_ADMIN, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.PHARMACIST), validateProduct(createProductSchema), productController.createProduct);
+router.put('/:id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.LEGACY_ADMIN, ROLES.PHARMACIST_MANAGER, ROLES.STORE_MANAGER, ROLES.PHARMACIST), validateProduct(updateProductSchema), productController.updateProduct);
+router.delete('/:id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.LEGACY_ADMIN, ROLES.PHARMACIST_MANAGER), productController.deleteProduct);
 
 module.exports = router;

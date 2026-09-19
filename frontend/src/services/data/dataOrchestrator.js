@@ -96,6 +96,11 @@ export const dataOrchestrator = {
                 const response = await apiMethod(item);
                 result = { ok: true, data: response.data };
             } catch (error) {
+                // Only connection failures can be queued safely. HTTP responses
+                // mean the server rejected the item and must reach the caller.
+                if (error.response || !error.request) {
+                    throw error;
+                }
                 console.warn(`[Orchestrator] API save failed for ${collection}, queueing:`, error);
                 syncStatus = 'pending';
             }
