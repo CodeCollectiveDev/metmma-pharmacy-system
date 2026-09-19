@@ -87,7 +87,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     }
 
     // Restock product and log movement
-    async function restockProduct(product, quantityToAdd, note = '') {
+    async function restockProduct(product, quantityToAdd, details = {}) {
         const qty = Number(quantityToAdd || 0);
         if (Number.isNaN(qty) || qty <= 0) return false;
 
@@ -99,11 +99,16 @@ export const useInventoryStore = defineStore('inventory', () => {
             stock: Number(product.stock || 0) + qty,
             lastRestockedAt: now,
             lastRestockedQty: qty,
-            lastRestockNote: note,
+            batchNumber: details.batchNumber || product.batchNumber || null,
+            expiryDate: details.expiryDate || product.expiryDate || null,
+            costPrice: details.purchasePrice === '' ? product.costPrice : Number(details.purchasePrice || product.costPrice || 0),
+            supplier: details.supplier || product.supplier || null,
+            lastRestockNote: details.note || '',
+            reason: details.note || `Stock received: ${qty} units`,
             lowStockIgnored: false,
             restockHistory: [
                 ...(product.restockHistory || []),
-                { date: now, quantity: qty, note }
+                { date: now, quantity: qty, batchNumber: details.batchNumber || '', expiryDate: details.expiryDate || '', note: details.note || '' }
             ]
         };
 
@@ -133,7 +138,7 @@ export const useInventoryStore = defineStore('inventory', () => {
 
     const expiredProducts = computed(() => {
         const today = new Date();
-        return products.value.filter(p => new Date(p.expiryDate) < today);
+        return products.value.filter(p => p.expiryDate && new Date(p.expiryDate) < today);
     });
 
     return {

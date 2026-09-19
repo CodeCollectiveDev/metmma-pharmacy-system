@@ -62,11 +62,11 @@ CREATE INDEX IF NOT EXISTS idx_sessions_revoked ON sessions(revoked_at);
 -- PRODUCTS TABLE - Main medicines inventory
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
-    product_code VARCHAR(50) UNIQUE NOT NULL,
+    product_code VARCHAR(50) UNIQUE,
     name VARCHAR(200) NOT NULL,
     generic_name VARCHAR(200),
-    batch_number VARCHAR(100) NOT NULL,
-    expiry_date DATE NOT NULL,
+    batch_number VARCHAR(100),
+    expiry_date DATE,
     quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     unit_price DECIMAL(10, 2) NOT NULL CHECK (unit_price >= 0),
     selling_price DECIMAL(10, 2) NOT NULL CHECK (selling_price >= 0),

@@ -17,11 +17,10 @@ const withIdempotencyKey = (saleData = {}) => {
 
 const toProductApiPayload = (product = {}) => ({
     ...product,
-    productCode: String(product.productCode || product.product_code || product.barcode || `PROD-${Date.now()}`)
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, '-'),
-    quantity: Number(product.quantity ?? product.stock ?? 0),
+    ...(product.productCode || product.product_code
+        ? { productCode: String(product.productCode || product.product_code).trim().toUpperCase().replace(/\s+/g, '-') }
+        : {}),
+    quantity: Number(product.stock ?? product.quantity ?? 0),
     unitPrice: Number(product.unitPrice ?? product.price ?? product.sellingPrice ?? 0),
     sellingPrice: Number(product.sellingPrice ?? product.price ?? product.unitPrice ?? 0),
     reorderLevel: Number(product.reorderLevel ?? product.minStockLevel ?? 10)
@@ -33,7 +32,7 @@ export const dataService = {
     addProduct: (product) => apiClient.post('/products', toProductApiPayload(product)),
     updateProduct: (product) => {
         const productId = product.id || product._id;
-        return apiClient.put(`/products/${productId}`, product);
+        return apiClient.put(`/products/${productId}`, toProductApiPayload(product));
     },
     deleteProduct: (product) => {
         const productId = product.id || product._id;
