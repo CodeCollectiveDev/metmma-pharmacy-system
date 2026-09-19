@@ -7,6 +7,7 @@ import { dataService } from '@/services/api/dataService';
 export const useInventoryStore = defineStore('inventory', () => {
     const products = ref([]);
     const loading = ref(false);
+    const lastError = ref('');
 
     // Fetch products using hybrid layer
     async function fetchProducts() {
@@ -22,6 +23,7 @@ export const useInventoryStore = defineStore('inventory', () => {
 
     // Add product using hybrid layer
     async function addProduct(product) {
+        lastError.value = '';
         try {
             const res = await dataOrchestrator.saveItem('products', product, dataService.addProduct);
             if (res.ok) {
@@ -42,6 +44,7 @@ export const useInventoryStore = defineStore('inventory', () => {
             return false;
         } catch (error) {
             console.error('Error adding product:', error);
+            lastError.value = error.response?.data?.message || error.response?.data?.error || 'The product could not be saved.';
             return false;
         }
     }
@@ -136,6 +139,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     return {
         products,
         loading,
+        lastError,
         fetchProducts,
         addProduct,
         updateProduct,

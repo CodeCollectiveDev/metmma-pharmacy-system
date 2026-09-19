@@ -107,6 +107,7 @@ const requireRole = (...allowedRoles) => {
 
 // Role constants for consistency
 const ROLES = {
+  LEGACY_ADMIN: 'admin',
   SUPER_ADMIN: 'super_admin',
   MANAGING_DIRECTOR: 'managing_director',
   DIRECTOR: 'director',
