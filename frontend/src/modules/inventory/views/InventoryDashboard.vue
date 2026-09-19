@@ -13,6 +13,10 @@ const showRestockModal = ref(false)
 const restockTarget = ref(null)
 const restockQty = ref('')
 const restockNote = ref('')
+const restockBatch = ref('')
+const restockExpiry = ref('')
+const restockPurchasePrice = ref('')
+const restockSupplier = ref('')
 const filter = ref('all')
 const searchQuery = ref('')
 const searchInputElement = ref(null)
@@ -21,11 +25,8 @@ const cameraScanTarget = ref('search')
 
 const newProduct = ref({
   name: '',
-  productCode: '',
   barcode: '',
   category: 'Antibiotics',
-  batchNumber: '',
-  expiryDate: '',
   supplier: '',
   price: null,
   stock: null,
@@ -59,6 +60,12 @@ const filteredProducts = computed(() => {
   return products
 })
 
+const existingBarcodeProduct = computed(() => {
+  const barcode = newProduct.value.barcode.trim().toLowerCase()
+  if (!barcode) return null
+  return store.products.find((product) => String(product.barcode ?? '').toLowerCase() === barcode) || null
+})
+
 const focusSearchInput = () => {
   searchInputElement.value?.focus()
 }
@@ -82,15 +89,19 @@ const handleCameraBarcode = (barcode) => {
 }
 
 const saveProduct = async () => {
-  if (!newProduct.value.name || !newProduct.value.productCode || !newProduct.value.batchNumber || !newProduct.value.expiryDate || !newProduct.value.supplier || newProduct.value.price === null) {
-    alert('Please fill required fields (Product Code, Name, Batch Number, Expiry Date, Supplier, Price)')
+  if (existingBarcodeProduct.value) {
+    alert('This barcode already belongs to an existing product. Use Restock on that product instead.')
+    return
+  }
+  if (!newProduct.value.name || !newProduct.value.category || newProduct.value.price === null) {
+    alert('Please fill the required fields (Product Name, Category, Selling Price)')
     return
   }
   
   const success = await store.addProduct({ ...newProduct.value })
   if (success) {
     showAddForm.value = false
-    newProduct.value = { name: '', productCode: '', barcode: '', category: 'Antibiotics', batchNumber: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
+    newProduct.value = { name: '', barcode: '', category: 'Antibiotics', supplier: '', price: null, stock: null, minStockLevel: 10 }
     alert('Product added successfully!')
   } else {
     alert(store.lastError || 'Product could not be saved. Check the required fields and try again.')
@@ -101,6 +112,10 @@ const openRestockModal = (product) => {
   restockTarget.value = product
   restockQty.value = ''
   restockNote.value = ''
+  restockBatch.value = ''
+  restockExpiry.value = ''
+  restockPurchasePrice.value = ''
+  restockSupplier.value = product.supplier || ''
   showRestockModal.value = true
 }
 
@@ -112,12 +127,22 @@ const confirmRestock = async () => {
     return
   }
 
-  const success = await store.restockProduct(restockTarget.value, quantity, restockNote.value)
+  const success = await store.restockProduct(restockTarget.value, quantity, {
+    batchNumber: restockBatch.value,
+    expiryDate: restockExpiry.value,
+    purchasePrice: restockPurchasePrice.value,
+    supplier: restockSupplier.value,
+    note: restockNote.value
+  })
   if (success) {
     showRestockModal.value = false
     restockTarget.value = null
     restockQty.value = ''
     restockNote.value = ''
+    restockBatch.value = ''
+    restockExpiry.value = ''
+    restockPurchasePrice.value = ''
+    restockSupplier.value = ''
     alert('Stock updated successfully')
   } else {
     alert('Failed to update stock')
@@ -222,11 +247,6 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
       <h3 class="app-section-title mb-4">Add New Product</h3>
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <label class="flex flex-col gap-1 text-sm text-gray-600">
-          <span>Product Code / SKU <strong class="text-red-600">*</strong></span>
-          <input v-model="newProduct.productCode" type="text" required placeholder="Internal code, e.g. AMOX-500" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase">
-          <small class="text-xs text-gray-500">Your internal code for this product. Use letters, numbers, and hyphens.</small>
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-gray-600">
           <span>Barcode</span>
           <div class="flex gap-2">
             <input v-model="newProduct.barcode" type="text" inputmode="numeric" placeholder="EAN/UPC number on the package" class="min-w-0 flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
@@ -234,29 +254,18 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
               <ScanBarcode class="h-5 w-5" />
             </button>
           </div>
-          <small class="text-xs text-gray-500">The numbered barcode printed on the medicine package. Optional.</small>
+          <small class="text-xs text-gray-500">Scan the number printed below the bars. Optional if the product has no barcode.</small>
+          <small v-if="existingBarcodeProduct" class="text-sm font-medium text-emerald-700">Product found: {{ existingBarcodeProduct.name }}. Use Restock below instead of creating a duplicate.</small>
         </label>
         <label class="flex flex-col gap-1 text-sm text-gray-600">
           <span>Product Name <strong class="text-red-600">*</strong></span>
           <input v-model="newProduct.name" type="text" required placeholder="e.g. Amoxicillin 500mg" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         </label>
         <label class="flex flex-col gap-1 text-sm text-gray-600">
-          <span>Batch / Lot Number <strong class="text-red-600">*</strong></span>
-          <input v-model="newProduct.batchNumber" type="text" required placeholder="Printed batch or lot number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-gray-600">
           <span>Category <strong class="text-red-600">*</strong></span>
           <select v-model="newProduct.category" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             <option v-for="cat in categories" :key="cat">{{ cat }}</option>
           </select>
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-gray-600">
-          <span>Expiry Date <strong class="text-red-600">*</strong></span>
-          <input v-model="newProduct.expiryDate" type="date" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-gray-600">
-          <span>Supplier <strong class="text-red-600">*</strong></span>
-          <input v-model="newProduct.supplier" type="text" required placeholder="Supplier name" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         </label>
         <label class="flex flex-col gap-1 text-sm text-gray-600">
           <span>Selling Price (MWK) <strong class="text-red-600">*</strong></span>
@@ -266,11 +275,8 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
           <span>Opening Stock Quantity</span>
           <input v-model.number="newProduct.stock" type="number" min="0" placeholder="Units currently available" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         </label>
-        <label class="flex flex-col gap-1 text-sm text-gray-600">
-          <span>Reorder Alert Level</span>
-          <input v-model.number="newProduct.minStockLevel" type="number" min="0" placeholder="Alert when stock reaches this number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        </label>
       </div>
+      <p class="mt-4 text-sm text-gray-500">Batch numbers, expiry dates, purchase prices, and suppliers belong to stock receiving. Add the product first, then use Restock when stock arrives.</p>
       <div class="flex justify-end mt-4">
         <button @click="saveProduct" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
           Save Product
@@ -322,27 +328,43 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
       @close="showCameraScanner = false"
     />
 
-    <!-- Restock Modal -->
+    <!-- Receive Stock Modal -->
     <div v-if="showRestockModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div class="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto mx-4 p-4 sm:p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Restock Item</h3>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Receive Stock</h3>
         <div class="space-y-3">
           <div class="text-sm text-gray-600">
             <div><span class="font-medium">Product:</span> {{ restockTarget?.name }}</div>
             <div><span class="font-medium">Current Stock:</span> {{ restockTarget?.stock ?? 0 }}</div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Quantity to Add</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Quantity Received <strong class="text-red-600">*</strong></label>
             <input v-model="restockQty" type="number" min="1" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 50" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Note (supplier/invoice)</label>
-            <input v-model="restockNote" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Optional" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Batch / Lot Number</label>
+            <input v-model="restockBatch" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Printed batch number" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+            <input v-model="restockExpiry" type="date" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Purchase Price per Unit (MWK)</label>
+            <input v-model="restockPurchasePrice" type="number" min="0" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="What you paid" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+            <input v-model="restockSupplier" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Supplier name" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Receiving Note</label>
+            <input v-model="restockNote" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Optional invoice or delivery note" />
           </div>
         </div>
         <div class="mt-6 flex justify-end gap-2">
           <button @click="showRestockModal = false" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
-          <button @click="confirmRestock" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Confirm Restock</button>
+          <button @click="confirmRestock" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Receive Stock</button>
         </div>
       </div>
     </div>
@@ -392,7 +414,7 @@ const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel |
                   @click="openRestockModal(product)"
                   class="px-2.5 py-1 text-xs font-medium rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
                 >
-                  Restock
+                  Receive Stock
                 </button>
                 <button
                   v-if="isLowStock(product)"

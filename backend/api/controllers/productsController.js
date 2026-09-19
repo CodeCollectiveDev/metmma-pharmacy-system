@@ -1,6 +1,16 @@
 //  CREATED BY PATRICK
 
 const pool = require('../db').pool;
+const { randomUUID } = require('crypto');
+
+const createProductCode = (name) => {
+  const prefix = String(name || 'PRODUCT')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '')
+    .toUpperCase()
+    .slice(0, 35) || 'PRODUCT';
+  return `${prefix}-${randomUUID().slice(0, 8).toUpperCase()}`;
+};
 
 /**
  * Helper to keep response format consistent
@@ -115,8 +125,10 @@ const createProduct = async (req, res) => {
 
     await client.query('BEGIN');
     
+    const productCode = data.productCode || createProductCode(data.name);
+
     // Check for unique product code
-    const existing = await client.query('SELECT id FROM products WHERE product_code = $1', [data.productCode]);
+    const existing = await client.query('SELECT id FROM products WHERE product_code = $1', [productCode]);
     if (existing.rows.length > 0) {
       await client.query('ROLLBACK');
       return res.status(409).json({ success: false, message: 'Product code already exists' });
@@ -126,7 +138,7 @@ const createProduct = async (req, res) => {
       INSERT INTO products (product_code, name, generic_name, batch_number, expiry_date, quantity, unit_price, selling_price, cost_price, supplier, category, reorder_level, location, barcode)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`;
     
-    const values = [data.productCode, data.name, data.genericName, data.batchNumber, data.expiryDate, data.quantity, data.unitPrice, data.sellingPrice, data.costPrice, data.supplier, data.category, data.reorderLevel, data.location, data.barcode];
+    const values = [productCode, data.name, data.genericName, data.batchNumber || null, data.expiryDate || null, data.quantity, data.unitPrice, data.sellingPrice, data.costPrice, data.supplier, data.category, data.reorderLevel, data.location, data.barcode];
     
     const result = await client.query(query, values);
     const product = result.rows[0];

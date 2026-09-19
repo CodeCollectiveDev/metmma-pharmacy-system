@@ -39,7 +39,12 @@ const helpTopics = [
     id: 'inventory',
     title: 'Inventory Management',
     items: [
-      { q: 'Adding New Products', a: 'Access the Inventory module and click "Add Product". Fill in all mandatory fields including Name, Batch Number, and Expiry Date.' },
+      { q: 'Adding a New Product', a: 'Open Inventory and select Add Product. Start with the Barcode field: click the camera button and hold the package barcode inside the camera view, or type the number printed below the bars. Then enter Product Name, choose a Category, enter the Selling Price, and optionally enter Opening Stock Quantity and Reorder Alert Level. Product ID and internal product code are generated automatically.' },
+      { q: 'What the Product Fields Mean', a: 'Barcode is the number printed on the product package and helps the system find the product. Product Name is the medicine or item name. Category groups similar products. Selling Price is the amount charged to the customer. Opening Stock Quantity is how many units are currently on hand. Reorder Alert Level is the quantity at which the system shows a low-stock warning.' },
+      { q: 'Scanning a Barcode', a: 'Click the camera button beside Barcode when adding a product. Allow camera access, use good lighting, keep the full barcode visible, and hold the phone steady. When a barcode is detected, its number is placed into the Barcode field automatically. The camera button in the search toolbar scans an existing product instead.' },
+      { q: 'When a Product Already Exists', a: 'If the scanned barcode is already saved, the form shows the matching product. Do not create a duplicate. Close the Add Product form and use Receive Stock on that product to record the new delivery.' },
+      { q: 'Receiving Stock', a: 'Use Receive Stock on an existing inventory item whenever new units arrive. Enter Quantity Received, then add the Batch / Lot Number, Expiry Date if available, Purchase Price per Unit, Supplier, and an optional Receiving Note. Saving increases the stock and records the movement.' },
+      { q: 'Batch and Expiry Information', a: 'Batch numbers and expiry dates belong to stock deliveries rather than the basic product setup. Enter them in Receive Stock when the supplier delivers a batch. Products without an expiry date are allowed, but recording expiry dates is recommended for pharmacy safety.' },
       { q: 'Monitoring Stock Levels', a: 'Use the "Low Stock" filter in the Inventory dashboard to identify items falling below the minimum threshold.' },
       { q: 'Expiry Tracking', a: 'The "Expired" filter displays all batches that have passed their expiry date and should be removed from stock.' }
     ]

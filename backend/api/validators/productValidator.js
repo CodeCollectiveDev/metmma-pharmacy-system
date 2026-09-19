@@ -1,16 +1,16 @@
 const Joi = require('joi');
 
 const createProductSchema = Joi.object({
-  productCode: Joi.string().pattern(/^[A-Z0-9-]+$/).min(3).max(20).required(),
+  productCode: Joi.string().pattern(/^[A-Z0-9-]+$/).min(3).max(50).optional().allow('', null),
   name: Joi.string().min(2).max(200).required(),
   genericName: Joi.string().min(2).max(200).optional().allow('', null),
-  batchNumber: Joi.string().min(2).max(100).required(),
-  expiryDate: Joi.date().greater('now').required(),
+  batchNumber: Joi.string().min(2).max(100).optional().allow('', null),
+  expiryDate: Joi.date().greater('now').optional().allow(null, ''),
   quantity: Joi.number().integer().min(0).default(0),
   unitPrice: Joi.number().precision(2).min(0).required(),
   sellingPrice: Joi.number().precision(2).min(0).required(),
   costPrice: Joi.number().precision(2).min(0).optional().allow(null),
-  supplier: Joi.string().min(2).max(200).required(),
+  supplier: Joi.string().min(2).max(200).optional().allow('', null),
   category: Joi.string().min(2).max(100).required(),
   reorderLevel: Joi.number().integer().min(0).default(10),
   location: Joi.string().max(100).optional().allow('', null),
