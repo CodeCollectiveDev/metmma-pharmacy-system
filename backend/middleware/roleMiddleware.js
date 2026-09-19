@@ -52,7 +52,7 @@ const authenticate = async (req, res, next) => {
     }
 
     req.user = {
-      id: decoded.sub,
+      id: Number(decoded.sub),
       username: decoded.username,
       role: decoded.role,
       sid: decoded.sid,
