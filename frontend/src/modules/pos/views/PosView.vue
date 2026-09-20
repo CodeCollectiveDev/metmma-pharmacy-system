@@ -5,7 +5,8 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import BarcodeCameraScanner from '@/modules/shared/components/BarcodeCameraScanner.vue'
 import { usePosStore } from '../store/posStore'
 import { dataService } from '@/services/api/dataService'
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle } from 'lucide-vue-next'
+import { save as saveLocalRecord } from '@/pouchdb'
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, Download, ScanBarcode, HelpCircle } from 'lucide-vue-next'
 
 const router = useRouter()
 const store = usePosStore()
@@ -147,6 +148,7 @@ const processPayment = async () => {
       paymentMethod: paymentMethod.value,
       cashier: user.name || 'Unknown'
     }
+    await saveLocalRecord('transactions', { ...lastTransaction.value, syncStatus: 'synced' })
     showReceipt.value = true
 
     // Clear cart and reload products — stock was decremented server-side
@@ -166,6 +168,33 @@ const processPayment = async () => {
 // Print receipt
 const printReceipt = () => {
   window.print()
+}
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;')
+
+const downloadReceipt = () => {
+  if (!lastTransaction.value) return
+  const transaction = lastTransaction.value
+  const items = transaction.items.map(item => `
+    <tr><td>${escapeHtml(item.name)} x${item.quantity}</td><td>${formatCurrency(item.total)}</td></tr>
+  `).join('')
+  const amountLines = transaction.amountTendered === null ? '' : `
+    <p>Amount received: ${formatCurrency(transaction.amountTendered)}</p>
+    <p>Change: ${formatCurrency(transaction.changeDue)}</p>
+  `
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${escapeHtml(transaction._id)}</title><style>body{font-family:Arial,sans-serif;max-width:420px;margin:32px auto;padding:20px;color:#222}h1{text-align:center;font-size:22px}p{text-align:center;color:#555}table{width:100%;border-collapse:collapse;margin:24px 0}td{padding:8px 0;border-bottom:1px dashed #bbb}td:last-child{text-align:right}.total{font-weight:bold;font-size:18px}</style></head><body><h1>METMMA Pharmacy</h1><p>Sales Receipt<br>${escapeHtml(new Date(transaction.date).toLocaleString())}<br>Receipt: ${escapeHtml(transaction._id)}</p><table>${items}</table><p>Subtotal: ${formatCurrency(transaction.subtotal)}<br>VAT (17.5%): ${formatCurrency(transaction.tax)}<br><span class="total">Total: ${formatCurrency(transaction.total)}</span><br>${amountLines}</p><p>Thank you for your purchase!</p></body></html>`
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `receipt-${transaction._id}.html`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 const formatCurrency = (amount) => {
@@ -353,7 +382,7 @@ const goToHelp = () => {
 
     <!-- Receipt Modal -->
     <div v-if="showReceipt" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 print:bg-white print:inset-auto">
-      <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[calc(100vh-2rem)] overflow-y-auto print:shadow-none print:rounded-none">
+      <div class="print-receipt bg-white rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[calc(100vh-2rem)] overflow-y-auto print:shadow-none print:rounded-none">
         <div class="p-6 text-center border-b print:border-none">
           <h2 class="text-xl font-bold">METMMA Pharmacy</h2>
           <p class="text-sm text-gray-500">Sales Receipt</p>
@@ -388,6 +417,9 @@ const goToHelp = () => {
           <button @click="printReceipt" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center justify-center gap-2">
             <Printer class="w-4 h-4" /> Print
           </button>
+          <button @click="downloadReceipt" class="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium flex items-center justify-center gap-2">
+            <Download class="w-4 h-4" /> Download
+          </button>
           <button @click="showReceipt = false" class="flex-1 py-2 border border-gray-200 text-gray-700 rounded-lg font-medium">
             Close
           </button>
@@ -399,7 +431,20 @@ const goToHelp = () => {
 
 <style>
 @media print {
+  @page { size: A4; margin: 8mm; }
   body * { visibility: hidden; }
-  .print\:bg-white, .print\:bg-white * { visibility: visible; }
+  .print-receipt, .print-receipt * { visibility: visible; }
+  .print-receipt {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    box-shadow: none;
+  }
+  .print-receipt > div { break-inside: avoid; }
 }
 </style>
