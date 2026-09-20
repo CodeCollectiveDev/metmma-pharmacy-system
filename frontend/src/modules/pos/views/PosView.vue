@@ -17,6 +17,8 @@ const paymentMethod = ref('cash')
 const showReceipt = ref(false)
 const lastTransaction = ref(null)
 const processing = ref(false)
+const amountTendered = ref('')
+const VAT_RATE = 0.175
 
 const categories = ['All', 'Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Cold', 'First Aid', 'Diagnostics', 'Diabetes', 'Gastrointestinal']
 
@@ -73,10 +75,20 @@ const handleCameraBarcode = (barcode) => {
   handleBarcodeScan()
 }
 
+const saleSubtotal = computed(() => Math.round(store.cartTotal * 100) / 100)
+const saleVat = computed(() => Math.round(saleSubtotal.value * VAT_RATE * 100) / 100)
+const saleTotal = computed(() => Math.round((saleSubtotal.value + saleVat.value) * 100) / 100)
+const changeDue = computed(() => Math.max(0, Math.round((Number(amountTendered.value || 0) - saleTotal.value) * 100) / 100))
+const paymentShortfall = computed(() => Math.max(0, Math.round((saleTotal.value - Number(amountTendered.value || 0)) * 100) / 100))
+
 // Process payment and complete transaction
 const processPayment = async () => {
   if (store.cart.length === 0) {
     alert('Cart is empty!')
+    return
+  }
+  if (paymentMethod.value === 'cash' && Number(amountTendered.value || 0) < saleTotal.value) {
+    alert(`Amount received is short by ${formatCurrency(paymentShortfall.value)}.`)
     return
   }
 
@@ -84,8 +96,8 @@ const processPayment = async () => {
   
   try {
     const user = JSON.parse(localStorage.getItem('user') || '{}')
-    const subtotal = store.cartTotal
-    const totalAmount = Math.round(subtotal * 1.165 * 100) / 100
+    const subtotal = saleSubtotal.value
+    const totalAmount = saleTotal.value
 
     // Backend contract: salesController.processSale expects
     // { items: [{ productId (DB id), quantity, unitPrice, subtotal }],
@@ -93,7 +105,7 @@ const processPayment = async () => {
     const payload = {
       localSaleId: globalThis.crypto?.randomUUID?.() || `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       items: store.cart.map(item => ({
-        productId: Number(item.id),
+        productId: Number(item.id || item._id),
         quantity: item.quantity,
         unitPrice: item.price,
         subtotal: Math.round(item.price * item.quantity * 100) / 100
@@ -102,6 +114,10 @@ const processPayment = async () => {
       paymentMethod: paymentMethod.value,
       customerName: '',
       userId: user.id
+    }
+
+    if (payload.items.some(item => !Number.isSafeInteger(item.productId) || item.productId <= 0)) {
+      throw new Error('This product is not synchronized with the server yet. Refresh inventory before selling it.')
     }
 
     // Sale must be confirmed by the backend before we show a receipt or
@@ -126,8 +142,10 @@ const processPayment = async () => {
         total: Math.round(item.price * item.quantity * 100) / 100
       })),
       subtotal,
-      tax: Math.round(subtotal * 0.165 * 100) / 100,
+      tax: saleVat.value,
       total: totalAmount,
+      amountTendered: paymentMethod.value === 'cash' ? Number(amountTendered.value) : null,
+      changeDue: paymentMethod.value === 'cash' ? changeDue.value : null,
       paymentMethod: paymentMethod.value,
       cashier: user.name || 'Unknown'
     }
@@ -136,10 +154,12 @@ const processPayment = async () => {
     // Clear cart and reload products — stock was decremented server-side
     // inside the sale transaction.
     store.clearCart()
+    amountTendered.value = ''
     await store.fetchProducts()
   } catch (error) {
     console.error('Payment error:', error)
-    alert('Payment failed: ' + (error.response?.data?.message || error.message))
+    const detail = error.response?.data?.errors?.map(item => `${item.field}: ${item.message}`).join('; ')
+    alert('Payment failed: ' + (detail || error.response?.data?.message || error.message))
   } finally {
     processing.value = false
   }
@@ -284,12 +304,12 @@ const goToHelp = () => {
             <span>{{ formatCurrency(store.cartTotal) }}</span>
           </div>
           <div class="flex justify-between text-sm">
-            <span class="text-gray-500">VAT (16.5%)</span>
-            <span>{{ formatCurrency(store.cartTotal * 0.165) }}</span>
+            <span class="text-gray-500">VAT (17.5%)</span>
+            <span>{{ formatCurrency(saleVat) }}</span>
           </div>
           <div class="flex justify-between text-lg font-bold text-blue-700 pt-2 border-t">
             <span>Total</span>
-            <span>{{ formatCurrency(store.cartTotal * 1.165) }}</span>
+            <span>{{ formatCurrency(saleTotal) }}</span>
           </div>
 
           <!-- Payment Method -->
@@ -306,6 +326,15 @@ const goToHelp = () => {
             >
               <CreditCard class="w-4 h-4" /> Card
             </button>
+          </div>
+
+          <div v-if="paymentMethod === 'cash'" class="space-y-2">
+            <label for="amount-tendered" class="block text-sm font-medium text-gray-700">Amount received (MWK)</label>
+            <input id="amount-tendered" v-model.number="amountTendered" type="number" min="0" step="0.01" :placeholder="`Enter at least ${saleTotal}`" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            <div v-if="amountTendered !== ''" class="flex justify-between text-sm font-medium" :class="paymentShortfall ? 'text-red-600' : 'text-green-700'">
+              <span>{{ paymentShortfall ? 'Amount still due' : 'Change due' }}</span>
+              <span>{{ formatCurrency(paymentShortfall || changeDue) }}</span>
+            </div>
           </div>
 
           <button
@@ -348,8 +377,10 @@ const goToHelp = () => {
 
           <div class="space-y-1 text-sm">
             <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(lastTransaction.subtotal) }}</span></div>
-            <div class="flex justify-between"><span>VAT (16.5%)</span><span>{{ formatCurrency(lastTransaction.tax) }}</span></div>
+            <div class="flex justify-between"><span>VAT (17.5%)</span><span>{{ formatCurrency(lastTransaction.tax) }}</span></div>
             <div class="flex justify-between font-bold text-lg"><span>Total</span><span>{{ formatCurrency(lastTransaction.total) }}</span></div>
+            <div v-if="lastTransaction.amountTendered !== null" class="flex justify-between"><span>Amount received</span><span>{{ formatCurrency(lastTransaction.amountTendered) }}</span></div>
+            <div v-if="lastTransaction.changeDue !== null" class="flex justify-between font-semibold"><span>Change</span><span>{{ formatCurrency(lastTransaction.changeDue) }}</span></div>
           </div>
 
           <p class="text-center text-sm text-gray-500 pt-4 border-t border-dashed">Thank you for your purchase!</p>
