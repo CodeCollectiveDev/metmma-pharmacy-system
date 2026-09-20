@@ -8,11 +8,19 @@ const generateIdempotencyKey = () => {
 };
 
 const withIdempotencyKey = (saleData = {}) => {
-    const payload = { ...saleData };
-    const key = payload.localSaleId || payload.local_sale_id || payload.idempotencyKey || payload.idempotency_key || generateIdempotencyKey();
-    payload.localSaleId = key;
-    payload.idempotencyKey = key;
-    return { payload, key };
+    const payload = {
+        items: (saleData.items || []).map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: item.subtotal ?? item.total
+        })),
+        totalAmount: saleData.totalAmount ?? saleData.total,
+        paymentMethod: saleData.paymentMethod,
+        customerName: saleData.customerName
+    };
+    const requestedKey = saleData.localSaleId || saleData.local_sale_id || saleData.idempotencyKey || saleData.idempotency_key;
+    return { payload, key: requestedKey || generateIdempotencyKey() };
 };
 
 const toProductApiPayload = (product = {}) => ({

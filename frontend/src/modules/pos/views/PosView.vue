@@ -100,10 +100,9 @@ const processPayment = async () => {
     const totalAmount = saleTotal.value
 
     // Backend contract: salesController.processSale expects
-    // { items: [{ productId (DB id), quantity, unitPrice, subtotal }],
-    //   totalAmount, paymentMethod, customerName, userId }
+    // { items: [{ productId, quantity, unitPrice, subtotal }],
+    //   totalAmount, paymentMethod, customerName }
     const payload = {
-      localSaleId: globalThis.crypto?.randomUUID?.() || `sale_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       items: store.cart.map(item => ({
         productId: Number(item.id || item._id),
         quantity: item.quantity,
@@ -112,8 +111,7 @@ const processPayment = async () => {
       })),
       totalAmount,
       paymentMethod: paymentMethod.value,
-      customerName: '',
-      userId: user.id
+      customerName: ''
     }
 
     if (payload.items.some(item => !Number.isSafeInteger(item.productId) || item.productId <= 0)) {
