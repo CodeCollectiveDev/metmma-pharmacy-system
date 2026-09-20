@@ -17,16 +17,27 @@ exports.getAttendanceByDate = async (req, res) => {
     const { date } = req.query;
     try {
         const result = await pool.query(
-            `SELECT a.*, a.check_in_time AS check_in, e.employee_id AS employee_code, e.first_name, e.last_name, e.role, e.department
-             FROM attendance a
-             JOIN employees e ON e.id = a.employee_id
-             WHERE a.date = COALESCE($1::date, CURRENT_DATE)
+                `SELECT a.*, e.id AS employee_id, a.check_in_time AS check_in,
+                          e.employee_id AS employee_code, e.first_name, e.last_name, e.role, e.department,
+                          l.id AS leave_id, l.leave_type, l.expected_return_date
+                 FROM employees e
+                 LEFT JOIN attendance a ON a.employee_id = e.id
+                     AND a.date = COALESCE($1::date, CURRENT_DATE)
+                 LEFT JOIN employee_leave l ON l.employee_id = e.id
+                     AND l.status = 'approved'
+                     AND COALESCE($1::date, CURRENT_DATE) BETWEEN l.start_date AND l.expected_return_date
+                 WHERE e.is_active = TRUE
              ORDER BY e.first_name, e.last_name`,
             [date || null]
         );
         res.json({ success: true, data: result.rows.map((record) => ({
             ...record,
-            status: record.status ? record.status.charAt(0).toUpperCase() + record.status.slice(1).toLowerCase() : record.status
+            on_leave: Boolean(record.leave_id),
+            status: record.leave_id
+                ? 'Leave'
+                : record.status
+                    ? record.status.charAt(0).toUpperCase() + record.status.slice(1).toLowerCase()
+                    : record.status
         })) });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -105,6 +116,15 @@ exports.updateLeaveStatus = async (req, res) => {
 exports.addAttendance = async (req, res) => {
     const { employee_id, date, status } = req.body;
     try {   
+        const leave = await pool.query(
+            `SELECT 1 FROM employee_leave
+             WHERE employee_id = $1 AND status = 'approved'
+               AND $2::date BETWEEN start_date AND expected_return_date`,
+            [employee_id, date]
+        );
+        if (leave.rowCount > 0) {
+            return res.status(409).json({ error: 'Attendance cannot be marked while the employee is on approved leave.' });
+        }
         await pool.query(
             `INSERT INTO attendance (employee_id, date, status)
              VALUES ($1, $2, LOWER($3))
