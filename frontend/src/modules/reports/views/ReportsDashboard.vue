@@ -21,14 +21,22 @@ onMounted(async () => {
     employees.value = await dataOrchestrator.fetchCollection('employees', dataService.getEmployees)
 
     const transactions = await dataOrchestrator.fetchCollection('transactions', dataService.getSalesHistory)
-    salesData.value = transactions.map(t => ({
-      id: t.id,
-      date: (t.created_at || t.date || '').toString().slice(0, 10),
-      product: t.product_name || t.product || 'Unknown',
-      qty: t.quantity || t.qty || 0,
-      total: t.total_amount || t.total || 0,
-      customer: t.customer_name || 'Walk-in'
-    }))
+    salesData.value = transactions.flatMap(t => {
+      const date = (t.created_at || t.date || '').toString().slice(0, 10)
+      const items = Array.isArray(t.items) ? t.items : [t]
+      return items.map((item, index) => {
+        const productId = item.productId ?? item.product_id
+        const product = products.value.find(candidate => String(candidate.id || candidate._id) === String(productId))
+        return {
+          id: `${t.id || t._id}-${productId || index}`,
+          date,
+          product: item.name || item.product_name || product?.name || 'Unknown',
+          qty: item.quantity || item.qty || 0,
+          total: item.subtotal || item.total || (items.length === 1 ? (t.total_amount || t.total || 0) : 0),
+          customer: t.customer_name || t.customerName || 'Walk-in'
+        }
+      })
+    })
   } finally {
     pageLoading.value = false
   }

@@ -145,7 +145,16 @@ const getSaleHistory = async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT s.*, 
-      (SELECT json_agg(si) FROM (SELECT * FROM sale_items WHERE sale_id = s.id) si) as items
+      (SELECT json_agg(json_build_object(
+        'productId', si.product_id,
+        'name', p.name,
+        'quantity', si.quantity,
+        'unitPrice', si.unit_price,
+        'subtotal', si.subtotal
+      ))
+       FROM sale_items si
+       LEFT JOIN products p ON p.id = si.product_id
+       WHERE si.sale_id = s.id) as items
       FROM sales s 
       ORDER BY s.created_at DESC`);
     res.json({ success: true, data: result.rows });
