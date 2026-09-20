@@ -22,7 +22,7 @@ const employeeFields = {
     'IT'
   ),
   role: Joi.string().max(100),
-  hire_date: Joi.date().iso().less('now'),
+  hire_date: Joi.date().iso().max('now'),
   salary: Joi.number().positive().precision(2),
   status: Joi.string().valid('active', 'inactive')
 };

@@ -33,7 +33,7 @@ export const useHrStore = defineStore('hr', () => {
             const parts = name.trim().split(/\s+/)
             const employeeData = {
                 first_name: employee.first_name || parts[0] || '',
-                last_name: employee.last_name || parts.slice(1).join(' ') || '',
+                last_name: employee.last_name || parts.slice(1).join(' ') || 'Staff',
                 role: employee.role || employee.position || '',
                 department: employee.department || '',
                 email: employee.email || '',
@@ -126,6 +126,7 @@ export const useHrStore = defineStore('hr', () => {
     }
 
     async function markAttendance(record) {
+        error.value = null
         try {
             // Normalize attendance record
             const attendanceData = {
@@ -136,12 +137,13 @@ export const useHrStore = defineStore('hr', () => {
             
             const result = await dataService.markAttendance(attendanceData)
             if (result.data?.success || result.status === 201) {
-                await fetchAttendance()
+                await fetchAttendance(attendanceData.date)
                 return true
             }
             return false
-        } catch (error) {
-            console.error('Error marking attendance:', error)
+        } catch (err) {
+            console.error('Error marking attendance:', err)
+            error.value = err.response?.data?.error || err.message
             return false
         }
     }

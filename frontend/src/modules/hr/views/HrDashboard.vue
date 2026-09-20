@@ -17,6 +17,7 @@ const formMessage = ref(null)
 const createdEmployee = ref(null)
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const leaveMessage = ref(null)
+const attendanceMessage = ref(null)
 const newLeave = ref({ employee_id: '', leave_type: 'Annual leave', reason: '', start_date: '', expected_return_date: '' })
 
 const newEmployee = ref({
@@ -41,12 +42,25 @@ const attendanceByEmployee = computed(() => new Map(store.attendance.map(record 
 const attendanceRows = computed(() => store.activeEmployees.map(employee => ({
   employee,
   record: attendanceByEmployee.value.get(String(employee.id)),
-  status: attendanceByEmployee.value.get(String(employee.id))?.status || 'Absent'
+  status: attendanceByEmployee.value.get(String(employee.id))?.status || 'Absent',
+  onLeave: attendanceByEmployee.value.get(String(employee.id))?.on_leave || false
 })))
 const presentCount = computed(() => attendanceRows.value.filter(row => ['Present', 'Late'].includes(row.status)).length)
 const absentCount = computed(() => attendanceRows.value.filter(row => row.status === 'Absent').length)
 
 const loadAttendance = () => store.fetchAttendance(selectedDate.value)
+
+const markEmployeeAttendance = async (employee, status) => {
+  attendanceMessage.value = null
+  const success = await store.markAttendance({
+    employee_id: employee.id,
+    date: selectedDate.value,
+    status: status.toLowerCase()
+  })
+  attendanceMessage.value = success
+    ? { type: 'success', text: `${employee.name}'s attendance was saved for ${formatDate(selectedDate.value)}.` }
+    : { type: 'error', text: store.error || 'Could not save attendance.' }
+}
 
 const submitLeave = async () => {
   leaveMessage.value = null
@@ -206,7 +220,7 @@ const grantAccount = (emp) => {
           </select>
           <input v-model="newEmployee.email" type="email" placeholder="Email *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <input v-model.number="newEmployee.salary" type="number" placeholder="Salary (MWK) *" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <input v-model="newEmployee.startDate" type="date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <label class="flex flex-col gap-1 text-sm text-gray-600"><span>Employment Start Date</span><input v-model="newEmployee.startDate" type="date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></label>
           <input v-model="newEmployee.phone" type="tel" placeholder="Phone Number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         </div>
         <div class="flex justify-end gap-3 mt-4">
@@ -277,13 +291,14 @@ const grantAccount = (emp) => {
       </div>
       <div class="app-card app-card-body">
         <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5">
-          <div><h3 class="app-section-title">Daily attendance</h3><p class="text-sm text-gray-500 mt-1">Review who reported for work on a specific date.</p></div>
-          <div class="flex items-center gap-2"><label for="attendance-date" class="text-sm text-gray-600">Date</label><input id="attendance-date" v-model="selectedDate" @change="loadAttendance" type="date" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"><button @click="loadAttendance" class="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Refresh attendance" aria-label="Refresh attendance"><RefreshCw class="w-4 h-4" /></button></div>
+          <div><h3 class="app-section-title">Daily attendance</h3><p class="text-sm text-gray-500 mt-1">Select a work date, then mark each employee. Previous dates remain in the attendance history.</p></div>
+          <div class="flex items-center gap-2"><label for="attendance-date" class="text-sm text-gray-600">Work date</label><input id="attendance-date" v-model="selectedDate" @change="loadAttendance" type="date" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"><button @click="loadAttendance" class="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Refresh attendance for selected date" aria-label="Refresh attendance"><RefreshCw class="w-4 h-4" /></button></div>
         </div>
+        <div v-if="attendanceMessage" :class="['mb-4 rounded-lg p-3 text-sm', attendanceMessage.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700']">{{ attendanceMessage.text }}</div>
         <div v-if="store.attendanceLoading" class="space-y-3"><div v-for="n in 5" :key="n" class="h-16 rounded-lg bg-gray-100 animate-pulse"></div></div>
         <div v-else-if="store.error" class="p-4 rounded-lg bg-red-50 text-red-700 text-sm">{{ store.error }}</div>
         <div v-else class="overflow-x-auto"><table class="w-full min-w-[680px]"><thead class="bg-gray-50 border-b border-gray-100"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check-in</th></tr></thead><tbody class="divide-y divide-gray-100">
-          <tr v-for="row in attendanceRows" :key="row.employee._id" class="hover:bg-gray-50"><td class="px-4 py-3"><p class="font-medium text-gray-800">{{ row.employee.name }}</p><p class="text-xs text-gray-500">{{ row.employee.position }}</p></td><td class="px-4 py-3 text-sm text-gray-600">{{ row.employee.department }}</td><td class="px-4 py-3"><span :class="['inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium', row.status === 'Absent' ? 'bg-red-100 text-red-700' : row.status === 'Late' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700']"><CheckCircle2 v-if="row.status !== 'Absent'" class="w-3.5 h-3.5" /><XCircle v-else class="w-3.5 h-3.5" />{{ row.status }}</span></td><td class="px-4 py-3 text-sm text-gray-600">{{ row.record?.check_in || '-' }}</td></tr>
+          <tr v-for="row in attendanceRows" :key="row.employee._id" class="hover:bg-gray-50"><td class="px-4 py-3"><p class="font-medium text-gray-800">{{ row.employee.name }}</p><p class="text-xs text-gray-500">{{ row.employee.position }}</p></td><td class="px-4 py-3 text-sm text-gray-600">{{ row.employee.department }}</td><td class="px-4 py-3"><span v-if="row.onLeave" class="inline-flex rounded-lg bg-amber-100 px-2 py-1.5 text-sm font-medium text-amber-700">On approved leave</span><select v-else :value="row.status" @change="markEmployeeAttendance(row.employee, $event.target.value)" class="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"><option>Present</option><option>Absent</option><option>Late</option><option>Leave</option><option>Holiday</option></select></td><td class="px-4 py-3 text-sm text-gray-600">{{ row.record?.check_in || '-' }}</td></tr>
           <tr v-if="attendanceRows.length === 0"><td colspan="4" class="px-4 py-10 text-center text-gray-400">No active employees found.</td></tr>
         </tbody></table></div>
       </div>
