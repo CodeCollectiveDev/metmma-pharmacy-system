@@ -5,7 +5,6 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import BarcodeCameraScanner from '@/modules/shared/components/BarcodeCameraScanner.vue'
 import { usePosStore } from '../store/posStore'
 import { dataService } from '@/services/api/dataService'
-import { save as saveLocalRecord } from '@/pouchdb'
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, Download, ScanBarcode, HelpCircle } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -82,6 +81,18 @@ const saleTotal = computed(() => Math.round((saleSubtotal.value + saleVat.value)
 const changeDue = computed(() => Math.max(0, Math.round((Number(amountTendered.value || 0) - saleTotal.value) * 100) / 100))
 const paymentShortfall = computed(() => Math.max(0, Math.round((saleTotal.value - Number(amountTendered.value || 0)) * 100) / 100))
 
+const saveReceiptLocally = (receipt) => {
+  try {
+    const receipts = JSON.parse(localStorage.getItem('metmma_receipts') || '[]')
+    const withoutDuplicate = receipts.filter(item => item._id !== receipt._id)
+    localStorage.setItem('metmma_receipts', JSON.stringify([...withoutDuplicate, receipt]))
+    return true
+  } catch (error) {
+    console.warn('Receipt could not be archived locally:', error)
+    return false
+  }
+}
+
 // Process payment and complete transaction
 const processPayment = async () => {
   if (store.cart.length === 0) {
@@ -148,7 +159,7 @@ const processPayment = async () => {
       paymentMethod: paymentMethod.value,
       cashier: user.name || 'Unknown'
     }
-    await saveLocalRecord('transactions', { ...lastTransaction.value, syncStatus: 'synced' })
+    saveReceiptLocally(lastTransaction.value)
     showReceipt.value = true
 
     // Clear cart and reload products — stock was decremented server-side
