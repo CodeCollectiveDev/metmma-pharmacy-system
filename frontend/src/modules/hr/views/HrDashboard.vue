@@ -18,6 +18,7 @@ const createdEmployee = ref(null)
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const leaveMessage = ref(null)
 const attendanceMessage = ref(null)
+const savingEmployee = ref(false)
 const newLeave = ref({ employee_id: '', leave_type: 'Annual leave', reason: '', start_date: '', expected_return_date: '' })
 
 const newEmployee = ref({
@@ -89,23 +90,29 @@ const resetForm = () => {
 }
 
 const saveEmployee = async () => {
+  if (savingEmployee.value) return
   formMessage.value = null
   if (!newEmployee.value.name || !newEmployee.value.position) {
     formMessage.value = { type: 'error', text: 'Full name and position are required' }
     return
   }
 
-  const result = await store.addEmployee({ ...newEmployee.value })
-  if (result.ok) {
-    createdEmployee.value = result.data
-    formMessage.value = {
-      type: 'success',
-      text: `Employee ${result.data.first_name} ${result.data.last_name} created (${result.data.employee_id})`
+  savingEmployee.value = true
+  try {
+    const result = await store.addEmployee({ ...newEmployee.value })
+    if (result.ok) {
+      createdEmployee.value = result.data
+      formMessage.value = {
+        type: 'success',
+        text: `Employee ${result.data.first_name} ${result.data.last_name} created (${result.data.employee_id})`
+      }
+      showAddForm.value = false
+      resetForm()
+    } else {
+      formMessage.value = { type: 'error', text: result.error || 'Failed to add employee' }
     }
-    showAddForm.value = false
-    resetForm()
-  } else {
-    formMessage.value = { type: 'error', text: result.error || 'Failed to add employee' }
+  } finally {
+    savingEmployee.value = false
   }
 }
 
@@ -225,7 +232,7 @@ const grantAccount = (emp) => {
         </div>
         <div class="flex justify-end gap-3 mt-4">
           <button type="button" @click="showAddForm = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">Save Employee</button>
+          <button type="submit" :disabled="savingEmployee" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 text-white rounded-lg font-medium transition-colors">{{ savingEmployee ? 'Saving Employee...' : 'Save Employee' }}</button>
         </div>
         </form>
       </div>
