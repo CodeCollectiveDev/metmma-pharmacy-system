@@ -1,45 +1,10 @@
-const express = require('express'); 
-const { Pool } = require('pg');
-require('dotenv').config();
-
-const app = express();
-const port = process.env.PORT || 3000;
-
-// Security middleware
-require('./middleware/security')(app);
-
-// Middleware
-app.use(express.json());
-
-// PSQL connection
-const isProduction = process.env.DATABASE_URL !== undefined;
-const pool = new Pool({
-  connectionString: isProduction ? process.env.DATABASE_URL : undefined,
-  host: isProduction ? undefined : (process.env.DB_HOST || 'localhost'),
-  port: isProduction ? undefined : (process.env.DB_PORT || 5432),
-  database: isProduction ? undefined : (process.env.DB_NAME || 'metmma_pharmacy'),
-  user: isProduction ? undefined : (process.env.DB_USER || 'postgres'),
-  password: isProduction ? undefined : (process.env.DB_PASSWORD || ''),
-  ssl: isProduction ? { rejectUnauthorized: false } : undefined,
-});
-
-// Test DB connection
-pool.connect((err) => {
-  if (err) {
-    console.error('Database connection error:', err);
-  } else {
-    console.log('Connected to PostgreSQL');
-  }
-});
-
-// Basic route
-app.get('/', (req, res) => {
-  res.send('METMMA Pharmacy Backend');
-});
-
-// API routes prefix
-app.use('/api', require('./routes'));
-
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+require('dotenv').config({ quiet: true });
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) throw new Error('Set JWT_SECRET to a random value of at least 32 characters before starting.');
+if (!/^\d+$/.test(process.env.TAX_RATE_BPS || '1650') || Number(process.env.TAX_RATE_BPS || 1650) > 10000) throw new Error('TAX_RATE_BPS must be an integer from 0 to 10000.');
+if (!/^[A-Za-z_\/-]+$/.test(process.env.PHARMACY_TIMEZONE || 'UTC')) throw new Error('Set a valid PHARMACY_TIMEZONE.');
+const app = require('./app');
+const {pool} = require('./api/db');
+const server = app.listen(Number(process.env.PORT || 3000), () => console.info('Pharmacy API is listening.'));
+server.requestTimeout = 15000; server.headersTimeout = 10000; server.keepAliveTimeout = 5000;
+async function stop() { server.close(async () => { await pool.end(); process.exit(0); }); setTimeout(()=>process.exit(1),10000).unref(); }
+process.once('SIGTERM',stop); process.once('SIGINT',stop);

@@ -1,142 +1,23 @@
 const express = require('express');
-const Joi = require('joi');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
+const { Joi, validate } = require('../lib/validation');
+const { AppError } = require('../lib/errors');
+const { authenticate, authorize, ROLES } = require('../middleware/roleMiddleware');
 const { createUser, findUserByUsername, normalizeRole, DB_ROLES } = require('../models/user');
-
 const router = express.Router();
-
-// Validation schemas
-const registerSchema = Joi.object({
-  username: Joi.string().trim().min(3).max(50).required(),
-  password: Joi.string().min(6).required(),
-  full_name: Joi.string().trim().min(1).max(100).required(),
-  email: Joi.string().trim().email().max(100).optional().empty(''),
-  role: Joi.string()
-    .trim()
-    .required()
-    .custom((value, helpers) => {
-      const normalized = normalizeRole(value);
-      if (!normalized || !DB_ROLES.includes(normalized)) {
-        return helpers.error('any.invalid');
-      }
-      return normalized;
-    }, 'role normalization')
-});
-
-const loginSchema = Joi.object({
-  username: Joi.string().required(),
-  password: Joi.string().required()
-});
-
-// Login handler function (reusable)
-const loginHandler = async (req, res) => {
-  try {
-    // Validate input
-    const { error, value } = loginSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ error: error.details[0].message });
-    }
-
-    const { username, password } = value;
-
-    // Find user by username
-    const user = await findUserByUsername(username);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-
-    // Check if user is active (default to true if column doesn't exist because we are using a default value)
-    if (user.is_active === false) {
-      return res.status(401).json({ error: 'Account is deactivated' });
-    }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        id: user.id, 
-        username: user.username, 
-        role: user.role 
-      },
-      process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      { expiresIn: '24h' }
-    );
-
-    // Return token and user info
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role
-      }
-    });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+const registerSchema = Joi.object({ username: Joi.string().trim().min(3).max(50).required(), password: Joi.string().min(10).max(72).required(), full_name: Joi.string().trim().min(1).max(100).required(), email: Joi.string().trim().email().max(100).allow(''), role: Joi.string().custom((value,helpers) => normalizeRole(value) || helpers.error('any.invalid')).valid(...DB_ROLES).required() }).required();
+const loginSchema = Joi.object({ username:Joi.string().trim().max(50).required(), password:Joi.string().max(72).required() }).required();
+const loginLimit = rateLimit({windowMs:15*60000,limit:20,skipSuccessfulRequests:true,standardHeaders:'draft-8',legacyHeaders:false,handler:(req,res,next)=>next(new AppError('RATE_LIMITED',429))});
+const loginHandler = async (req,res) => {
+  const user = await findUserByUsername(req.body.username);
+  if (!user || !user.is_active || !(await bcrypt.compare(req.body.password,user.password_hash))) throw new AppError('INVALID_CREDENTIALS',401);
+  const token = jwt.sign({id:user.id,username:user.username,role:user.role},process.env.JWT_SECRET,{expiresIn:'12h',algorithm:'HS256'});
+  res.json({token,user:{id:user.id,username:user.username,role:user.role}});
 };
-
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
-  const pool = require('../api/db').pool;
-  const client = await pool.connect();
-  
-  try {
-    // Validate input
-    const { error, value } = registerSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ error: error.details[0].message });
-    }
-
-    const { username, password, role, full_name, email } = value;
-
-    await client.query('BEGIN');
-
-    // Create user in users table
-    const user = await createUser({ username, password, role, full_name, email });
-
-    // Also create employee record for HR system
-    // const nameParts = full_name.trim().split(' ');
-    // const firstName = nameParts[0] || full_name;
-    // const lastName = nameParts.slice(1).join(' ') || '';
-
-    // await client.query(
-    //   `INSERT INTO employees (first_name, last_name, role, hire_date, email, phone, status)
-    //    VALUES ($1, $2, $3, CURRENT_DATE, $4, '', 'active')`,
-    //   [firstName, lastName, role, email || '']
-    // );
-
-    // await client.query('COMMIT');
-
-    res.status(201).json({ message: 'User created successfully', user });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    if (err.code === '23505') { // Unique violation
-      res.status(409).json({ error: 'Username already exists' });
-    } else if (err.code === 'INVALID_ROLE' || err.code === 'INVALID_FULL_NAME') {
-      res.status(400).json({ error: err.message });
-    } else {
-      console.error(err);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  } finally {
-    client.release();
-  }
-});
-
-// POST /api/auth/login
-router.post('/login', loginHandler);
-
-// Create a separate router for login endpoint at /api/login
+router.post('/login',loginLimit,validate(loginSchema),loginHandler);
+router.post('/register',authenticate,authorize(ROLES.ADMIN),validate(registerSchema),async (req,res)=>res.status(201).json({message:'Staff account created.',user:await createUser(req.body)}));
 const loginRouter = express.Router();
-loginRouter.post('/', loginHandler);
-
-module.exports = router;
-module.exports.loginRouter = loginRouter;
+loginRouter.post('/',loginLimit,validate(loginSchema),loginHandler);
+module.exports = router; module.exports.loginRouter = loginRouter;
