@@ -1,5 +1,7 @@
 const { Pool } = require('pg');
 require('dotenv').config({ quiet: true });
+// pg parses legacy timestamps without a zone using Node's time zone. Keep it aligned with the DB session.
+process.env.TZ = process.env.PHARMACY_TIMEZONE || 'UTC';
 const ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: true, ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {}) } : undefined;
 const pool = new Pool({
   ...(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : { host: process.env.DB_HOST || 'localhost', port: Number(process.env.DB_PORT || 5432), database: process.env.DB_NAME || 'metmma_pharmacy', user: process.env.DB_USER, password: process.env.DB_PASSWORD }),

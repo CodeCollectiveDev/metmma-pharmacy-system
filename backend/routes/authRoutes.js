@@ -7,7 +7,7 @@ const { AppError } = require('../lib/errors');
 const { authenticate, authorize, ROLES } = require('../middleware/roleMiddleware');
 const { createUser, findUserByUsername, normalizeRole, DB_ROLES } = require('../models/user');
 const router = express.Router();
-const registerSchema = Joi.object({ username: Joi.string().trim().min(3).max(50).required(), password: Joi.string().min(10).max(72).required(), full_name: Joi.string().trim().min(1).max(100).required(), email: Joi.string().trim().email().max(100).allow(''), role: Joi.string().custom((value,helpers) => normalizeRole(value) || helpers.error('any.invalid')).valid(...DB_ROLES).required() }).required();
+const registerSchema = Joi.object({ username: Joi.string().trim().min(3).max(50).required(), password: Joi.string().min(10).max(72).custom((value,h)=>Buffer.byteLength(value)<=72?value:h.error('any.invalid')).required(), full_name: Joi.string().trim().min(1).max(100).required(), email: Joi.string().trim().email().max(100).allow(''), role: Joi.string().custom((value,helpers) => normalizeRole(value) || helpers.error('any.invalid')).valid(...DB_ROLES).required() }).required();
 const loginSchema = Joi.object({ username:Joi.string().trim().max(50).required(), password:Joi.string().max(72).required() }).required();
 const loginLimit = rateLimit({windowMs:15*60000,limit:20,skipSuccessfulRequests:true,standardHeaders:'draft-8',legacyHeaders:false,handler:(req,res,next)=>next(new AppError('RATE_LIMITED',429))});
 const loginHandler = async (req,res) => {

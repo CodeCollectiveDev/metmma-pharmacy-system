@@ -58,7 +58,7 @@ async function reverseSale(req,res) {
   const result=await db.transaction(async client=>{
     const sale=(await client.query('SELECT * FROM sales WHERE id=$1 FOR UPDATE',[req.params.id])).rows[0];
     if(!sale)throw new AppError('NOT_FOUND',404);
-    if(sale.status==='reversed')return sale; // A retry cannot restock or refund twice.
+    if(sale.status==='reversed')return {id:sale.id,status:sale.status}; // A retry cannot restock or refund twice.
     const items=(await client.query('SELECT product_id,SUM(quantity)::int AS quantity FROM sale_items WHERE sale_id=$1 GROUP BY product_id ORDER BY product_id',[sale.id])).rows;
     await client.query('SELECT id FROM products WHERE id=ANY($1::int[]) ORDER BY id FOR UPDATE',[items.map(i=>i.product_id)]);
     await client.query(`INSERT INTO stock_movements(product_id,user_id,movement_type,quantity_change,previous_quantity,new_quantity,notes) SELECT p.id,$1,'return',x.quantity,p.quantity,p.quantity+x.quantity,$2 FROM products p JOIN UNNEST($3::int[],$4::int[]) x(id,quantity) ON p.id=x.id`,[req.user.id,`Reversal ${sale.receipt_number}: ${req.body.reason}`,items.map(i=>i.product_id),items.map(i=>i.quantity)]);

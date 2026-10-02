@@ -6,7 +6,7 @@ const {authenticate,authorize,ROLES}=require('../../middleware/roleMiddleware');
 const payments=['cash','card','mobile_money','bank_transfer'];
 const expenseFields={date:Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),amount:money.required(),category:Joi.string().valid('Stock purchase','Rent','Utilities','Salaries','Transport','Other').required(),paymentMethod:Joi.string().valid(...payments).required(),note:Joi.string().trim().max(500).allow('',null),supplier:Joi.string().trim().max(200).allow('',null)};
 router.use(authenticate,authorize(ROLES.ADMIN,ROLES.STORE_MANAGER,ROLES.PHARMACIST,ROLES.HR_OFFICER));
-router.get('/transactions',validate(Joi.object({...pageFields,...dateFields,type:Joi.string().valid('all','income','expense'),paymentMethod:Joi.string().valid('all',...payments),search:Joi.string().trim().max(100).allow('')}),'query'),c.getTransactions);
+router.get('/transactions',validate(Joi.object({...pageFields,...dateFields,type:Joi.string().valid('all','income','expense'),paymentMethod:Joi.string().valid('all',...payments),search:Joi.string().trim().max(100).allow(''),includeDeleted:Joi.boolean().default(false)}),'query'),c.getTransactions);
 router.get('/summary',validate(Joi.object(dateFields),'query'),c.getSummary);
 router.get('/expenses/:id/audit',validate(idParam,'params'),validate(pageQuery,'query'),c.getAudit);
 router.post('/expenses',authorize(ROLES.ADMIN,ROLES.STORE_MANAGER),validate(Joi.object({...expenseFields,idempotencyKey:Joi.string().guid({version:'uuidv4'}).required()}).required()),c.createExpense);
