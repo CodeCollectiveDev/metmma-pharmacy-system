@@ -1,30 +1,8 @@
-const Joi = require('joi');
-
-const money = Joi.number().min(0).max(9999999999.99).precision(2);
+const { Joi, validate } = require('../../lib/validation');
+const money = Joi.alternatives().try(Joi.string().pattern(/^\d{1,10}(\.\d{1,2})?$/),Joi.number().min(0).max(9999999999.99).custom((value,helpers)=>Number.isInteger(value*100+1e-5) || Math.abs(value*100-Math.round(value*100))<1e-5 ? value : helpers.error('any.invalid')));
 const saleSchema = Joi.object({
-  items: Joi.array().items(Joi.object({
-    productId: Joi.number().integer().positive().required(),
-    quantity: Joi.number().integer().positive().required(),
-    unitPrice: money.required(),
-    subtotal: money.required()
-  })).min(1).required(),
-  totalAmount: money.required(),
-  paymentMethod: Joi.string().trim().min(1).max(20).default('cash'),
-  customerName: Joi.string().trim().max(100).allow('', null),
-  userId: Joi.number().integer().positive().allow(null)
+  idempotencyKey: Joi.string().guid({version:'uuidv4'}).required(),
+  items: Joi.array().items(Joi.object({ productId:Joi.number().integer().positive().max(2147483647).required(),quantity:Joi.number().integer().min(1).max(1000000).required(),unitPrice:money.required(),subtotal:money.required() })).min(1).max(100).unique('productId').required(),
+  totalAmount:money.required(),paymentMethod:Joi.string().valid('cash','card','mobile_money','bank_transfer').default('cash'),customerName:Joi.string().trim().max(100).allow('',null),userId:Joi.number().integer().positive().allow(null)
 }).required();
-
-const validateSale = (req, res, next) => {
-  const { error, value } = saleSchema.validate(req.body, { abortEarly: false });
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: error.details.map(detail => ({ field: detail.path.join('.'), message: detail.message }))
-    });
-  }
-  req.body = value;
-  next();
-};
-
-module.exports = { saleSchema, validateSale };
+module.exports = { saleSchema, validateSale:validate(saleSchema), money };

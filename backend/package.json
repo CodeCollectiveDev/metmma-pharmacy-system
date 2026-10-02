@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "test:integration": "node --test test/integration/*.test.js"
+    "test:integration": "node --test test/integration/*.test.js",
+    "check": "node scripts/check.js",
+    "migrate": "node scripts/migrate.js up",
+    "migrate:down": "node scripts/migrate.js down",
+    "bootstrap:admin": "node scripts/bootstrap-admin.js"
   },
   "keywords": [],
   "author": "",

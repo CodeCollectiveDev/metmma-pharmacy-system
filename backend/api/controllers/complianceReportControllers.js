@@ -1,23 +1,4 @@
-const pool = require('../db');
-
-exports.getComplianceReports = async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM compliance_reports');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-exports.createComplianceReport = async (req, res) => {
-  const { compliance_area, status, notes, created_by } = req.body;
-  try {
-    await pool.query(
-      'INSERT INTO compliance_reports (report_date, compliance_area, status, notes, created_by) VALUES (NOW(), $1, $2, $3, $4)',
-      [compliance_area, status, notes, created_by]
-    );
-    res.status(201).send('Compliance report created');
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+const db=require('../db');
+const {paging}=require('../../lib/validation');
+exports.getComplianceReports=async(req,res)=>{const q=req.validatedQuery,count=(await db.query('SELECT COUNT(*) FROM compliance_reports')).rows[0].count;const r=await db.query('SELECT id,report_date,compliance_type,description,status,created_at,created_by FROM compliance_reports ORDER BY report_date DESC,id DESC LIMIT $1 OFFSET $2',[q.limit,(q.page-1)*q.limit]);res.json({success:true,data:r.rows,pagination:paging(q,count,r.rowCount)});};
+exports.createComplianceReport=async(req,res)=>{const d=req.body;const status={Compliant:'completed','Non-Compliant':'in_progress','Under Review':'in_progress',Pending:'pending'}[d.status];const r=await db.query(`INSERT INTO compliance_reports(report_date,compliance_type,description,status,created_by) VALUES($1,$2,$3,$4,$5) RETURNING id`,[d.last_audit_date,d.policy_name,JSON.stringify(d),status,req.user.id]);res.status(201).json({success:true,data:r.rows[0]});};

@@ -1,29 +1,4 @@
-const pool = require('../db');
-
-exports.getAttendanceByEmployee = async (req, res) => {
-    const { employee_id } = req.params;
-    try {   
-        const result = await pool.query(
-            'SELECT * FROM attendance WHERE employee_id = $1',
-            [employee_id]
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-
-exports.addAttendance = async (req, res) => {
-    const { employee_id, date, status } = req.body;
-    try {   
-        await pool.query(
-            'INSERT INTO attendance (employee_id, date, status) VALUES ($1, $2, $3)',
-            [employee_id, date, status]
-        );
-        res.status(201).json({ message: 'Attendance record added successfully' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-
-
+const db=require('../db');
+const {paging}=require('../../lib/validation');
+exports.getAttendanceByEmployee=async(req,res)=>{const q=req.validatedQuery,count=(await db.query('SELECT COUNT(*) FROM attendance WHERE employee_id=$1',[req.params.employee_id])).rows[0].count;const r=await db.query('SELECT id,employee_id,date,status,check_in_time,check_out_time,hours_worked,notes FROM attendance WHERE employee_id=$1 ORDER BY date DESC,id DESC LIMIT $2 OFFSET $3',[req.params.employee_id,q.limit,(q.page-1)*q.limit]);res.json({success:true,data:r.rows,pagination:paging(q,count,r.rowCount)});};
+exports.addAttendance=async(req,res)=>{await db.query('INSERT INTO attendance(employee_id,date,status) VALUES($1,$2,$3)',[req.body.employee_id,req.body.date,req.body.status]);res.status(201).json({success:true,message:'Attendance saved.'});};
