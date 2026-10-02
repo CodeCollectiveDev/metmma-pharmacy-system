@@ -1,19 +1,15 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16
-    container_name: metmma-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: metmma_pharmacy
       POSTGRES_USER: metmma_user
-      POSTGRES_PASSWORD: SecurePass123!
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD for the local database}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 volumes:
   postgres_data:
