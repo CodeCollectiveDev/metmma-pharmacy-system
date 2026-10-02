@@ -71,6 +71,9 @@ export const usePosStore = defineStore('pos', () => {
         if (items.some(i => !Number.isSafeInteger(i.productId) || i.productId < 1)) throw localError('PRODUCT_UNAVAILABLE')
         pending.value = { idempotencyKey: crypto.randomUUID(), items, totalAmount: decimal(subtotalMinor.value + taxMinor.value), paymentMethod, customerName }
       }
+      // A retry reference must survive a reload before any sale can reach the server.
+      try { localStorage.setItem(storageKey(), JSON.stringify({ cart: cart.value, pending: pending.value })) }
+      catch { throw localError('UNEXPECTED') }
       const response = await dataService.recordSale(pending.value)
       const transaction = response.data.data
       // Only the confirmed server response clears the cart. No catalogue refresh on the checkout path.
