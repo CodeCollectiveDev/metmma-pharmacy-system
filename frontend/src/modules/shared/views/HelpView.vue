@@ -1,9 +1,16 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { getLegacyPendingRecords } from '@/pouchdb'
+import ErrorNotice from '@/components/ErrorNotice.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { startTour } from '@/composables/useTour'
 const search = ref('')
 const role = localStorage.getItem('role')
+const legacy = ref(null), legacyError = ref(null)
+onMounted(async () => { if (role === 'admin') { try { legacy.value = await getLegacyPendingRecords() } catch (err) { legacyError.value = err } } })
+function downloadLegacy() {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(legacy.value,null,2)],{type:'application/json'})); const a = document.createElement('a'); a.href = url; a.download = 'old-pending-pharmacy-records.json'; a.click(); URL.revokeObjectURL(url)
+}
 const topics = [
   ['Sell items', 'Open Sell items. Search by name or code, or scan a barcode and press Enter. Choose a product to add it to the cart. Check the quantity, choose Cash or Card and select Complete Sale. Collect payment using your usual process; this system records it.'],
   ['If a sale fails', 'Your cart stays here. Check your connection and select Retry sale. A retry uses the same checkout reference, so it cannot save the sale twice. If stock or prices changed, check the cart before trying again.'],
@@ -21,6 +28,8 @@ const filtered = computed(() => topics.filter(t => t.join(' ').toLowerCase().inc
 <template>
   <MainLayout title="Help and tour" subtitle="Short instructions for everyday work">
     <div class="panel mb-4 flex flex-wrap items-center gap-3"><button class="primary" @click="startTour(true)">Take the tour</button><button class="secondary" @click="startTour()">Resume tour</button><router-link v-if="role === 'admin'" to="/register" class="secondary">Create staff account</router-link></div>
+    <div v-if="role === 'admin' && legacy && (legacy.transactions.length || legacy.products.length)" class="panel mb-4"><p>{{ legacy.transactions.length }} old pending receipts and {{ legacy.products.length }} pending products are kept in this browser. Compare them with saved server records before entering them again.</p><button class="secondary mt-3" @click="downloadLegacy">Download pending records for review</button></div>
+    <ErrorNotice :error="legacyError" />
     <label class="block mb-4">Find help<input v-model="search" class="field mt-1" placeholder="Search for help" /></label>
     <div class="space-y-3"><details v-for="topic in filtered" :key="topic[0]" class="panel" open><summary class="font-semibold cursor-pointer">{{ topic[0] }}</summary><p class="mt-3 leading-relaxed">{{ topic[1] }}</p></details></div>
     <div v-if="!filtered.length" class="panel"><p>No matching instructions. Try a shorter word or take the tour.</p><button class="primary mt-3" @click="search = ''">Show all help</button></div>
