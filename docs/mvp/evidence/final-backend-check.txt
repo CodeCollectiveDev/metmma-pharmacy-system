@@ -1,0 +1,5 @@
+
+> backend@1.0.0 check
+> node scripts/check.js
+
+Checked syntax in 40 JavaScript files.

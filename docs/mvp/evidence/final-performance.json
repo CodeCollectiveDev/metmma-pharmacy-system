@@ -1,0 +1,37 @@
+{
+  "fixture": {
+    "products": 1000,
+    "sales": 100
+  },
+  "viewport": "1440x900 / 1024x768",
+  "times": {
+    "posReady": 656.905359,
+    "search": 105.99589999999989,
+    "addToCart": 59.41737899999998,
+    "checkout": 96.72263899999984,
+    "inventoryReady": 220.16028299999994
+  },
+  "api": {
+    "/products?search=Medicine%201000": {
+      "meanMs": 7.656035599999996,
+      "bytes": 483
+    },
+    "/products": {
+      "meanMs": 5.400039399999969,
+      "bytes": 18438
+    },
+    "/sales/history": {
+      "meanMs": 5.1360972000001315,
+      "bytes": 5656
+    },
+    "/finances/transactions": {
+      "meanMs": 5.118462599999839,
+      "bytes": 6640
+    },
+    "/notifications": {
+      "meanMs": 4.832862199999909,
+      "bytes": 118
+    }
+  },
+  "errors": []
+}

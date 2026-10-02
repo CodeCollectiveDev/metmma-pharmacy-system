@@ -1,0 +1,36 @@
+
+> backend@1.0.0 test:integration
+> node --test test/integration/*.test.js
+
+✔ all catalogue pages, filters, metadata and low-stock products remain reachable (458.789003ms)
+✔ frontend checkout payload persists sale fields, lines and a single stock decrement (93.628255ms)
+✔ invalid checkout and unauthorized writes are rejected without inserting records (14.977963ms)
+✔ employee creation persists all submitted fields, generates its identifier and can be read/updated (62.144477ms)
+✔ every supported attendance status persists; Excused fails before PostgreSQL (91.045183ms)
+✔ email migration preserves legacy rows and can run repeatedly (42.42573ms)
+✔ atomic checkout records exact stock, lines, authenticated actor and one linked income (750.394618ms)
+{"requestId":"30793546-df7f-4fd3-9a50-57e808f9a9ff","path":"/api/sales/checkout","error":"secret SQL test detail","stack":"error: secret SQL test detail\n    at /workspace/metmma-pharmacy-system-main/backend/node_modules/pg/lib/client.js:545:17\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async /workspace/metmma-pharmacy-system-main/backend/api/controllers/salesController.js:42:5\n    at async Object.transaction (/workspace/metmma-pharmacy-system-main/backend/test/integration/hardening.test.js:13:141)\n    at async processSale (/workspace/metmma-pharmacy-system-main/backend/api/controllers/salesController.js:16:18)"}
+✔ income write failure rolls back sale, lines, stock and movements and returns sanitized correlation ID (40.908504ms)
+✔ ten concurrent retries use one sale, one income and one stock deduction (198.609067ms)
+✔ competing sales cannot oversell the last three units (70.66695ms)
+✔ opposite cart orders acquire locks consistently without deadlock (39.582455ms)
+✔ server rejects altered prices/totals, duplicate lines, expired/inactive products, and insufficient stock (93.454179ms)
+✔ decimal sale of 0.10 plus 0.20 records 0.30 subtotal, 0.05 tax and 0.35 total (34.111591ms)
+✔ one reversal returns stock and records exactly one money reversal, even on concurrent retries (63.62625ms)
+✔ expense create/retry/edit/delete keeps an audit trail and rejects stale updates (103.417576ms)
+✔ income reconciles to all POS sales and summary net reconciles exactly after expenses and refunds (19.53606ms)
+✔ financial permissions, sessions, health, invalid data and SQL injection have safe responses (65.348387ms)
+✔ notifications use real low-stock/expiry data and read state belongs to each user (56.020931ms)
+✔ additive restock and optimistic absolute adjustments cannot overwrite a concurrent sale (40.70042ms)
+✔ migration up/down/up preserves preexisting records and archives all new finance, audit and read data (77.007833ms)
+✔ legacy report APIs write the verified schema and employee partial edits preserve omitted fields (43.034169ms)
+✔ deactivated staff cannot use an otherwise valid signed session (8.490915ms)
+✔ delivery retries do not add the same stock twice (45.776568ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3142.593785

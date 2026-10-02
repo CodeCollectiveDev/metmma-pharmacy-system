@@ -1,0 +1,3 @@
+{"requestId":"b93a8ed2-b6c9-4b00-a765-d3fd1bd0dcbb","event":"readiness_failed","error":"connect ECONNREFUSED 127.0.0.1:59999"}
+{"requestId":"b93a8ed2-b6c9-4b00-a765-d3fd1bd0dcbb","path":"/api/health","error":"The pharmacy system is temporarily unavailable. Please try again.","stack":"Error: The pharmacy system is temporarily unavailable. Please try again.\n    at /workspace/metmma-pharmacy-system-main/backend/routes/index.js:6:317\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)"}
+Real DB connection failure returns sanitized unavailable readiness response with request reference.

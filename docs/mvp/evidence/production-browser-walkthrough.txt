@@ -1,0 +1,15 @@
+PASS First-run tour completes and remembers this user.
+PASS Tour can be skipped, resumed and relaunched from Help.
+PASS Add product persists the real server contract.
+PASS Barcode Enter makes a saved sale, receipt and one stock deduction.
+PASS Notification modal lists real stock notices, marks read, and Esc restores focus.
+PASS Notification keyboard focus stays inside; overlay and Close both work.
+PASS Restock resolves the real notice; empty state and zero badge verified.
+PASS Validation failure highlights amount, keeps input and hides internal details.
+PASS Expense create, edit, confirmed delete and deleted-record audit are usable.
+PASS Transactions and exact summary reconcile with saved sales.
+PASS Server-unreachable simulation keeps the cart; retry saves exactly one sale.
+PASS Expired session is renewed in place without losing the cart or customer name.
+PASS Concurrent insufficient stock shows a friendly message and preserves the cart.
+PASS Production routes fit desktop and both tablet orientations without page overflow.
+PASS Production normal flows have no page or console errors.

@@ -1,0 +1,11 @@
+{
+  "condition": "actual refused PostgreSQL connection",
+  "status": 503,
+  "body": {
+    "success": false,
+    "code": "UNAVAILABLE",
+    "message": "The pharmacy system is temporarily unavailable. Please try again.",
+    "errors": [],
+    "requestId": "b93a8ed2-b6c9-4b00-a765-d3fd1bd0dcbb"
+  }
+}
