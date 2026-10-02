@@ -1,0 +1,30 @@
+
+> frontend@0.0.0 build
+> vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 1815 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                  0.73 kB │ gzip:  0.40 kB
+dist/assets/metmma_pharmacy_logo-DGBOMDfz.svg   53.22 kB │ gzip: 24.66 kB
+dist/assets/PosView-wOzXrhuV.css                 0.10 kB │ gzip:  0.08 kB
+dist/assets/index-79xQXyNM.css                  31.57 kB │ gzip:  6.32 kB
+dist/assets/plus-BQVVH4MW.js                     0.16 kB │ gzip:  0.15 kB
+dist/assets/search-CoF0e4wo.js                   0.17 kB │ gzip:  0.17 kB
+dist/assets/trending-up-B-bjBTqC.js              0.18 kB │ gzip:  0.17 kB
+dist/assets/calendar-DaVFYByS.js                 0.26 kB │ gzip:  0.20 kB
+dist/assets/triangle-alert-Gut6jyLW.js           0.27 kB │ gzip:  0.22 kB
+dist/assets/scan-barcode-B9MKr5Sq.js             0.41 kB │ gzip:  0.24 kB
+dist/assets/NotFoundView-BH8mrdpj.js             1.27 kB │ gzip:  0.70 kB
+dist/assets/dataOrchestrator-ClQDt65D.js         2.26 kB │ gzip:  1.03 kB
+dist/assets/HelpView-CHg2qa7a.js                 5.64 kB │ gzip:  2.65 kB
+dist/assets/Dashboard-DDr3SgfL.js                7.17 kB │ gzip:  2.44 kB
+dist/assets/ReportsDashboard-zS8U03Xi.js         9.60 kB │ gzip:  2.88 kB
+dist/assets/MainLayout-CF5C0s08.js              10.77 kB │ gzip:  4.39 kB
+dist/assets/HrDashboard-BxZe-G47.js             13.73 kB │ gzip:  3.95 kB
+dist/assets/PosView-Cu2SZQQl.js                 13.98 kB │ gzip:  5.19 kB
+dist/assets/InventoryDashboard-DI6JS2zK.js      15.44 kB │ gzip:  4.49 kB
+dist/assets/index-BY4dxVMS.js                  181.67 kB │ gzip: 67.04 kB
+✓ built in 4.05s
