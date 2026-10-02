@@ -1,46 +1,10 @@
-const Joi = require('joi');
-
-const createProductSchema = Joi.object({
-  productCode: Joi.string().pattern(/^[A-Z0-9-]+$/).min(3).max(20).required(),
-  name: Joi.string().min(2).max(200).required(),
-  genericName: Joi.string().min(2).max(200).optional().allow('', null),
-  batchNumber: Joi.string().min(2).max(100).required(),
-  expiryDate: Joi.date().greater('now').required(),
-  quantity: Joi.number().integer().min(0).default(0),
-  unitPrice: Joi.number().precision(2).min(0).required(),
-  sellingPrice: Joi.number().precision(2).min(0).required(),
-  costPrice: Joi.number().precision(2).min(0).optional().allow(null),
-  supplier: Joi.string().min(2).max(200).required(),
-  category: Joi.string().min(2).max(100).required(),
-  reorderLevel: Joi.number().integer().min(0).default(10),
-  location: Joi.string().max(100).optional().allow('', null),
-  barcode: Joi.string().max(100).optional().allow('', null),
-  isActive: Joi.boolean().default(true)
-});
-
-// FIXED: Added .keys({ reason: ... }) so Joi doesn't strip it
-const updateProductSchema = createProductSchema.fork(
-  Object.keys(createProductSchema.describe().keys), 
-  (schema) => schema.optional()
-).keys({
-  reason: Joi.string().when('quantity', {
-    is: Joi.exist(),
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  })
-}).min(1);
-
-const validateProduct = (schema) => {
-  return (req, res, next) => {
-    // stripUnknown: true will now keep 'reason' because it's in the schema
-    const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
-    if (error) {
-      const errors = error.details.map(d => ({ field: d.path.join('.'), message: d.message.replace(/"/g, "'") }));
-      return res.status(400).json({ success: false, message: 'Validation failed', errors });
-    }
-    req.body = value;
-    next();
-  };
+const { Joi,validate }=require('../../lib/validation');
+const {money}=require('./salesValidator');
+const fields={
+ productCode:Joi.string().trim().pattern(/^[A-Z0-9-]+$/).min(3).max(50),name:Joi.string().trim().min(2).max(200),genericName:Joi.string().trim().max(200).allow('',null),batchNumber:Joi.string().trim().min(2).max(100),
+ expiryDate:Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).custom((value,h)=>{const d=new Date(value+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value?value:h.error('any.invalid');}),
+ quantity:Joi.number().integer().min(0).max(2147483647),unitPrice:money,sellingPrice:money,costPrice:money.allow(null),supplier:Joi.string().trim().min(2).max(200),category:Joi.string().trim().min(2).max(100),reorderLevel:Joi.number().integer().min(0).max(2147483647),location:Joi.string().trim().max(100).allow('',null),barcode:Joi.string().trim().max(100).allow('',null),isActive:Joi.boolean()
 };
-
-module.exports = { createProductSchema, updateProductSchema, validateProduct };
+const createProductSchema=Joi.object({...fields,productCode:fields.productCode.required(),name:fields.name.required(),batchNumber:fields.batchNumber.required(),expiryDate:fields.expiryDate.required(),unitPrice:fields.unitPrice.required(),sellingPrice:fields.sellingPrice.required(),supplier:fields.supplier.required(),category:fields.category.required(),quantity:fields.quantity.default(0),reorderLevel:fields.reorderLevel.default(10)}).required();
+const updateProductSchema=Joi.object({...fields,reason:Joi.string().trim().min(3).max(500).when('quantity',{is:Joi.exist(),then:Joi.required()}),expectedQuantity:Joi.number().integer().min(0).when('quantity',{is:Joi.exist(),then:Joi.required()})}).min(1).required();
+module.exports={createProductSchema,updateProductSchema,validateProduct:validate};
