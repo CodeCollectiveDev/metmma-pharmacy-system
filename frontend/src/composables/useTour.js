@@ -16,6 +16,7 @@ export function startTour(restart = false) {
   tour.steps = allSteps.filter(s => s.roles.includes(localStorage.getItem('role')))
   tour.index = restart ? 0 : Math.min(state.index || 0, Math.max(0, tour.steps.length - 1))
   tour.open = true
+  save()
 }
 export function autoTour() { if (!localStorage.getItem(key())) startTour() }
 export function pauseTour() { save(); tour.open = false }

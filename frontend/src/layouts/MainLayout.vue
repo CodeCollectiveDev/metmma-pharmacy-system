@@ -8,7 +8,7 @@ defineProps({
   subtitle: { type: String, default: '' }
 })
 
-const sidebarCollapsed = ref(false)
+const sidebarCollapsed = ref(window.innerWidth >= 768 && window.innerWidth < 1280)
 const mobileMenuOpen = ref(false)
 </script>
 

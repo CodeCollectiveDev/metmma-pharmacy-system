@@ -117,16 +117,16 @@ const formatCurrency = (amount) => {
           <input v-model="newEmployee.email" required maxlength="255" type="email" aria-label="Email *" placeholder="Email *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <input v-model="newEmployee.role" maxlength="50" type="text" aria-label="Role (optional)" placeholder="Role (optional)" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
           <input v-model="newEmployee.position" required maxlength="100" type="text" aria-label="Position *" placeholder="Position *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <select v-model="newEmployee.department" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <label class="block">Department<select v-model="newEmployee.department" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             <option value="">Select Department</option>
             <option>Pharmacy</option>
             <option>Sales</option>
             <option>Operations</option>
             <option>Human Resources</option>
             <option>Administration</option>
-          </select>
+          </select></label>
           <input v-model.number="newEmployee.salary" required min="0.01" step="0.01" type="number" aria-label="Salary (MWK) *" placeholder="Salary (MWK) *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <input v-model="newEmployee.startDate" type="date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <label class="block">Start date<input aria-label="Start date" v-model="newEmployee.startDate" type="date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></label>
           <input v-model="newEmployee.phone" type="tel" aria-label="Phone Number" placeholder="Phone Number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
         </div>
         <div class="flex justify-end gap-3 mt-4">

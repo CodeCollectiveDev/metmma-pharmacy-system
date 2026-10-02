@@ -96,7 +96,7 @@ const handleLogout = () => {
   >
     <!-- Logo -->
     <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3" :class="{ 'md:hidden': collapsed }">
         <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
           <img src="@/assets/metmma_pharmacy_logo.svg" alt="METMMA Pharmacy Logo" class="w-7 h-7 object-contain">
         </div>

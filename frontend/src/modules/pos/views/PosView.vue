@@ -9,7 +9,7 @@ import { currency } from '@/services/api/money'
 const store = usePosStore()
 const barcode = ref(''), scanner = ref(null), payment = ref('cash'), customer = ref(''), receipt = ref(null), showReceipt = ref(false), configured = ref(false)
 let timer
-watch(() => [store.searchQuery, store.selectedCategory], () => { clearTimeout(timer); timer = setTimeout(() => store.fetchProducts(), 80) })
+watch(() => [store.searchQuery, store.selectedCategory], () => { clearTimeout(timer); timer = setTimeout(() => store.fetchProducts(), 40) })
 onMounted(async () => { try { await store.configure(); configured.value = true; await store.fetchProducts() } catch {} scanner.value?.focus() })
 onBeforeUnmount(() => clearTimeout(timer))
 async function scan() { if (await store.scan(barcode.value)) barcode.value = ''; scanner.value?.focus() }
@@ -22,13 +22,13 @@ async function retryLoad() { try { await store.configure(); configured.value = t
   <MainLayout title="Sell items" subtitle="Add items, collect payment and save a sale">
     <ErrorNotice :error="store.error" :retry="store.pending ? pay : retryLoad" />
     <p v-if="store.pending && !store.processing" role="status" class="panel mb-4">This sale is waiting for confirmation. Retry it using the same cart. Its checkout reference is {{ store.pending.idempotencyKey }}.</p>
-    <div class="grid gap-4 xl:grid-cols-[1fr_24rem]">
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section class="panel" aria-label="Products to sell">
         <label class="block mb-3">Scan a barcode or enter a product code<div class="flex gap-2 mt-1"><input ref="scanner" id="barcode-input" v-model="barcode" :disabled="store.locked" @keydown.enter.prevent="scan" class="field" placeholder="Scan barcode or enter code" autocomplete="off" /><button class="primary" :disabled="store.locked || !barcode" @click="scan">Add scanned item</button></div></label>
         <label class="block mb-4">Search products<input v-model="store.searchQuery" class="field mt-1" placeholder="Search products..." /></label>
         <p class="text-sm text-gray-600 mb-3">Select a product to add one to your cart. Showing up to 40 matches; type more to narrow the list. Expired products cannot be sold.</p>
         <p v-if="store.loading" role="status" class="mb-3">Finding products…</p>
-        <div class="grid grid-cols-2 lg:grid-cols-3 gap-3" :aria-busy="store.loading">
+        <div class="grid grid-cols-2 xl:grid-cols-3 gap-3 max-h-64 lg:max-h-[calc(100vh-24rem)] overflow-y-auto p-1" role="region" aria-label="Matching products" tabindex="0" :aria-busy="store.loading">
           <button v-for="product in store.products" :key="product.id" :disabled="store.locked || product.stock <= 0" @click="store.addToCart(product)" class="text-left p-3 rounded-lg border border-gray-300 hover:bg-blue-50 hover:border-blue-700" :aria-label="`Add ${product.name} to cart`">
             <span class="block font-semibold">{{ product.name }}</span><span class="block text-blue-800 font-bold">{{ currency(product.price) }}</span><span class="text-sm text-gray-600">{{ product.productCode }} · {{ product.stock }} left</span>
           </button>

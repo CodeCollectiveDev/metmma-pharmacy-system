@@ -5,7 +5,7 @@ import ErrorNotice from '@/components/ErrorNotice.vue'
 import { dataService } from '@/services/api/dataService'
 import { currency } from '@/services/api/money'
 const data = ref(null), error = ref(null), loading = ref(false), role = localStorage.getItem('role')
-async function load() { loading.value = true; error.value = null; try { data.value = (await dataService.getDashboard()).data } catch (err) { error.value = err } finally { loading.value = false } }
+async function load() { loading.value = true; error.value = null; data.value = null; try { data.value = (await dataService.getDashboard()).data } catch (err) { error.value = err } finally { loading.value = false } }
 onMounted(load)
 </script>
 <template>

@@ -13,7 +13,7 @@ let mounted = true
 async function load(page = 1) {
   loading.value = true; error.value = null
   try { const res = await dataService.getNotifications({ page, limit: 20 }); if (mounted) { rows.value = res.data.data; unread.value = res.data.unreadCount; pagination.value = res.data.pagination } }
-  catch (err) { if (mounted) error.value = err }
+  catch (err) { if (mounted) { error.value = err; unread.value = 0; rows.value = []; pagination.value = null } }
   finally { if (mounted) loading.value = false }
 }
 async function mark(item = null, go = false) {

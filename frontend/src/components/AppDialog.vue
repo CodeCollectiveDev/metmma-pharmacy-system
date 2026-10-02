@@ -19,11 +19,18 @@ function close(event) {
   event?.preventDefault()
   if (props.dismissible) emit('close')
 }
+function trapFocus(event) {
+  const controls = [...dialog.value.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(el => el.getClientRects().length)
+  const first = controls[0], last = controls[controls.length - 1]
+  if (!first) { event.preventDefault(); dialog.value.focus(); return }
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.value)) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog.value)) { event.preventDefault(); first.focus() }
+}
 onBeforeUnmount(() => { dialog.value?.close?.(); previousFocus?.focus?.() })
 </script>
 <template>
   <Teleport to="body">
-    <dialog ref="dialog" :aria-labelledby="headingId" class="app-dialog" @cancel="close" @click="close">
+    <dialog ref="dialog" :aria-labelledby="headingId" class="app-dialog" tabindex="-1" @keydown.tab="trapFocus" @cancel="close" @click="close">
       <div @click.stop class="p-5 sm:p-6">
         <div class="flex items-start justify-between gap-4 mb-4">
           <h2 :id="headingId" class="text-xl font-bold">{{ title }}</h2>

@@ -28,5 +28,5 @@ export const dataService = {
   addExpense: body => apiClient.post('/finances/expenses', body),
   updateExpense: (id, body) => apiClient.put(`/finances/expenses/${id}`, body),
   deleteExpense: (id, version) => apiClient.delete(`/finances/expenses/${id}`, { data: { version } }),
-  getExpenseAudit: id => apiClient.get(`/finances/expenses/${id}/audit`)
+  getExpenseAudit: (id, params = {}) => apiClient.get(`/finances/expenses/${id}/audit`, { params })
 }

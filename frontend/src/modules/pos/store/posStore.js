@@ -84,6 +84,7 @@ export const usePosStore = defineStore('pos', () => {
     } catch (err) {
       const safe = userError(err)
       if (['VALIDATION', 'INSUFFICIENT_STOCK', 'PRICE_CHANGED', 'PRODUCT_UNAVAILABLE', 'PERMISSION_DENIED', 'NOT_FOUND'].includes(safe.code)) pending.value = null
+      if (safe.code === 'PRICE_CHANGED') { try { taxBps.value = (await dataService.getConfig()).data.taxRateBps } catch {} }
       if (['PRICE_CHANGED', 'INSUFFICIENT_STOCK'].includes(safe.code)) {
         await Promise.allSettled(cart.value.map(async item => {
           const res = await dataService.getProduct(item.id)

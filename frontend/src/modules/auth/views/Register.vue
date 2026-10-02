@@ -21,44 +21,44 @@
 
       <form @submit.prevent="register" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-          <input 
-            v-model="formData.username" 
-            type="text" 
-            placeholder="your_username" 
+          <label for="account-username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <input
+            id="account-username" v-model="formData.username"
+            type="text"
+            placeholder="your_username"
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             required
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-          <input 
-            v-model="formData.full_name" 
-            type="text" 
-            placeholder="John Doe" 
+          <label for="account-full_name" class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+          <input
+            id="account-full_name" v-model="formData.full_name"
+            type="text"
+            placeholder="John Doe"
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             required
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-          <input 
-            v-model="formData.email" 
-            type="email" 
-            placeholder="your@example.com" 
+          <label for="account-email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+          <input
+            id="account-email" v-model="formData.email"
+            type="email"
+            placeholder="your@example.com"
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             required
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input 
-            v-model="formData.password" 
-            type="password" 
-            placeholder="••••••••" 
+          <label for="account-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input
+            id="account-password" v-model="formData.password"
+            type="password"
+            placeholder="••••••••"
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             required
             minlength="10"
@@ -67,9 +67,9 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-          <select 
-            v-model="formData.role" 
+          <label for="account-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+          <select
+            id="account-role" v-model="formData.role"
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             required
           >
@@ -82,8 +82,8 @@
           </select>
         </div>
 
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow transition-colors flex justify-center items-center gap-2"
           :disabled="loading"
         >
@@ -106,7 +106,6 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
 import { authService } from '@/services/api/authService';
 import { userError } from '@/services/api/errors';
 
@@ -121,7 +120,6 @@ const formData = ref({
 const error = ref("");
 const success = ref(false);
 const loading = ref(false);
-const router = useRouter();
 
 async function register() {
   error.value = "";
@@ -143,7 +141,7 @@ async function register() {
     }
 
     const data = await authService.register(formData.value);
-    
+
     if (data && data.message) {
       success.value = true;
     } else {
