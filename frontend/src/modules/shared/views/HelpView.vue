@@ -1,142 +1,28 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
-import { ChevronDown, ChevronRight, Search, Phone, Mail, HelpCircle } from 'lucide-vue-next'
-
-const openSections = ref(['getting-started'])
-const searchQuery = ref('')
-
-const toggleSection = (id) => {
-  if (openSections.value.includes(id)) {
-    openSections.value = openSections.value.filter(s => s !== id)
-  } else {
-    openSections.value.push(id)
-  }
-}
-
-const isOpen = (id) => openSections.value.includes(id)
-
-const helpTopics = [
-  {
-    id: 'getting-started',
-    title: 'Getting Started',
-    items: [
-      { q: 'Logging In', a: 'Use your username and password provided by the administrator. Ensure you are logging in with the correct credentials assigned to your role.' },
-      { q: 'System Navigation', a: 'Use the sidebar menu to navigate between modules. The top bar displays your current location and important system notifications.' }
-    ]
-  },
-  {
-    id: 'sales',
-    title: 'Point of Sale (POS)',
-    items: [
-      { q: 'Starting a Transaction', a: 'Navigate to the Point of Sale module. Scan barcodes or search for products manually. Add items to the cart and proceed to payment.' },
-      { q: 'Scanning Products', a: 'Click the barcode input field and use your connected scanner or mobile device. The system will automatically detect the batch number.' },
-      { q: 'Processing Payments', a: 'Select the payment method (Cash or Card). For cash transactions, ensure the correct amount is tendered before completing the sale.' },
-      { q: 'Receipt Printing', a: 'Upon successful transaction, a digital receipt will be generated. You can print this immediately using the "Print" button.' }
-    ]
-  },
-  {
-    id: 'inventory',
-    title: 'Inventory Management',
-    items: [
-      { q: 'Adding New Products', a: 'Access the Inventory module and click "Add Product". Fill in all mandatory fields including Name, Batch Number, and Expiry Date.' },
-      { q: 'Monitoring Stock Levels', a: 'Use the "Low Stock" filter in the Inventory dashboard to identify items falling below the minimum threshold.' },
-      { q: 'Expiry Tracking', a: 'The "Expired" filter displays all batches that have passed their expiry date and should be removed from stock.' }
-    ]
-  },
-  {
-    id: 'reports',
-    title: 'Reports & Analytics',
-    items: [
-      { q: 'Generating Sales Reports', a: 'Go to the Reports module. Select "Sales Reports" and choose your desired date range (Today, Week, Month).' },
-      { q: 'Exporting Data', a: 'All reports can be exported to CSV format. Click the "Export CSV" button at the top right of any report view.' }
-    ]
-  }
+import { startTour } from '@/composables/useTour'
+const search = ref('')
+const role = localStorage.getItem('role')
+const topics = [
+  ['Sell items', 'Open Sell items. Search by name or code, or scan a barcode and press Enter. Choose a product to add it to the cart. Check the quantity, choose Cash or Card and select Complete Sale. Collect payment using your usual process; this system records it.'],
+  ['If a sale fails', 'Your cart stays here. Check your connection and select Retry sale. A retry uses the same checkout reference, so it cannot save the sale twice. If stock or prices changed, check the cart before trying again.'],
+  ['Stock and products', 'Inventory shows current stock. Add a product with its code, batch, expiry date and selling price. Add stock records a delivery and its note. Deactivating a product hides it from future sales and keeps past receipts.'],
+  ['Past sales', 'Sales shows saved receipts, payment methods and sold items. Cashiers see their own sales. Only an administrator can reverse a sale. A reversal returns the full quantity and records the money returned; it happens only once.'],
+  ['Notifications', 'The bell shows unread low stock and expiry notices. Open it to read a notice or mark all as read. Notices change when the product changes. Ask the stock manager about a notice if you cannot open Inventory.'],
+  ['Finances', 'Completed sales record income automatically. Administrators and store managers can record expenses, edit them or delete an incorrect entry. Each change is recorded with the person and date. Pharmacists and HR officers can view finances. Choose dates to see income, expenses and the amount left.'],
+  ['Staff', 'Administrators and HR officers can view staff and mark attendance. An administrator adds employees or creates sign-in accounts. Staff records and sign-in accounts are separate.'],
+  ['Connection and help', 'Stock and money records need a working connection. If an action fails, keep the form open, check the connection and try again. Give the Help reference to your administrator if one is shown.'],
+  ['Keyboard and scanner', 'Press Tab to move between controls and Enter to choose a product or confirm a button. Press Esc to close a window. Keep the scanner field selected when using a barcode scanner.'],
+  ['Existing offline records', 'Older versions stored pending receipts in this browser. They are kept for review and are not sent automatically. Ask your administrator to compare them with server receipts before entering anything again.']
 ]
-
-const filteredTopics = () => {
-  if (!searchQuery.value) return helpTopics
-  
-  const query = searchQuery.value.toLowerCase()
-  return helpTopics.map(topic => {
-    const matchingItems = topic.items.filter(item => 
-      item.q.toLowerCase().includes(query) || 
-      item.a.toLowerCase().includes(query)
-    )
-    
-    if (matchingItems.length > 0) {
-      return { ...topic, items: matchingItems }
-    }
-    return null
-  }).filter(t => t !== null)
-}
+const filtered = computed(() => topics.filter(t => t.join(' ').toLowerCase().includes(search.value.toLowerCase())))
 </script>
-
 <template>
-  <MainLayout title="Help Center" subtitle="System documentation and support">
-    <!-- Search -->
-    <div class="max-w-2xl mx-auto mb-6 sm:mb-8">
-      <div class="relative">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search for answers..."
-          class="w-full pl-12 pr-4 py-4 border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-lg"
-        >
-        <Search class="w-6 h-6 text-gray-400 absolute left-4 top-4" />
-      </div>
-    </div>
-
-    <!-- FAQ Sections -->
-    <div class="max-w-4xl mx-auto space-y-4">
-      <div v-for="topic in filteredTopics()" :key="topic.id" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <button
-          @click="toggleSection(topic.id)"
-          class="w-full px-4 sm:px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-        >
-          <h3 class="font-semibold text-lg text-gray-800">{{ topic.title }}</h3>
-          <ChevronDown v-if="isOpen(topic.id) || searchQuery" class="w-5 h-5 text-gray-500" />
-          <ChevronRight v-else class="w-5 h-5 text-gray-500" />
-        </button>
-
-        <div v-if="isOpen(topic.id) || searchQuery" class="border-t border-gray-100">
-          <div v-for="(item, index) in topic.items" :key="index" class="px-4 sm:px-6 py-4 border-b border-gray-50 last:border-b-0 space-y-2">
-            <p class="font-medium text-blue-700">{{ item.q }}</p>
-            <p class="text-gray-600 text-sm leading-relaxed">{{ item.a }}</p>
-          </div>
-        </div>
-      </div>
-      
-      <div v-if="filteredTopics().length === 0" class="text-center py-12 text-gray-500">
-        No results found for "{{ searchQuery }}"
-      </div>
-    </div>
-
-    <!-- Contact Support -->
-    <div class="max-w-4xl mx-auto mt-8 bg-blue-50 border border-blue-100 rounded-xl p-4 sm:p-8">
-      <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-        <div class="p-4 bg-blue-100 rounded-full text-blue-600">
-          <HelpCircle class="w-8 h-8" />
-        </div>
-        <div>
-          <h3 class="text-lg font-bold text-gray-900 mb-2">Technical Support</h3>
-          <p class="text-gray-600 mb-6">If you cannot find the answer you are looking for, please contact our support team.</p>
-          <div class="flex flex-wrap gap-6">
-            <div class="flex items-center gap-3 text-gray-700">
-              <div class="p-2 bg-white rounded-lg border border-gray-200">
-                <Phone class="w-4 h-4" />
-              </div>
-              <span class="font-medium">+265 889 123 456</span>
-            </div>
-            <div class="flex items-center gap-3 text-gray-700">
-              <div class="p-2 bg-white rounded-lg border border-gray-200">
-                <Mail class="w-4 h-4" />
-              </div>
-              <span class="font-medium">support@metmma.com</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <MainLayout title="Help and tour" subtitle="Short instructions for everyday work">
+    <div class="panel mb-4 flex flex-wrap items-center gap-3"><button class="primary" @click="startTour(true)">Take the tour</button><button class="secondary" @click="startTour()">Resume tour</button><router-link v-if="role === 'admin'" to="/register" class="secondary">Create staff account</router-link></div>
+    <label class="block mb-4">Find help<input v-model="search" class="field mt-1" placeholder="Search for help" /></label>
+    <div class="space-y-3"><details v-for="topic in filtered" :key="topic[0]" class="panel" open><summary class="font-semibold cursor-pointer">{{ topic[0] }}</summary><p class="mt-3 leading-relaxed">{{ topic[1] }}</p></details></div>
+    <div v-if="!filtered.length" class="panel"><p>No matching instructions. Try a shorter word or take the tour.</p><button class="primary mt-3" @click="search = ''">Show all help</button></div>
   </MainLayout>
 </template>

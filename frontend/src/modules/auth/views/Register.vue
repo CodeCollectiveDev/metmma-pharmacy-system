@@ -6,7 +6,7 @@
           <img src="@/assets/metmma_pharmacy_logo.svg" alt="METMMA Pharmacy Logo" class="w-16 h-12 object-contain">
         </div>
         <h2 class="text-2xl font-bold text-gray-800">METMMA PHARMACY</h2>
-        <p class="text-gray-500 text-sm">Create a new account</p>
+        <p class="text-gray-500 text-sm">Create a staff sign-in account</p>
       </div>
 
       <div v-if="error" class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm border border-red-100 flex items-center gap-2">
@@ -16,7 +16,7 @@
 
       <div v-if="success" class="bg-green-50 text-green-600 p-3 rounded-lg mb-4 text-sm border border-green-100 flex items-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Account created successfully! Redirecting to login...
+        Account created. You can give the username to your staff member.
       </div>
 
       <form @submit.prevent="register" class="space-y-4">
@@ -61,9 +61,9 @@
             placeholder="••••••••" 
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             required
-            minlength="6"
+            minlength="10"
           />
-          <p class="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+          <p class="text-xs text-gray-500 mt-1">Minimum 10 characters</p>
         </div>
 
         <div>
@@ -94,9 +94,9 @@
 
       <div class="mt-6 pt-6 border-t border-gray-200 text-center">
         <p class="text-sm text-gray-600">
-          Already have an account?
-          <router-link to="/login" class="text-blue-600 hover:text-blue-700 font-medium">
-            Sign in here
+          Finished?
+          <router-link to="/help" class="text-blue-600 hover:text-blue-700 font-medium">
+            Back to Help
           </router-link>
         </p>
       </div>
@@ -108,6 +108,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { authService } from '@/services/api/authService';
+import { userError } from '@/services/api/errors';
 
 const formData = ref({
   username: "",
@@ -135,8 +136,8 @@ async function register() {
       return;
     }
 
-    if (formData.value.password.length < 6) {
-      error.value = "Password must be at least 6 characters";
+    if (formData.value.password.length < 10) {
+      error.value = "Password must be at least 10 characters";
       loading.value = false;
       return;
     }
@@ -145,22 +146,11 @@ async function register() {
     
     if (data && data.message) {
       success.value = true;
-      // Redirect to login after 2 seconds
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
     } else {
       error.value = "Failed to create account";
     }
   } catch (err) {
-    console.error('[Register] API Error:', err);
-    if (err.response && err.response.status === 409) {
-      error.value = "Username already exists. Please choose another.";
-    } else if (err.response && err.response.data && err.response.data.error) {
-      error.value = err.response.data.error;
-    } else {
-      error.value = "Failed to create account. Please try again.";
-    }
+    error.value = userError(err).message;
   } finally {
     loading.value = false;
   }

@@ -25,7 +25,7 @@ const ROLE_HIERARCHY = {
 
 const routes = [
   { path: '/login', component: Login, meta: { requiresAuth: false } },
-  { path: '/register', component: Register, meta: { requiresAuth: false } },
+  { path: '/register', component: Register, meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Create staff account' } },
 
   { path: '/', redirect: '/dashboard' },
   
@@ -44,8 +44,8 @@ const routes = [
     component: () => import('@/modules/pos/views/PosView.vue'),
     meta: {
       requiresAuth: true,
-      roles: [ROLES.CASHIER, ROLES.ADMIN],
-      label: 'Point of Sale'
+      roles: [ROLES.CASHIER, ROLES.ADMIN, ROLES.PHARMACIST],
+      label: 'Sell items'
     }
   },
   
@@ -91,6 +91,9 @@ const routes = [
       requiresAdmin: false
     }
   },
+
+  { path: '/sales', component: () => import('@/modules/sales/views/SalesView.vue'), meta: { requiresAuth: true, roles: Object.values(ROLES), label: 'Sales' } },
+  { path: '/finances', component: () => import('@/modules/finances/views/FinancesView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER], label: 'Finances' } },
 
   // 404 catch-all
   {

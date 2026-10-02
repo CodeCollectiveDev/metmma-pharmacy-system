@@ -1,149 +1,98 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { v4 as uuidv4 } from 'uuid'
-import { save } from '@/pouchdb'
-import { dataOrchestrator } from '@/services/data/dataOrchestrator'
+import { ref, computed, watch } from 'vue'
 import { dataService } from '@/services/api/dataService'
-
+import { minor, decimal, normalizeProduct } from '@/services/api/money'
+import { localError, userError } from '@/services/api/errors'
 export const usePosStore = defineStore('pos', () => {
-    // State
-    const cart = ref([])
-    const products = ref([])
-    const searchQuery = ref('')
-    const selectedCategory = ref('All')
-
-    // Fetch products using hybrid layer
-    async function fetchProducts() {
-        try {
-            products.value = await dataOrchestrator.fetchCollection('products', dataService.getProducts)
-        } catch (error) {
-            console.error('Error fetching products for POS:', error)
-        }
-    }
-
-    // Getters
-    const filteredProducts = computed(() => {
-        return products.value.filter(product => {
-            const matchesSearch = product.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-            const matchesCategory = selectedCategory.value === 'All' || product.category === selectedCategory.value
-            return matchesSearch && matchesCategory
-        })
-    })
-
-    const cartTotal = computed(() => {
-        return cart.value.reduce((total, item) => total + (item.price * item.quantity), 0)
-    })
-
-    // Actions
-    function addToCart(product) {
-        // Check if stock is sufficient
-        if (product.stock <= 0) {
-            alert('Item out of stock!'); // Simple alert for now
-            return;
-        }
-
-        const existingItem = cart.value.find(item => item._id === product._id)
-        if (existingItem) {
-            if (existingItem.quantity < product.stock) {
-                existingItem.quantity++
-            } else {
-                alert('Not enough stock!');
-            }
-        } else {
-            cart.value.push({ ...product, quantity: 1 })
-        }
-    }
-
-    function removeFromCart(productId) {
-        cart.value = cart.value.filter(item => item._id !== productId)
-    }
-
-    function updateQuantity(productId, change) {
-        const item = cart.value.find(item => item._id === productId)
-        if (item) {
-            // Find original product to check stock limit
-            const product = products.value.find(p => p._id === productId);
-
-            const newQuantity = item.quantity + change;
-
-            if (newQuantity <= 0) {
-                removeFromCart(productId)
-            } else if (product && newQuantity > product.stock) {
-                alert('Cannot exceed available stock!');
-            } else {
-                item.quantity = newQuantity
-            }
-        }
-    }
-
-    function clearCart() {
-        cart.value = []
-    }
-
-    async function checkout(paymentMethod) {
-        if (!cart.value.length) throw new Error('Cart is empty')
-        const user = JSON.parse(localStorage.getItem('user') || '{}')
-        const money = amount => Math.round((amount + Number.EPSILON) * 100) / 100
-        const items = cart.value.map(item => {
-            const productId = Number(item.id || item._id)
-            if (!Number.isSafeInteger(productId) || productId <= 0) {
-                throw new Error(`${item.name} must be synchronized before it can be sold`)
-            }
-            return {
-                productId,
-                name: item.name,
-                batchNumber: item.batchNumber,
-                quantity: item.quantity,
-                unitPrice: Number(item.price),
-                subtotal: money(item.price * item.quantity)
-            }
-        })
-        const subtotal = money(items.reduce((sum, item) => sum + item.subtotal, 0))
-        const tax = money(subtotal * 0.165)
-        const transaction = {
-            _id: `txn_${uuidv4()}`,
-            date: new Date().toISOString(),
-            items,
-            subtotal,
-            tax,
-            totalAmount: money(subtotal + tax),
-            paymentMethod,
-            customerName: null,
-            userId: user.id,
-            cashier: user.name || 'Unknown'
-        }
-        const result = await dataOrchestrator.saveItem('transactions', transaction, dataService.recordSale)
-        if (!result.ok) throw new Error('Sale could not be saved')
-
-        // The checkout endpoint owns persisted stock changes. Offline stock is
-        // only a local projection; it must never be replayed as a product write.
-        if (result.offline) {
-            for (const item of cart.value) {
-                const product = products.value.find(p => p._id === item._id)
-                if (product) {
-                    product.stock -= item.quantity
-                    product.quantity = product.stock
-                    await save('products', { ...product })
-                }
-            }
-        }
-        clearCart()
-        if (!result.offline) await fetchProducts()
-        return { transaction: result.data, offline: result.offline }
-    }
-
-    return {
-        cart,
-        products,
-        searchQuery,
-        selectedCategory,
-        filteredProducts,
-        cartTotal,
-        fetchProducts,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        checkout
-    }
+  const cart = ref([]), products = ref([]), searchQuery = ref(''), selectedCategory = ref('All')
+  const loading = ref(false), processing = ref(false), error = ref(null), pending = ref(null), taxBps = ref(1650)
+  let owner = null, generation = 0
+  function storageKey() { return `mpms:cart:v1:${owner}` }
+  function restoreCart() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (owner === user.id) return
+    owner = user.id
+    try { const draft = JSON.parse(localStorage.getItem(storageKey()) || '{}'); cart.value = draft.cart || []; pending.value = draft.pending || null }
+    catch { cart.value = []; pending.value = null }
+  }
+  watch([cart, pending], () => {
+    if (owner) { try { localStorage.setItem(storageKey(), JSON.stringify({ cart: cart.value, pending: pending.value })) } catch { error.value = localError('UNEXPECTED') } }
+  }, { deep: true, flush: 'sync' })
+  const subtotalMinor = computed(() => cart.value.reduce((sum, item) => sum + minor(item.price) * item.quantity, 0))
+  const taxMinor = computed(() => Math.floor((subtotalMinor.value * taxBps.value + 5000) / 10000))
+  const cartTotal = computed(() => subtotalMinor.value / 100)
+  const totalAmount = computed(() => (subtotalMinor.value + taxMinor.value) / 100)
+  const filteredProducts = computed(() => products.value)
+  const locked = computed(() => processing.value || !!pending.value)
+  async function fetchProducts() {
+    const current = ++generation
+    loading.value = true
+    try {
+      const res = await dataService.getProductPage({ search: searchQuery.value, category: selectedCategory.value === 'All' ? undefined : selectedCategory.value, sellable: true, limit: 40 })
+      if (current === generation) { products.value = res.data.data.map(normalizeProduct); error.value = null }
+    } catch (err) { if (current === generation) { products.value = []; error.value = err } }
+    finally { if (current === generation) loading.value = false }
+  }
+  async function configure() { restoreCart(); try { taxBps.value = (await dataService.getConfig()).data.taxRateBps } catch (err) { error.value = err; throw err } }
+  function addToCart(product) {
+    if (locked.value) return
+    if (product.stock <= 0) { error.value = localError('INSUFFICIENT_STOCK'); return }
+    const item = cart.value.find(i => i._id === product._id)
+    if (item) { if (item.quantity >= product.stock) { error.value = localError('INSUFFICIENT_STOCK'); return }; item.quantity++ }
+    else cart.value.push({ ...product, quantity: 1 })
+    error.value = null
+  }
+  function removeFromCart(id) { if (!locked.value) cart.value = cart.value.filter(i => i._id !== id) }
+  function updateQuantity(id, change) {
+    if (locked.value) return
+    const item = cart.value.find(i => i._id === id)
+    if (!item) return
+    const quantity = item.quantity + change
+    if (quantity <= 0) removeFromCart(id)
+    else if (quantity > item.stock) error.value = localError('INSUFFICIENT_STOCK')
+    else item.quantity = quantity
+  }
+  function clearCart() { if (!locked.value) cart.value = [] }
+  async function scan(code) {
+    if (locked.value) return
+    try {
+      const response = await dataService.getProductPage({ barcode: code.trim(), sellable: true, limit: 2 })
+      if (response.data.data.length === 1) { addToCart(normalizeProduct(response.data.data[0])); return true }
+      error.value = localError('NOT_FOUND')
+    } catch (err) { error.value = err }
+    return false
+  }
+  async function checkout(paymentMethod, customerName = '') {
+    if (processing.value || !cart.value.length) return
+    processing.value = true; error.value = null
+    try {
+      if (!pending.value) {
+        const items = cart.value.map(i => ({ productId: Number(i.id || i._id), quantity: i.quantity, unitPrice: decimal(minor(i.price)), subtotal: decimal(minor(i.price) * i.quantity) }))
+        if (items.some(i => !Number.isSafeInteger(i.productId) || i.productId < 1)) throw localError('PRODUCT_UNAVAILABLE')
+        pending.value = { idempotencyKey: crypto.randomUUID(), items, totalAmount: decimal(subtotalMinor.value + taxMinor.value), paymentMethod, customerName }
+      }
+      const response = await dataService.recordSale(pending.value)
+      const transaction = response.data.data
+      // Only the confirmed server response clears the cart. No catalogue refresh on the checkout path.
+      pending.value = null; cart.value = []
+      for (const product of products.value) {
+        const line = transaction.items.find(i => i.productId === product.id)
+        if (line) product.stock = line.remainingStock
+      }
+      window.dispatchEvent(new Event('stock-changed'))
+      return { transaction, offline: false }
+    } catch (err) {
+      const safe = userError(err)
+      if (['VALIDATION', 'INSUFFICIENT_STOCK', 'PRICE_CHANGED', 'PRODUCT_UNAVAILABLE', 'PERMISSION_DENIED', 'NOT_FOUND'].includes(safe.code)) pending.value = null
+      if (['PRICE_CHANGED', 'INSUFFICIENT_STOCK'].includes(safe.code)) {
+        await Promise.allSettled(cart.value.map(async item => {
+          const res = await dataService.getProduct(item.id)
+          item.price = res.data.data.sellingPrice; item.stock = res.data.data.quantity
+        }))
+      }
+      error.value = err
+      throw err
+    } finally { processing.value = false }
+  }
+  return { cart, products, searchQuery, selectedCategory, filteredProducts, cartTotal, subtotalMinor, taxMinor, totalAmount, taxBps, loading, processing, error, pending, locked, restoreCart, configure, fetchProducts, addToCart, removeFromCart, updateQuantity, clearCart, scan, checkout }
 })

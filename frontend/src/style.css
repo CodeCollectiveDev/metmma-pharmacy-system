@@ -1,1 +1,23 @@
 @import "tailwindcss";
+@layer base {
+  body { color: #1e293b; font-size: 16px; }
+  button, a, input, select, textarea { touch-action: manipulation; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .6; }
+  :focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+  input, select, textarea { font-size: 1rem; }
+}
+@layer components {
+  .primary { @apply px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 disabled:opacity-60; }
+  .secondary { @apply px-4 py-2 rounded-lg border border-gray-300 bg-white text-slate-800 hover:bg-gray-100; }
+  .field { @apply w-full px-3 py-2 rounded-lg border border-gray-300 bg-white; }
+  .panel { @apply bg-white rounded-xl border border-gray-200 p-4 sm:p-6; }
+  .app-dialog { @apply m-auto w-[calc(100%-2rem)] max-w-xl rounded-xl bg-white text-slate-800 shadow-xl max-h-[90vh] overflow-auto p-0 border-0; }
+  .app-dialog::backdrop { background: rgb(15 23 42 / .55); }
+}
+@media print {
+  body * { visibility: hidden; }
+  .receipt, .receipt * { visibility: visible; }
+  .receipt { position: absolute; left: 0; top: 0; width: 100%; }
+  .print-hide { display: none; }
+}

@@ -1,340 +1,57 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
+import AppDialog from '@/components/AppDialog.vue'
+import ErrorNotice from '@/components/ErrorNotice.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
 import { useInventoryStore } from '../store/inventoryStore'
-import { Plus, Search, Package, AlertTriangle, Calendar, Edit, ScanBarcode } from 'lucide-vue-next'
-
-const store = useInventoryStore()
-const showAddForm = ref(false)
-const showRestockModal = ref(false)
-const restockTarget = ref(null)
-const restockQty = ref('')
-const restockNote = ref('')
-const filter = ref('all')
-const searchQuery = ref('')
-const barcodeSearch = ref('')
-
-const newProduct = ref({
-  name: '',
-  category: 'Antibiotics',
-  batchNumber: '',
-  expiryDate: '',
-  supplier: '',
-  price: null,
-  stock: null,
-  minStockLevel: 10
-})
-
-const categories = ['Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Cold', 'First Aid', 'Diagnostics', 'Diabetes', 'Gastrointestinal', 'Other']
-
-onMounted(() => {
-  store.fetchProducts()
-})
-
-const filteredProducts = computed(() => {
-  let products = store.products
-  
-  // Filter by status
-  if (filter.value === 'low') products = store.lowStockProducts
-  if (filter.value === 'expired') products = store.expiredProducts
-  
-  // Filter by search
-  if (searchQuery.value || barcodeSearch.value) {
-    const query = (searchQuery.value || barcodeSearch.value).toLowerCase()
-    products = products.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.batchNumber?.toLowerCase().includes(query) ||
-      p.category?.toLowerCase().includes(query)
-    )
-  }
-  
-  return products
-})
-
-const handleBarcodeSearch = () => {
-  searchQuery.value = barcodeSearch.value
-  barcodeSearch.value = ''
+import { dataService } from '@/services/api/dataService'
+import { currency } from '@/services/api/money'
+import { userError } from '@/services/api/errors'
+import { confirmAction } from '@/composables/useFeedback'
+const store = useInventoryStore(), route = useRoute()
+const role = localStorage.getItem('role'), canAdd = ['admin', 'pharmacist'].includes(role), canEdit = ['admin', 'pharmacist', 'store_manager'].includes(role)
+const search = ref(''), status = ref('all'), showForm = ref(false), saving = ref(false), error = ref(null), fields = ref([]), notice = ref(''), restock = ref(null), quantity = ref(1), note = ref('')
+const blank = () => ({ productCode: '', name: '', batchNumber: '', expiryDate: '', quantity: 0, sellingPrice: '', supplier: '', category: 'Other', reorderLevel: 10, barcode: '' })
+const form = ref(blank())
+const inputs = [ ['productCode','Product code','text','A unique code, such as PARA-001.'], ['name','Product name','text','The name staff will search for.'], ['batchNumber','Batch number','text','Use the number on the pack.'], ['expiryDate','Expiry date','date','Use the expiry date on the pack.'], ['quantity','Starting quantity','number','Number of units available.'], ['sellingPrice','Selling price (MWK)','number','Price for one unit, before VAT.'], ['supplier','Supplier','text','Who supplied this product.'], ['category','Category','text','For example, Painkillers or Vitamins.'], ['reorderLevel','Low stock threshold','number','You get a notice at or below this quantity.'], ['barcode','Barcode (optional)','text','The number read by your scanner.'] ]
+let timer
+function load(page = 1) { return store.fetchProducts({ page, search: search.value, status: status.value, id: route.query.product }) }
+async function refresh() { await Promise.allSettled([load(), store.refreshSummary()]) }
+watch([search, status, () => route.query.product], () => { clearTimeout(timer); timer = setTimeout(() => load(), 100) })
+onMounted(refresh); onBeforeUnmount(() => clearTimeout(timer))
+function invalid(name) { return fields.value.some(f => f.field === name) }
+async function saveProduct() {
+  if (saving.value) return
+  saving.value = true; error.value = null; fields.value = []
+  try { await dataService.addProduct({ ...form.value, unitPrice: form.value.sellingPrice }); showForm.value = false; form.value = blank(); notice.value = 'Product saved.'; await refresh(); window.dispatchEvent(new Event('stock-changed')) }
+  catch (err) { error.value = err; fields.value = userError(err).fields }
+  finally { saving.value = false }
 }
-
-const saveProduct = async () => {
-  if (!newProduct.value.name || !newProduct.value.batchNumber) {
-    alert('Please fill required fields (Name, Batch Number)')
-    return
-  }
-  
-  const success = await store.addProduct({ ...newProduct.value })
-  if (success) {
-    showAddForm.value = false
-    newProduct.value = { name: '', category: 'Antibiotics', batchNumber: '', expiryDate: '', supplier: '', price: null, stock: null, minStockLevel: 10 }
-    alert('Product added successfully!')
-  }
+async function addStock() {
+  if (saving.value) return
+  saving.value = true; error.value = null
+  try { await dataService.restockProduct(restock.value.id, { quantity: quantity.value, reason: note.value }); restock.value = null; notice.value = 'Stock added.'; await refresh(); window.dispatchEvent(new Event('stock-changed')) }
+  catch (err) { error.value = err }
+  finally { saving.value = false }
 }
-
-const openRestockModal = (product) => {
-  restockTarget.value = product
-  restockQty.value = ''
-  restockNote.value = ''
-  showRestockModal.value = true
+async function deactivate(product) {
+  if (!(await confirmAction('Deactivate this product?', `${product.name} will no longer appear in Sell items. Its stock and past receipts will stay in the records.`, 'Deactivate product'))) return
+  saving.value = true; error.value = null
+  try { await dataService.deleteProduct(product); notice.value = 'Product deactivated.'; await refresh(); window.dispatchEvent(new Event('stock-changed')) } catch (err) { error.value = err } finally { saving.value = false }
 }
-
-const confirmRestock = async () => {
-  if (!restockTarget.value) return
-  const quantity = Number(restockQty.value)
-  if (Number.isNaN(quantity) || quantity <= 0) {
-    alert('Please enter a valid quantity greater than 0')
-    return
-  }
-
-  const success = await store.restockProduct(restockTarget.value, quantity, restockNote.value)
-  if (success) {
-    showRestockModal.value = false
-    restockTarget.value = null
-    restockQty.value = ''
-    restockNote.value = ''
-    alert('Stock updated successfully')
-  } else {
-    alert('Failed to update stock')
-  }
-}
-
-const ignoreLowStock = async (product) => {
-  const reason = window.prompt('Optional reason to ignore low stock:', '') || ''
-  const success = await store.ignoreLowStock(product, reason)
-  if (success) {
-    alert('Low stock notification ignored')
-  } else {
-    alert('Failed to ignore low stock notification')
-  }
-}
-
-const removeExpired = async (product) => {
-  const confirmRemove = window.confirm('Remove expired item from stock? This will delete it.')
-  if (!confirmRemove) return
-  const success = await store.deleteProduct(product)
-  if (success) {
-    alert('Expired item removed')
-  } else {
-    alert('Failed to remove expired item')
-  }
-}
-
-const removeAllExpired = async () => {
-  if (!store.expiredProducts.length) return
-  const confirmRemove = window.confirm('Remove ALL expired items from stock? This will delete them.')
-  if (!confirmRemove) return
-
-  let failures = 0
-  for (const product of store.expiredProducts) {
-    const success = await store.deleteProduct(product)
-    if (!success) failures += 1
-  }
-
-  if (failures === 0) {
-    alert('All expired items removed')
-  } else {
-    alert(`Some items could not be removed (${failures} failed).`)
-  }
-}
-
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK', minimumFractionDigits: 0 }).format(amount || 0)
-}
-
-const isExpired = (date) => new Date(date) < new Date()
-const isLowStock = (product) => product.stock <= (product.minStockLevel || 10) && !product.lowStockIgnored
-const isLowStockIgnored = (product) => product.stock <= (product.minStockLevel || 10) && product.lowStockIgnored
 </script>
-
 <template>
-  <MainLayout title="Inventory Management" subtitle="Manage stock, products, and suppliers">
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6">
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-        <div class="p-3 bg-blue-50 rounded-lg">
-          <Package class="w-6 h-6 text-blue-600" />
-        </div>
-        <div>
-          <p class="text-sm text-gray-500">Total Products</p>
-          <p class="text-2xl font-bold text-gray-800">{{ store.products.length }}</p>
-        </div>
-      </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-orange-100 flex items-center gap-4">
-        <div class="p-3 bg-orange-50 rounded-lg">
-          <AlertTriangle class="w-6 h-6 text-orange-600" />
-        </div>
-        <div>
-          <p class="text-sm text-gray-500">Low Stock</p>
-          <p class="text-2xl font-bold text-orange-600">{{ store.lowStockProducts.length }}</p>
-        </div>
-      </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100 flex items-center gap-4">
-        <div class="p-3 bg-red-50 rounded-lg">
-          <Calendar class="w-6 h-6 text-red-600" />
-        </div>
-        <div>
-          <p class="text-sm text-gray-500">Expired</p>
-          <p class="text-2xl font-bold text-red-600">{{ store.expiredProducts.length }}</p>
-        </div>
-      </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <button @click="showAddForm = !showAddForm" class="w-full h-full flex items-center justify-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
-          <Plus class="w-5 h-5" />
-          <span>{{ showAddForm ? 'Cancel' : 'Add Product' }}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Add Product Form -->
-    <div v-if="showAddForm" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
-      <h3 class="font-semibold text-gray-800 mb-4">Add New Product</h3>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input v-model="newProduct.name" type="text" placeholder="Product Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model="newProduct.batchNumber" type="text" placeholder="Batch Number *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <select v-model="newProduct.category" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <option v-for="cat in categories" :key="cat">{{ cat }}</option>
-        </select>
-        <input v-model="newProduct.expiryDate" type="date" placeholder="Expiry Date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model="newProduct.supplier" type="text" placeholder="Supplier" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.price" type="number" placeholder="Price (MWK)" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.stock" type="number" placeholder="Quantity" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        <input v-model.number="newProduct.minStockLevel" type="number" placeholder="Min Stock Level" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-      </div>
-      <div class="flex justify-end mt-4">
-        <button @click="saveProduct" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-          Save Product
-        </button>
-      </div>
-    </div>
-
-    <!-- Filters & Search -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-      <div class="p-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div class="grid grid-cols-1 sm:flex gap-2">
-          <button @click="filter = 'all'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
-            All ({{ store.products.length }})
-          </button>
-          <button @click="filter = 'low'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'low' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
-            Low Stock ({{ store.lowStockProducts.length }})
-          </button>
-          <button @click="filter = 'expired'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'expired' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
-            Expired ({{ store.expiredProducts.length }})
-          </button>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:flex gap-2">
-          <div class="relative">
-            <input v-model="barcodeSearch" @keyup.enter="handleBarcodeSearch" type="text" placeholder="Scan barcode..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-48 focus:ring-2 focus:ring-blue-500 outline-none">
-            <ScanBarcode class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-          </div>
-          <div class="relative">
-            <input v-model="searchQuery" type="text" placeholder="Search products..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-64 focus:ring-2 focus:ring-blue-500 outline-none">
-            <Search class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-          </div>
-          <button
-            v-if="store.expiredProducts.length"
-            @click="removeAllExpired"
-            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            Remove All Expired
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Restock Modal -->
-    <div v-if="showRestockModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto mx-4 p-4 sm:p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Restock Item</h3>
-        <div class="space-y-3">
-          <div class="text-sm text-gray-600">
-            <div><span class="font-medium">Product:</span> {{ restockTarget?.name }}</div>
-            <div><span class="font-medium">Current Stock:</span> {{ restockTarget?.stock ?? 0 }}</div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Quantity to Add</label>
-            <input v-model="restockQty" type="number" min="1" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 50" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Note (supplier/invoice)</label>
-            <input v-model="restockNote" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Optional" />
-          </div>
-        </div>
-        <div class="mt-6 flex justify-end gap-2">
-          <button @click="showRestockModal = false" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
-          <button @click="confirmRestock" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Confirm Restock</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Products Table -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="overflow-x-auto">
-      <table class="w-full min-w-[850px]">
-        <thead class="bg-gray-50 border-b border-gray-100">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch #</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expiry</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock (Qty)</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="product in filteredProducts" :key="product._id" class="hover:bg-gray-50">
-            <td class="px-6 py-4">
-              <p class="font-medium text-gray-800">{{ product.name }}</p>
-              <p class="text-sm text-gray-500">{{ product.supplier }}</p>
-            </td>
-            <td class="px-6 py-4 font-mono text-sm text-gray-600">{{ product.batchNumber }}</td>
-            <td class="px-6 py-4 text-gray-600">{{ product.category }}</td>
-            <td class="px-6 py-4" :class="isExpired(product.expiryDate) ? 'text-red-600 font-medium' : 'text-gray-600'">
-              {{ product.expiryDate ? new Date(product.expiryDate).toLocaleDateString() : '-' }}
-            </td>
-            <td class="px-6 py-4">
-              <span :class="['font-bold', isLowStock(product) ? 'text-red-600' : 'text-gray-800']">{{ product.stock }}</span>
-              <span class="text-xs text-gray-400 ml-1">/ min {{ product.minStockLevel || 10 }}</span>
-            </td>
-            <td class="px-6 py-4 font-medium text-gray-800">{{ formatCurrency(product.price) }}</td>
-            <td class="px-6 py-4">
-              <span v-if="isExpired(product.expiryDate)" class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">Expired</span>
-              <span v-else-if="isLowStockIgnored(product)" class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">Low Stock (Ignored)</span>
-              <span v-else-if="isLowStock(product)" class="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">Low Stock</span>
-              <span v-else class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">OK</span>
-            </td>
-            <td class="px-6 py-4">
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-if="!isExpired(product.expiryDate)"
-                  @click="openRestockModal(product)"
-                  class="px-2.5 py-1 text-xs font-medium rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
-                >
-                  Restock
-                </button>
-                <button
-                  v-if="isLowStock(product)"
-                  @click="ignoreLowStock(product)"
-                  class="px-2.5 py-1 text-xs font-medium rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
-                >
-                  Ignore Low Stock
-                </button>
-                <button
-                  v-if="isExpired(product.expiryDate)"
-                  @click="removeExpired(product)"
-                  class="px-2.5 py-1 text-xs font-medium rounded bg-red-50 text-red-700 hover:bg-red-100"
-                >
-                  Remove Expired
-                </button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="filteredProducts.length === 0">
-            <td colspan="8" class="px-6 py-8 text-center text-gray-400">No products found</td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
-    </div>
+  <MainLayout title="Inventory" subtitle="Check current stock, add products and record deliveries">
+    <ErrorNotice :error="store.error || (!showForm && !restock ? error : null)" :retry="refresh" /><p v-if="notice" role="status" class="mb-4 text-green-800">{{ notice }}</p>
+    <div class="grid grid-cols-3 gap-3 mb-4"><div class="panel">Products <strong class="block text-2xl">{{ store.summary.total }}</strong></div><div class="panel">Low stock <strong class="block text-2xl">{{ store.summary.low }}</strong></div><div class="panel">Expired <strong class="block text-2xl">{{ store.summary.expired }}</strong></div></div>
+    <div class="panel mb-4 flex flex-wrap items-end gap-3"><label class="flex-1">Find a product<input v-model="search" class="field mt-1" placeholder="Name, code or barcode" /></label><label>Show<select v-model="status" class="field mt-1"><option value="all">All products</option><option value="low">Low stock</option><option value="expired">Expired</option><option value="expiring">Expiry within 90 days</option></select></label><button v-if="canAdd" class="primary" @click="showForm = true; error = null">Add product</button><router-link v-if="route.query.product" to="/inventory" class="secondary">Show all products</router-link></div>
+    <p v-if="store.loading" role="status" class="mb-3">Loading stock…</p>
+    <div class="panel overflow-x-auto p-0"><table class="w-full min-w-[760px]"><thead class="bg-gray-50"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-left">Batch / expiry</th><th class="p-3 text-left">Stock</th><th class="p-3 text-left">Price</th><th class="p-3 text-left">Actions</th></tr></thead><tbody><tr v-for="product in store.products" :key="product.id" class="border-t border-gray-200"><td class="p-3"><strong>{{ product.name }}</strong><p class="text-sm text-gray-600">{{ product.productCode }} · {{ product.supplier }}</p></td><td class="p-3">{{ product.batchNumber }}<p class="text-sm">{{ product.expiryDate?.slice(0,10) }}</p></td><td class="p-3">{{ product.quantity }}<p class="text-sm text-gray-600">Low at {{ product.reorderLevel }}</p><p class="text-sm text-red-800" v-if="product.expired">Expired — do not sell</p></td><td class="p-3">{{ currency(product.sellingPrice) }}</td><td class="p-3"><div class="flex gap-2"><button v-if="canEdit && !product.expired" class="secondary" :disabled="saving" title="Record units received in a delivery" @click="restock = product; quantity = 1; note = ''; error = null">Add stock</button><button v-if="role === 'admin'" class="secondary text-red-800" :disabled="saving" @click="deactivate(product)">Deactivate</button></div></td></tr></tbody></table><div v-if="!store.loading && !store.products.length && !store.error" class="p-6 text-center"><p>No products match these filters.</p><p class="text-sm text-gray-600 my-2">Add your first product or clear the search to see available records.</p><button v-if="canAdd" class="primary" @click="showForm = true">Add product</button><button v-else class="secondary" @click="search = ''; status = 'all'; load()">Clear filters</button></div><PaginationControls :pagination="store.pagination" :loading="store.loading" @change="load" /></div>
+    <AppDialog :open="showForm" title="Add product" :dismissible="!saving" @close="showForm = false">
+      <form @submit.prevent="saveProduct"><ErrorNotice :error="error" /><div class="grid sm:grid-cols-2 gap-3"><label v-for="[name,label,type,help] in inputs" :key="name">{{ label }}<input v-model="form[name]" :type="type" :required="name !== 'barcode'" :min="type === 'number' ? 0 : undefined" :step="name === 'sellingPrice' ? '0.01' : type === 'number' ? '1' : undefined" :aria-invalid="invalid(name)" :aria-describedby="`help-${name}`" class="field mt-1" /><span :id="`help-${name}`" class="block text-sm text-gray-600">{{ invalid(name) ? 'Please check this value.' : help }}</span></label></div><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Save product' }}</button></form>
+    </AppDialog>
+    <AppDialog :open="!!restock" title="Add stock" :dismissible="!saving" @close="restock = null"><form @submit.prevent="addStock"><p class="mb-3">Record a delivery of {{ restock?.name }}. New units are added to the latest stock count.</p><ErrorNotice :error="error" /><label class="block mb-3">Units received<input v-model.number="quantity" type="number" min="1" step="1" required class="field mt-1" /></label><label class="block">Delivery note or reason<input v-model="note" maxlength="500" required class="field mt-1" placeholder="Supplier and invoice, or a short reason" /></label><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Add stock' }}</button></form></AppDialog>
   </MainLayout>
 </template>
