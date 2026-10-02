@@ -9,6 +9,9 @@ ALTER TABLE sales ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMP;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS reversal_reason TEXT;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS reversal_kind VARCHAR(20);
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS reversed_by INTEGER REFERENCES users(id);
+ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS idempotency_key UUID;
+ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS request_hash CHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS mvp_stock_request_key ON stock_movements(user_id,idempotency_key) WHERE idempotency_key IS NOT NULL;
 ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS product_name VARCHAR(200);
 -- Re-applying after a down migration restores all archived financial/read state.
 DO $$ BEGIN
@@ -16,6 +19,10 @@ DO $$ BEGIN
     UPDATE sales s SET idempotency_key=a.idempotency_key,request_hash=a.request_hash,subtotal_amount=a.subtotal_amount,tax_amount=a.tax_amount,tax_rate_bps=a.tax_rate_bps,status=a.status,reversed_at=a.reversed_at,reversal_reason=a.reversal_reason,reversal_kind=a.reversal_kind,reversed_by=a.reversed_by FROM mvp_archive_sales_state a WHERE s.id=a.id;
     UPDATE sale_items si SET product_name=a.product_name FROM mvp_archive_item_state a WHERE si.id=a.id;
     DROP TABLE mvp_archive_sales_state, mvp_archive_item_state;
+  END IF;
+  IF to_regclass('mvp_archive_stock_state') IS NOT NULL THEN
+    UPDATE stock_movements sm SET idempotency_key=a.idempotency_key,request_hash=a.request_hash FROM mvp_archive_stock_state a WHERE sm.id=a.id;
+    DROP TABLE mvp_archive_stock_state;
   END IF;
   IF to_regclass('mvp_archive_financial_transactions') IS NOT NULL THEN ALTER TABLE mvp_archive_financial_transactions RENAME TO financial_transactions; END IF;
   IF to_regclass('mvp_archive_expense_audit') IS NOT NULL THEN ALTER TABLE mvp_archive_expense_audit RENAME TO expense_audit; END IF;

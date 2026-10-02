@@ -3,7 +3,7 @@ const c=require('../controllers/productsController');
 const {createProductSchema,updateProductSchema}=require('../validators/productValidator');
 const {Joi,validate,idParam,pageFields}=require('../../lib/validation');
 const {authenticate,authorize,ROLES}=require('../../middleware/roleMiddleware');
-const query=Joi.object({...pageFields,category:Joi.string().trim().max(100).allow(''),search:Joi.string().trim().max(100).allow(''),barcode:Joi.string().trim().max(100),sellable:Joi.boolean(),status:Joi.string().valid('all','low','expired','expiring'),id:Joi.number().integer().positive(),days:Joi.number().integer().min(0).max(3650)});
+const query=Joi.object({...pageFields,limit:pageFields.limit.default(50),category:Joi.string().trim().max(100).allow(''),search:Joi.string().trim().max(100).allow(''),barcode:Joi.string().trim().max(100),sellable:Joi.boolean(),status:Joi.string().valid('all','low','expired','expiring'),id:Joi.number().integer().positive(),days:Joi.number().integer().min(0).max(3650)});
 router.use(authenticate);
 router.get('/',validate(query,'query'),c.getAllProducts);
 router.get('/summary',c.getSummary);
@@ -12,6 +12,6 @@ router.get('/expiring',validate(query,'query'),(req,res,next)=>{req.validatedQue
 router.get('/:id',validate(idParam,'params'),c.getProductById);
 router.post('/',authorize(ROLES.ADMIN,ROLES.PHARMACIST),validate(createProductSchema),c.createProduct);
 router.put('/:id',authorize(ROLES.ADMIN,ROLES.PHARMACIST,ROLES.STORE_MANAGER),validate(idParam,'params'),validate(updateProductSchema),c.updateProduct);
-router.post('/:id/restock',authorize(ROLES.ADMIN,ROLES.PHARMACIST,ROLES.STORE_MANAGER),validate(idParam,'params'),validate(Joi.object({quantity:Joi.number().integer().min(1).max(1000000).required(),reason:Joi.string().trim().min(3).max(500).required()}).required()),c.restockProduct);
+router.post('/:id/restock',authorize(ROLES.ADMIN,ROLES.PHARMACIST,ROLES.STORE_MANAGER),validate(idParam,'params'),validate(Joi.object({idempotencyKey:Joi.string().guid({version:'uuidv4'}).required(),quantity:Joi.number().integer().min(1).max(1000000).required(),reason:Joi.string().trim().min(3).max(500).required()}).required()),c.restockProduct);
 router.delete('/:id',authorize(ROLES.ADMIN),validate(idParam,'params'),c.deleteProduct);
 module.exports=router;
