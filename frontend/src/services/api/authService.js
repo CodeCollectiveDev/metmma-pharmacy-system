@@ -1,29 +1,6 @@
-import apiClient from './apiClient';
-
+import apiClient from './apiClient'
 export const authService = {
-    login: async (username, password) => {
-        try {
-            const response = await apiClient.post('/auth/login', { username, password });
-            return response.data;
-        } catch (error) {
-            console.error('[AuthService] Login error:', error);
-            throw error;
-        }
-    },
-
-    register: async (userData) => {
-        try {
-            const response = await apiClient.post('/auth/register', userData);
-            return response.data;
-        } catch (error) {
-            console.error('[AuthService] Registration error:', error);
-            throw error;
-        }
-    },
-
-    logout: () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('user');
-    }
-};
+  login: async (username, password) => (await apiClient.post('/auth/login', { username, password })).data,
+  register: async userData => (await apiClient.post('/auth/register', userData)).data,
+  logout: () => { ['token', 'role', 'user'].forEach(key => localStorage.removeItem(key)) }
+}

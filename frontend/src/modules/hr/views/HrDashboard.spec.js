@@ -3,18 +3,16 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import HrDashboard from './HrDashboard.vue'
 import { dataService } from '@/services/api/dataService'
-import { dataOrchestrator } from '@/services/data/dataOrchestrator'
 import { createRequire } from 'node:module'
 
-vi.mock('@/services/api/dataService', () => ({ dataService: { addEmployee: vi.fn(), getEmployees: vi.fn() } }))
-vi.mock('@/services/data/dataOrchestrator', () => ({ dataOrchestrator: { fetchCollection: vi.fn() } }))
-vi.mock('@/pouchdb', () => ({ getAll: vi.fn().mockResolvedValue([]), save: vi.fn(), remove: vi.fn() }))
+vi.mock('@/services/api/dataService', () => ({ dataService: { addEmployee: vi.fn(), getEmployees: vi.fn(), markAttendance: vi.fn() } }))
 const { employeeCreateSchema } = createRequire(import.meta.url)('../../../../../backend/api/validators/employeeValidators.js')
 
 beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
-    dataOrchestrator.fetchCollection.mockResolvedValue([])
+    localStorage.setItem('role','admin')
+    dataService.getEmployees.mockResolvedValue({data:{data:[],pagination:{page:1,total:0,totalPages:0,hasMore:false}}})
 })
 
 const fillForm = async () => {
@@ -53,11 +51,13 @@ it('submits an accepted employee contract from the form and displays returned de
 
 it('keeps the form and displays field validation errors', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    dataService.addEmployee.mockRejectedValue({ response: { data: { error: 'Validation error', details: [{ message: 'email must be valid' }] } } })
+    dataService.addEmployee.mockRejectedValue({ response: { status:400,data: { code:'VALIDATION',errors: [{ field:'email',message: 'private' }] } } })
     const wrapper = await fillForm()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect(wrapper.get('[role="alert"]').text()).toBe('email must be valid')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Please check')
+    expect(wrapper.text()).toContain('Check email')
+    expect(wrapper.text()).not.toContain('private')
     expect(wrapper.find('form').exists()).toBe(true)
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
     wrapper.unmount()

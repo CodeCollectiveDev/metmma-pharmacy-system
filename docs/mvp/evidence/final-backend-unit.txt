@@ -1,0 +1,21 @@
+
+> backend@1.0.0 test
+> node --test test/*.test.js
+
+✔ required request bodies cannot bypass field validation (8.147952ms)
+✔ checkout accepts the established contract and rejects invalid required fields (12.420762ms)
+✔ checkout validation passes safe field paths to the error handler (0.553549ms)
+✔ employee creation keeps required persistence fields, including an optional role (15.248296ms)
+✔ employee validation remains compatible with existing API departments and update roles (4.890294ms)
+✔ attendance validation exactly matches the SQL domain and normalizes old casing (2.31584ms)
+✔ catalogue returns coherent filtered page metadata and stable ordering (4.787979ms)
+✔ empty and past-end pages have no more results (0.246669ms)
+✔ page validation caps oversized requests and rejects invalid pagination (4.843423ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 960.293061

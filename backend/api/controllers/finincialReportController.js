@@ -1,23 +1,4 @@
-const pool = require('../db');
-
-exports.getFinancialReports = async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM financial_reports');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-exports.createFinancialReport = async (req, res) => {
-  const { revenue, expenses, profit, created_by } = req.body;
-  try {
-    await pool.query(
-      'INSERT INTO financial_reports (report_date, revenue, expenses, profit, created_by) VALUES (NOW(), $1, $2, $3, $4)',
-      [revenue, expenses, profit, created_by]
-    );
-    res.status(201).send('Financial report created');
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+const db=require('../db');
+const {paging}=require('../../lib/validation');
+exports.getFinancialReports=async(req,res)=>{const q=req.validatedQuery,count=(await db.query('SELECT COUNT(*) FROM financial_reports')).rows[0].count;const r=await db.query('SELECT id,report_date,total_revenue,total_costs,expenses_breakdown,created_at,created_by FROM financial_reports ORDER BY report_date DESC,id DESC LIMIT $1 OFFSET $2',[q.limit,(q.page-1)*q.limit]);res.json({success:true,data:r.rows,pagination:paging(q,count,r.rowCount)});};
+exports.createFinancialReport=async(req,res)=>{const d=req.body;const r=await db.query(`INSERT INTO financial_reports(report_date,total_revenue,total_costs,expenses_breakdown,created_by) VALUES($1,$2,$3,$4,$5) RETURNING id`,[d.period_end,d.total_revenue,d.total_expenses,JSON.stringify(d),req.user.id]);res.status(201).json({success:true,data:r.rows[0]});};

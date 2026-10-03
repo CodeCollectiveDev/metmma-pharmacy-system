@@ -1,89 +1,51 @@
-# METMMA Pharmacy Management System
+# METMMA Pharmacy Management System — hardened MVP
 
-A local-first pharmacy management system built with:
+Vue 3, Vite, Tailwind and Pinia frontend; Express 5 and PostgreSQL backend. Stock and money are confirmed by the server. A failed checkout keeps a per-user cart and a retry reference.
 
-- Frontend: Vue 3 + Vite + Tailwind CSS + PouchDB
-- Backend: Node.js + Express + PostgreSQL
-- Auth: JWT-based role authentication
-- Sync: Offline-first with local-to-local sync
+Deployment: follow the [VPS + Neon + R2 runbook](docs/DEPLOYMENT_VPS.md) for GitHub Actions, Vercel/Netlify and local Docker development. Also read the [pre-change audit](docs/mvp/AUDIT.md), [final report](docs/mvp/FINAL_REPORT.md) and [business release checklist](docs/mvp/DEPLOYMENT_CHECKLIST.md).
 
----
+## Development
 
-## Repository Structure
+Use Node 22.12+ and PostgreSQL 16. Install both supplied lockfiles:
 
-backend/ → Express API & PostgreSQL logic
+~~~sh
+npm ci --prefix backend
+npm ci --prefix frontend
+~~~
 
-frontend/ → Vue 3 frontend app
+Start the isolated local PostgreSQL databases. Development commands explicitly use ports 55432 (app) and 55433 (integration tests), overriding database settings in your existing `.env`. No Neon credentials are needed.
 
-docs/ → API contracts, DB design, sprint plans
+~~~sh
+docker compose up -d --wait
+npm run migrate:dev --prefix backend
+# Optional first local admin: securely export BOOTSTRAP_USERNAME and BOOTSTRAP_PASSWORD.
+npm run bootstrap:dev --prefix backend
+npm run dev --prefix backend
+~~~
 
-postman/ → Postman collections
+In another terminal run npm run dev from frontend. Vite serves localhost:5173 and proxies /api to localhost:3000. Separately hosted production frontends need VITE_API_BASE_URL at build time; see frontend/.env.example.
 
----
+## Verification
 
-## Branching Strategy
+~~~sh
+npm run check --prefix backend
+npm test --prefix backend
+npm run check --prefix frontend
+npm test --prefix frontend
+npm run build --prefix frontend
+# Always selects the disposable Docker test database, never Neon.
+npm run test:integration:local --prefix backend
+python3 -m unittest discover -s deploy/tests -p 'test_*.py'
+~~~
 
-- `main` → production-ready (protected)
-- `develop` → integration branch (default)
-- Feature branches:
-  - `feat/<feature-name>`
-  - `fix/<bug-name>`
-  - `chore/<task-name>`
+Integration suites create unique schemas and remove them afterward. Check scripts validate JavaScript syntax and Vue templates; ESLint and static type checks are not configured. Results and the separate browser harness are in docs/mvp/evidence.
 
-🚫 No direct commits to `main` or `develop`
+## Workflows
 
----
+Sell items, inventory and deliveries, receipts and administrator reversals, real stock/expiry notifications, income and expenses, staff/attendance, bounded reports, and Help with a resumable tour. Suppliers remain a product text field; customers remain an optional receipt name.
 
-## Git Workflow
+Administrators manage sign-ins in Accounts, link existing staff, or create a staff record automatically with a new account. Administrators and HR officers manage leave in Leave. Camera scanning is available in Sell items and Inventory; USB scanners and manual entry remain supported. Roles are enforced on the server. Old IndexedDB pending records remain available for administrator download and manual reconciliation; they are never automatically replayed.
 
-1. Pull latest `develop`
-2. Create feature branch
-3. Commit small, clear changes
-4. Push branch
-5. Open PR → `develop`
-6. Require at least 1 review
+Serve frontend/dist over HTTPS, run backend/npm start under a process manager or hosting service, and migrate before accepting writes. Follow the release checklist for real-data checks, backup/restore, smoke tests and rollback.
 
----
-
-## Backend Rules
-
-- Use Joi validation on every API input
-- Role-based middleware required
-- No business logic inside routes
-- Environment variables via `.env` (never commit secrets)
-
----
-
-## Frontend Rules
-
-- Offline-first: PouchDB is source of truth
-- Only FE Architect touches sync service
-- Use shared helpers for DB access
-- No direct API calls outside services
-
----
-
-## Sprint Plan
-
-This project follows a **7-day sprint plan**.
-See `docs/sprint-plan.md` for daily tasks.
-
----
-
-## Communication
-
-- GitHub Issues → tasks & bugs
-- Slack/Discord → quick questions
-- PRs must reference issues
-
----
-
-## Ownership
-
-- Backend Lead: Joshua
-- 
-  Core Team: Patrick, Gilbert
-  
-- Frontend Lead: Mike
-- 
-  Core Team: Debora, Praise, Fatsani
+See [the feature comparison and setup notes](docs/STAFF_WORKFLOWS.md) for the develop-branch comparison, required staff-workflow migration and verification limits.

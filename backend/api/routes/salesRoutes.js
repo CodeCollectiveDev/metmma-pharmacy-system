@@ -1,10 +1,10 @@
-const express = require('express');
-const router = express.Router();
-const salesController = require('../controllers/salesController');
-const { validateSale } = require('../validators/salesValidator');
-const { authenticate, authorize, ROLES } = require('../../middleware/roleMiddleware');
-
-router.post('/checkout', authenticate, authorize(ROLES.ADMIN, ROLES.CASHIER, ROLES.PHARMACIST), validateSale, salesController.processSale);
-router.get('/history', authenticate, salesController.getSaleHistory);
-
-module.exports = router;
+const router=require('express').Router();
+const c=require('../controllers/salesController');
+const {validateSale}=require('../validators/salesValidator');
+const {Joi,validate,pageFields,dateFields,idParam}=require('../../lib/validation');
+const {authenticate,authorize,ROLES}=require('../../middleware/roleMiddleware');
+router.use(authenticate);
+router.post('/checkout',authorize(ROLES.ADMIN,ROLES.CASHIER,ROLES.PHARMACIST),validateSale,c.processSale);
+router.get('/history',validate(Joi.object({...pageFields,...dateFields,search:Joi.string().trim().max(100).allow('')}),'query'),c.getSaleHistory);
+router.post('/:id/reverse',authorize(ROLES.ADMIN),validate(idParam,'params'),validate(Joi.object({reason:Joi.string().trim().min(3).max(500).required(),kind:Joi.string().valid('refund','void').required()}).required()),c.reverseSale);
+module.exports=router;

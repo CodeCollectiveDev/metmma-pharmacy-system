@@ -34,7 +34,7 @@ export const useRole = () => {
   )
 
   const canAccessPos = computed(() =>
-    [ROLES.ADMIN, ROLES.CASHIER].includes(userRole.value)
+    [ROLES.ADMIN, ROLES.CASHIER, ROLES.PHARMACIST].includes(userRole.value)
   )
 
   const hasHigherOrEqualRole = (minRole) => {

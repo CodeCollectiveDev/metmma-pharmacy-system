@@ -1,0 +1,14 @@
+[Unit]
+Description=Back up METMMA Neon database to Cloudflare R2
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=metmma
+Group=metmma
+WorkingDirectory=/opt/metmma
+ExecStart=/bin/bash /opt/metmma/current/backup-now.sh
+TimeoutStartSec=2h
+UMask=0077

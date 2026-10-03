@@ -1,0 +1,6 @@
+{
+  "javascriptChunksScanned": 13,
+  "fixtureSecretsPresent": [],
+  "applicationConsoleDebugCalls": [],
+  "scope": "Known fixture secrets plus source application console/debugger calls; not a general secret-scanner guarantee."
+}

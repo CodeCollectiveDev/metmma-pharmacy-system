@@ -1,0 +1,19 @@
+{
+  "helper": "scripts/backup.js with container-provided PostgreSQL 16 pg_dump",
+  "format": "custom",
+  "restore": "pg_restore --no-owner --no-privileges into a separate empty synthetic database",
+  "counts": {
+    "users": 5,
+    "products": 1000,
+    "sales": 101,
+    "sale_items": 1,
+    "stock_movements": 1,
+    "financial_transactions": 101,
+    "expense_audit": 0,
+    "notification_reads": 0
+  },
+  "totals": {
+    "sales": "1176.65",
+    "income": "1176.65"
+  }
+}

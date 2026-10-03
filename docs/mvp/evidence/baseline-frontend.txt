@@ -1,0 +1,22 @@
+
+> frontend@0.0.0 test
+> vitest run
+
+
+ RUN  v4.0.18 /workspace/metmma-pharmacy-system-main/frontend
+
+ ✓ src/modules/pos/store/posStore.spec.js (8 tests) 33ms
+stdout | src/services/data/dataOrchestrator.spec.js > preserves offline sales through history refresh and replays the same API contract
+[SyncWorker] Syncing 1 items from transactions
+
+ ✓ src/services/data/dataOrchestrator.spec.js (10 tests) 49ms
+ ✓ src/services/api/dataService.spec.js (9 tests) 18ms
+ ✓ src/modules/hr/views/HrDashboard.spec.js (2 tests) 133ms
+ ✓ src/modules/pos/views/PosView.spec.js (3 tests) 127ms
+ ✓ src/services/data/catalogue.spec.js (2 tests) 64ms
+
+ Test Files  6 passed (6)
+      Tests  34 passed (34)
+   Start at  05:11:04
+   Duration  7.57s (transform 770ms, setup 0ms, import 1.99s, tests 424ms, environment 4.11s)
+

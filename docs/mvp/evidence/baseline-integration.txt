@@ -1,0 +1,19 @@
+
+> backend@1.0.0 test:integration
+> node --test test/integration/*.test.js
+
+✔ all catalogue pages, filters, metadata and low-stock products remain reachable (412.00587ms)
+Sale Error: Insufficient stock for Product 103. Stock: 0, Requested: 2
+✔ frontend checkout payload persists sale fields, lines and a single stock decrement (191.387287ms)
+✔ invalid checkout and unauthorized writes are rejected without inserting records (15.315704ms)
+✔ employee creation persists all submitted fields, generates its identifier and can be read/updated (48.675449ms)
+✔ every supported attendance status persists; Excused fails before PostgreSQL (58.716765ms)
+✔ email migration preserves legacy rows and can run repeatedly (23.944695ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1048.880361

@@ -141,3 +141,15 @@ vite.config.ts.timestamp-*
 # Database backups (keep .gitkeep)
 backups/*.sql
 backups/*.gz
+
+# Release backups may contain patient/staff and financial data.
+backups/*.dump
+backups/*.partial
+
+# Python deployment-test cache
+__pycache__/
+*.pyc
+
+# Real VPS environment files (templates remain tracked)
+deploy/backend.env
+deploy/backup.env

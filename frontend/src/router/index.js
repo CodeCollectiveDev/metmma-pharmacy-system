@@ -24,8 +24,10 @@ const ROLE_HIERARCHY = {
 }
 
 const routes = [
+  { path: '/accounts', component: () => import('@/modules/admin/views/AccountsView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Accounts' } },
+  { path: '/leave', component: () => import('@/modules/hr/views/LeaveView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN, ROLES.HR_OFFICER], label: 'Leave' } },
   { path: '/login', component: Login, meta: { requiresAuth: false } },
-  { path: '/register', component: Register, meta: { requiresAuth: false } },
+  { path: '/register', component: Register, meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Create staff account' } },
 
   { path: '/', redirect: '/dashboard' },
   
@@ -44,8 +46,8 @@ const routes = [
     component: () => import('@/modules/pos/views/PosView.vue'),
     meta: {
       requiresAuth: true,
-      roles: [ROLES.CASHIER, ROLES.ADMIN],
-      label: 'Point of Sale'
+      roles: [ROLES.CASHIER, ROLES.ADMIN, ROLES.PHARMACIST],
+      label: 'Sell items'
     }
   },
   
@@ -92,6 +94,9 @@ const routes = [
     }
   },
 
+  { path: '/sales', component: () => import('@/modules/sales/views/SalesView.vue'), meta: { requiresAuth: true, roles: Object.values(ROLES), label: 'Sales' } },
+  { path: '/finances', component: () => import('@/modules/finances/views/FinancesView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER], label: 'Finances' } },
+
   // 404 catch-all
   {
     path: '/:pathMatch(.*)*',
@@ -114,7 +119,8 @@ router.setPermissionDeniedCallback = (callback) => {
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  const role = localStorage.getItem('role')
+  const role = (localStorage.getItem('role') || '').toLowerCase()
+  if (role && role !== localStorage.getItem('role')) localStorage.setItem('role', role)
 
   // Allow public routes
   if (!to.meta.requiresAuth) {
