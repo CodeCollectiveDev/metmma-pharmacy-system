@@ -138,10 +138,17 @@ jobs:
           umask 077
           ssh_dir=$(mktemp -d "$RUNNER_TEMP/metmma-ssh.XXXXXX")
           trap 'rm -rf "$ssh_dir"' EXIT
-          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
+          key="$ssh_dir/key"
+          key_material=${VPS_SSH_KEY//\\n/$'\n'}
+          printf '%s\n' "$key_material" | tr -d '\r' > "$key"
+          if ! ssh-keygen -y -f "$key" >/dev/null 2>&1; then
+            printf '%s' "$VPS_SSH_KEY" | tr -d '\r' | base64 --decode > "$key"
+          fi
+          chmod 600 "$key"
+          ssh-keygen -y -f "$key" >/dev/null 2>&1
           ssh-keyscan -p "$VPS_PORT" -t ed25519 "$VPS_HOST" > "$ssh_dir/known_hosts" 2>/dev/null
           test -s "$ssh_dir/known_hosts"
-          opts=(-i "$ssh_dir/key" -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          opts=(-i "$key" -o IdentitiesOnly=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
           target="$VPS_USER@$VPS_HOST"
           scp_target="$target"
           if [[ $VPS_HOST == *:* ]]; then scp_target="$VPS_USER@[$VPS_HOST]"; fi
