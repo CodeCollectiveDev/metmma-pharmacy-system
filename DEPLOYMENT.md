@@ -1,4 +1,6 @@
-# 🚀 Deployment Guide — Live on Netlify + Render + Neon
+# Archived: Netlify + Render + Neon deployment
+
+**For the current VPS backend, GitHub Actions, Neon, Cloudflare R2 backups and Docker development setup, use [the VPS deployment runbook](docs/DEPLOYMENT_VPS.md).** The Render instructions below describe the previous hosting setup.
 
 This guide walks you through deploying the METMMA Pharmacy System to production in approximately 30 minutes.
 

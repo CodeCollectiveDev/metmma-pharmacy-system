@@ -4,6 +4,11 @@
   "description": "Express + PostgreSQL backend for METMMA Pharmacy System.",
   "main": "index.js",
   "scripts": {
+    "dev": "node scripts/local.js server",
+    "migrate:dev": "node scripts/local.js migrate",
+    "bootstrap:dev": "node scripts/local.js bootstrap",
+    "test:integration:local": "node scripts/local.js test",
+    "db:init": "node scripts/init-database.js",
     "start": "node server.js",
     "test": "node --test test/*.test.js",
     "test:integration": "node --test test/integration/*.test.js",

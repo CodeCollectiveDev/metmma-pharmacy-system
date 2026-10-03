@@ -1,5 +1,7 @@
 # Weekend release checklist
 
+For the current hosting configuration and commands, use the [VPS + Neon + R2 runbook](../DEPLOYMENT_VPS.md). Retain this checklist's business validation and smoke tests; its Render/local-development instructions predate the VPS setup.
+
 **Do not reopen the uploaded checkout after rollback:** it trusts client totals and can duplicate receipts. Use a maintenance page while resolving a failed rollout. This checklist is reviewable preparation; no production deployment or live-data migration has been run.
 
 ## Environment

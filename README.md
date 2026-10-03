@@ -2,7 +2,7 @@
 
 Vue 3, Vite, Tailwind and Pinia frontend; Express 5 and PostgreSQL backend. Stock and money are confirmed by the server. A failed checkout keeps a per-user cart and a retry reference.
 
-Read the [pre-change audit](docs/mvp/AUDIT.md), [final report](docs/mvp/FINAL_REPORT.md) and [weekend deployment checklist](docs/mvp/DEPLOYMENT_CHECKLIST.md). These supersede the uploaded sprint, offline-sync, backup and deployment instructions.
+Deployment: follow the [VPS + Neon + R2 runbook](docs/DEPLOYMENT_VPS.md) for GitHub Actions, Vercel/Netlify and local Docker development. Also read the [pre-change audit](docs/mvp/AUDIT.md), [final report](docs/mvp/FINAL_REPORT.md) and [business release checklist](docs/mvp/DEPLOYMENT_CHECKLIST.md).
 
 ## Development
 
@@ -13,16 +13,14 @@ npm ci --prefix backend
 npm ci --prefix frontend
 ~~~
 
-Copy backend/.env.example to backend/.env. Supply a database connection and a random JWT_SECRET of at least 32 characters. Locally set DB_SSL=false, NODE_ENV=development, TRUST_PROXY=0 and ALLOWED_ORIGINS=http://localhost:5173.
-
-For a new disposable development database, set DB_PASSWORD in the shell and run docker compose up -d. Init seeds placeholder accounts; the bootstrap below sets a real administrator password. Never reinitialize an existing database.
+Start the isolated local PostgreSQL databases. Development commands explicitly use ports 55432 (app) and 55433 (integration tests), overriding database settings in your existing `.env`. No Neon credentials are needed.
 
 ~~~sh
-cd backend
-npm run migrate
-# Optional new installation: supply BOOTSTRAP_USERNAME and BOOTSTRAP_PASSWORD securely.
-npm run bootstrap:admin
-npm start
+docker compose up -d --wait
+npm run migrate:dev --prefix backend
+# Optional first local admin: securely export BOOTSTRAP_USERNAME and BOOTSTRAP_PASSWORD.
+npm run bootstrap:dev --prefix backend
+npm run dev --prefix backend
 ~~~
 
 In another terminal run npm run dev from frontend. Vite serves localhost:5173 and proxies /api to localhost:3000. Separately hosted production frontends need VITE_API_BASE_URL at build time; see frontend/.env.example.
@@ -35,8 +33,9 @@ npm test --prefix backend
 npm run check --prefix frontend
 npm test --prefix frontend
 npm run build --prefix frontend
-# TEST_DATABASE_URL must point to an isolated disposable PostgreSQL database.
-npm run test:integration --prefix backend
+# Always selects the disposable Docker test database, never Neon.
+npm run test:integration:local --prefix backend
+python3 -m unittest discover -s deploy/tests -p 'test_*.py'
 ~~~
 
 Integration suites create unique schemas and remove them afterward. Check scripts validate JavaScript syntax and Vue templates; ESLint and static type checks are not configured. Results and the separate browser harness are in docs/mvp/evidence.
