@@ -38,6 +38,8 @@ const user = computed(() => {
 
 // All available menu items with visibility conditions
 const allMenuItems = [
+  { path: '/accounts', label: 'Accounts', icon: Users, show: computed(() => userRole.value === 'admin') },
+  { path: '/leave', label: 'Leave', icon: FileText, show: canAccessHr },
   { 
     path: '/dashboard', 
     label: 'Dashboard', 

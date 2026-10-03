@@ -1,6 +1,6 @@
 # METMMA Pharmacy Management System — hardened MVP
 
-Vue 3, Vite, Tailwind and Pinia frontend; Express 5 and PostgreSQL backend. No new application dependencies or frameworks. Stock and money are confirmed by the server. A failed checkout keeps a per-user cart and a retry reference.
+Vue 3, Vite, Tailwind and Pinia frontend; Express 5 and PostgreSQL backend. Stock and money are confirmed by the server. A failed checkout keeps a per-user cart and a retry reference.
 
 Read the [pre-change audit](docs/mvp/AUDIT.md), [final report](docs/mvp/FINAL_REPORT.md) and [weekend deployment checklist](docs/mvp/DEPLOYMENT_CHECKLIST.md). These supersede the uploaded sprint, offline-sync, backup and deployment instructions.
 
@@ -45,6 +45,8 @@ Integration suites create unique schemas and remove them afterward. Check script
 
 Sell items, inventory and deliveries, receipts and administrator reversals, real stock/expiry notifications, income and expenses, staff/attendance, bounded reports, and Help with a resumable tour. Suppliers remain a product text field; customers remain an optional receipt name.
 
-User login accounts and staff records are separate existing domains. Administrators create login accounts from Help. Roles are enforced on the server. Old IndexedDB pending records remain available for administrator download and manual reconciliation; they are never automatically replayed.
+Administrators manage sign-ins in Accounts, link existing staff, or create a staff record automatically with a new account. Administrators and HR officers manage leave in Leave. Camera scanning is available in Sell items and Inventory; USB scanners and manual entry remain supported. Roles are enforced on the server. Old IndexedDB pending records remain available for administrator download and manual reconciliation; they are never automatically replayed.
 
 Serve frontend/dist over HTTPS, run backend/npm start under a process manager or hosting service, and migrate before accepting writes. Follow the release checklist for real-data checks, backup/restore, smoke tests and rollback.
+
+See [the feature comparison and setup notes](docs/STAFF_WORKFLOWS.md) for the develop-branch comparison, required staff-workflow migration and verification limits.

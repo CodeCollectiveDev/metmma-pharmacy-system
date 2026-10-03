@@ -5,7 +5,7 @@ process.env.TZ = process.env.PHARMACY_TIMEZONE || 'UTC';
 const ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: true, ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {}) } : undefined;
 const pool = new Pool({
   ...(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : { host: process.env.DB_HOST || 'localhost', port: Number(process.env.DB_PORT || 5432), database: process.env.DB_NAME || 'metmma_pharmacy', user: process.env.DB_USER, password: process.env.DB_PASSWORD }),
-  max: 20, idleTimeoutMillis: 30000, connectionTimeoutMillis: 2000,
+  max: 20, idleTimeoutMillis: 30000, connectionTimeoutMillis: process.env.DATABASE_URL ? 10000 : 2000,
   statement_timeout: 5000, query_timeout: 6000,
   options: `-c timezone=${process.env.PHARMACY_TIMEZONE || 'UTC'}`, ssl
 });

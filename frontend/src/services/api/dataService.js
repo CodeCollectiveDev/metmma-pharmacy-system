@@ -16,6 +16,7 @@ export const dataService = {
   addEmployee: employee => apiClient.post('/employees', employee),
   updateEmployee: employee => { const { id, _id, ...body } = employee; return apiClient.put(`/employees/${id || _id}`, body) },
   deleteEmployee: employee => apiClient.delete(`/employees/${employee.id || employee._id}`),
+  getAttendanceHistory: (params = {}) => apiClient.get('/attendance', { params }),
   getAttendance: (id, params = {}) => apiClient.get(`/attendance/employee/${id}`, { params }),
   markAttendance: record => apiClient.post('/attendance', record),
   getRecentActivity: () => apiClient.get('/reports/recent-activity'),

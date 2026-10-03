@@ -1,9 +1,12 @@
 const router=require('express').Router();
 const c=require('../controllers/attendanceControllers');
 const {attendanceSchema,employeeIdParam}=require('../validators/attendanceValidators');
-const {validate,pageQuery}=require('../../lib/validation');
+const {Joi,validate,pageFields,dateFields}=require('../../lib/validation');
 const {authenticate,authorize,ROLES}=require('../../middleware/roleMiddleware');
+const query=Joi.object({...pageFields,...dateFields,employee_id:Joi.number().integer().positive(),search:Joi.string().trim().max(100).allow(''),status:Joi.string().valid('present','absent','late','leave','holiday')});
 router.use(authenticate);
-router.get('/employee/:employee_id',authorize(ROLES.ADMIN,ROLES.HR_OFFICER,ROLES.STORE_MANAGER,ROLES.PHARMACIST),validate(employeeIdParam,'params'),validate(pageQuery,'query'),c.getAttendanceByEmployee);
+router.get('/',authorize(ROLES.ADMIN,ROLES.HR_OFFICER,ROLES.STORE_MANAGER,ROLES.PHARMACIST),validate(query,'query'),c.getAttendance);
+router.get('/day',authorize(ROLES.ADMIN,ROLES.HR_OFFICER,ROLES.STORE_MANAGER,ROLES.PHARMACIST),validate(query.fork(['start'],schema=>schema.required()),'query'),c.getDailyAttendance);
+router.get('/employee/:employee_id',authorize(ROLES.ADMIN,ROLES.HR_OFFICER,ROLES.STORE_MANAGER,ROLES.PHARMACIST),validate(employeeIdParam,'params'),validate(query,'query'),c.getAttendanceByEmployee);
 router.post('/',authorize(ROLES.ADMIN,ROLES.HR_OFFICER,ROLES.STORE_MANAGER),validate(attendanceSchema),c.addAttendance);
 module.exports=router;

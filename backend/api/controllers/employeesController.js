@@ -2,7 +2,7 @@ const db=require('../db');
 const {randomUUID}=require('node:crypto');
 const {AppError}=require('../../lib/errors');
 const {paging}=require('../../lib/validation');
-const columns='id,employee_id,first_name,last_name,email,phone_number,role,hire_date,salary,department,position,is_active';
+const columns='id,user_id,employee_id,first_name,last_name,email,phone_number,role,hire_date,salary,department,position,is_active';
 exports.getEmployees=async(req,res)=>{const q=req.validatedQuery,v=[],where=q.search?(v.push(`%${q.search}%`),`WHERE first_name ILIKE $1 OR last_name ILIKE $1 OR position ILIKE $1`):'';const count=(await db.query(`SELECT COUNT(*) FROM employees ${where}`,v)).rows[0].count;v.push(q.limit,(q.page-1)*q.limit);const r=await db.query(`SELECT ${columns} FROM employees ${where} ORDER BY first_name,id LIMIT $${v.length-1} OFFSET $${v.length}`,v);res.json({success:true,data:r.rows,pagination:paging(q,count,r.rowCount)});};
 exports.getEmployeeById=async(req,res)=>{const row=(await db.query(`SELECT ${columns} FROM employees WHERE id=$1`,[req.params.id])).rows[0];if(!row)throw new AppError('NOT_FOUND',404);res.json(row);};
 exports.addEmployee=async(req,res)=>{const d=req.body;const r=await db.query(`INSERT INTO employees(employee_id,first_name,last_name,role,hire_date,salary,email,department,position,phone_number) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${columns}`,[`EMP-${randomUUID()}`,d.first_name,d.last_name,d.role,d.hire_date,d.salary,d.email,d.department,d.job_title,d.phone]);res.status(201).json({success:true,data:r.rows[0]});};

@@ -6,6 +6,8 @@ router.get('/',(req,res)=>res.json({service:'METMMA Pharmacy API'}));
 router.get('/health',async(req,res)=>{try{await db.query('SELECT 1');await db.query('SELECT s.idempotency_key,f.id FROM sales s CROSS JOIN financial_transactions f LIMIT 0');res.json({status:'OK'});}catch(err){console.error(JSON.stringify({requestId:req.requestId,event:'readiness_failed',error:err.message}));throw new AppError('UNAVAILABLE',503);}});
 router.get('/config',(req,res)=>res.json({currency:'MWK',taxRateBps:require('../lib/money').taxRate(),timeZone:process.env.PHARMACY_TIMEZONE || 'UTC'}));
 const auth=require('./authRoutes');router.use('/auth',auth);router.use('/login',auth.loginRouter);
+router.use('/accounts',require('../api/routes/accountsRoutes'));
+router.use('/leave',require('../api/routes/leaveRoutes'));
 router.use('/products',require('../api/routes/productsRoutes'));
 router.use('/sales',require('../api/routes/salesRoutes'));
 router.use('/notifications',require('../api/routes/notificationsRoutes'));

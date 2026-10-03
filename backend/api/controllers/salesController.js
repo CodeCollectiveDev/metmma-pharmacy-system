@@ -3,15 +3,17 @@ const db = require('../db');
 const { AppError } = require('../../lib/errors');
 const { paging, dateFilter } = require('../../lib/validation');
 const { minor, decimal, tax, taxRate } = require('../../lib/money');
+const { paymentAmounts } = require('../../lib/payment');
 const hash = body => createHash('sha256').update(JSON.stringify(body)).digest('hex');
 async function saleData(client,id) {
   const sale = (await client.query(`SELECT s.*,u.username FROM sales s LEFT JOIN users u ON u.id=s.user_id WHERE s.id=$1`,[id])).rows[0];
   const items = (await client.query(`SELECT si.product_id AS "productId",si.product_name AS name,si.quantity,si.unit_price AS "unitPrice",si.subtotal,p.quantity AS "remainingStock" FROM sale_items si LEFT JOIN products p ON p.id=si.product_id WHERE si.sale_id=$1 ORDER BY si.id`,[id])).rows;
-  return { id:sale.id,receiptNumber:sale.receipt_number,date:sale.created_at,subtotal:sale.subtotal_amount,tax:sale.tax_amount,totalAmount:sale.total_amount,paymentMethod:sale.payment_method,customerName:sale.customer_name,userId:sale.user_id,cashier:sale.username,status:sale.status,items };
+  return { id:sale.id,receiptNumber:sale.receipt_number,date:sale.created_at,subtotal:sale.subtotal_amount,tax:sale.tax_amount,totalAmount:sale.total_amount,amountReceived:sale.amount_received,changeGiven:sale.change_given,paymentMethod:sale.payment_method,customerName:sale.customer_name,userId:sale.user_id,cashier:sale.username,status:sale.status,items };
 }
 async function processSale(req,res) {
   const body = req.body;
   const canonical = {items:[...body.items].sort((a,b)=>a.productId-b.productId).map(i=>({productId:i.productId,quantity:i.quantity,unitPrice:decimal(minor(i.unitPrice)),subtotal:decimal(minor(i.subtotal))})),totalAmount:decimal(minor(body.totalAmount)),paymentMethod:body.paymentMethod,customerName:body.customerName || null};
+  if (body.amountReceived !== undefined) canonical.amountReceived = decimal(minor(body.amountReceived));
   const requestHash = hash(canonical);
   const result = await db.transaction(async client => {
     // Serializes retries before any insert or stock check. Hash collisions only serialize unrelated requests.
@@ -19,8 +21,18 @@ async function processSale(req,res) {
     const previous = (await client.query('SELECT id,request_hash FROM sales WHERE user_id=$1 AND idempotency_key=$2',[req.user.id,body.idempotencyKey])).rows[0];
     if (previous) { if (previous.request_hash !== requestHash) throw new AppError('CHECKOUT_KEY_CONFLICT',409); return { data:await saleData(client,previous.id),replayed:true }; }
     const ids = canonical.items.map(i=>i.productId);
-    const locked = (await client.query(`SELECT id,name,quantity,selling_price,is_active,expiry_date>=CURRENT_DATE AS valid_expiry FROM products WHERE id=ANY($1::int[]) ORDER BY id FOR UPDATE`,[ids])).rows;
-    if (locked.length !== ids.length || locked.some(p=>!p.is_active || !p.valid_expiry)) throw new AppError('PRODUCT_UNAVAILABLE',409);
+    const locked = (await client.query(`SELECT id,name,quantity,selling_price,is_active,expiry_date::text AS expiry_date,expiry_date>=CURRENT_DATE AS valid_expiry FROM products WHERE id=ANY($1::int[]) ORDER BY id FOR UPDATE`,[ids])).rows;
+    const unavailable = body.items.flatMap((item,index)=>{
+      const product=locked.find(p=>Number(p.id)===item.productId);
+      const reason=!product?'missing':!product.is_active?'inactive':!product.valid_expiry?(product.expiry_date?'expired':'missing_expiry'):null;
+      return reason?[{productId:item.productId,reason,expiryDate:product?.expiry_date || null,index}]:[];
+    });
+    if(unavailable.length){
+      const error=new AppError('PRODUCT_UNAVAILABLE',409,unavailable.map(i=>`items.${i.index}.productId`));
+      error.unavailableItems=unavailable.map(({index,...item})=>item);
+      console.warn(JSON.stringify({event:'checkout_product_unavailable',requestId:req.requestId,items:error.unavailableItems}));
+      throw error;
+    }
     let subtotal = 0n;
     for (const item of canonical.items) {
       const product = locked.find(p=>p.id===item.productId);
@@ -32,8 +44,9 @@ async function processSale(req,res) {
     const bps = taxRate(), taxes = tax(subtotal,bps), total = subtotal+taxes;
     if (total>999999999999n) throw new AppError('VALIDATION',400,['totalAmount']);
     if (minor(canonical.totalAmount)!==total) throw new AppError('PRICE_CHANGED',409);
+    const {received,change}=paymentAmounts(total,body.paymentMethod,body.amountReceived);
     const receiptNumber=`REC-${randomUUID()}`;
-    const sale = (await client.query(`INSERT INTO sales(receipt_number,total_amount,payment_method,customer_name,user_id,idempotency_key,request_hash,subtotal_amount,tax_amount,tax_rate_bps) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,[receiptNumber,decimal(total),body.paymentMethod,body.customerName || null,req.user.id,body.idempotencyKey,requestHash,decimal(subtotal),decimal(taxes),bps])).rows[0];
+    const sale = (await client.query(`INSERT INTO sales(receipt_number,total_amount,payment_method,customer_name,user_id,idempotency_key,request_hash,subtotal_amount,tax_amount,tax_rate_bps,amount_received,change_given) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,[receiptNumber,decimal(total),body.paymentMethod,body.customerName || null,req.user.id,body.idempotencyKey,requestHash,decimal(subtotal),decimal(taxes),bps,decimal(received),decimal(change)])).rows[0];
     // Bounded bulk writes, independent of cart size. All locks acquired in product ID order above.
     const quantities = canonical.items.map(i=>i.quantity), names = locked.map(p=>p.name), prices = locked.map(p=>p.selling_price), subtotals = canonical.items.map(i=>decimal(minor(locked.find(p=>p.id===i.productId).selling_price)*BigInt(i.quantity)));
     await client.query(`INSERT INTO sale_items(sale_id,product_id,quantity,unit_price,subtotal,product_name) SELECT $1,product_id,quantity,price,subtotal,name FROM UNNEST($2::int[],$3::int[],$4::numeric[],$5::numeric[],$6::text[]) AS x(product_id,quantity,price,subtotal,name)`,[sale.id,ids,quantities,prices,subtotals,names]);
@@ -52,7 +65,7 @@ async function getSaleHistory(req,res) {
   const count=(await db.query(`SELECT COUNT(*) FROM sales s ${filter}`,values)).rows[0].count;
   values.push(query.limit,(query.page-1)*query.limit);
   const result=await db.query(`WITH selected AS (SELECT s.*,u.username FROM sales s LEFT JOIN users u ON u.id=s.user_id ${filter} ORDER BY s.created_at DESC,s.id DESC LIMIT $${values.length-1} OFFSET $${values.length}) SELECT s.*,COALESCE(lines.items,'[]'::json) AS items FROM selected s LEFT JOIN LATERAL (SELECT json_agg(json_build_object('productId',si.product_id,'name',si.product_name,'quantity',si.quantity,'unitPrice',si.unit_price::text,'subtotal',si.subtotal::text) ORDER BY si.id) AS items FROM sale_items si WHERE si.sale_id=s.id) lines ON TRUE ORDER BY s.created_at DESC,s.id DESC`,values);
-  res.json({success:true,data:result.rows.map(s=>({id:s.id,receiptNumber:s.receipt_number,date:s.created_at,totalAmount:s.total_amount,subtotal:s.subtotal_amount,tax:s.tax_amount,paymentMethod:s.payment_method || 'cash',customerName:s.customer_name,cashier:s.username,status:s.status,items:s.items})),pagination:paging(query,count,result.rowCount)});
+  res.json({success:true,data:result.rows.map(s=>({id:s.id,receiptNumber:s.receipt_number,date:s.created_at,totalAmount:s.total_amount,subtotal:s.subtotal_amount,tax:s.tax_amount,amountReceived:s.amount_received,changeGiven:s.change_given,paymentMethod:s.payment_method || 'cash',customerName:s.customer_name,cashier:s.username,status:s.status,items:s.items})),pagination:paging(query,count,result.rowCount)});
 }
 async function reverseSale(req,res) {
   const result=await db.transaction(async client=>{

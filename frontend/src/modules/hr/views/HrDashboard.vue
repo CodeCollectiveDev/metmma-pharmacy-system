@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import AttendancePanel from '../components/AttendancePanel.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
@@ -9,14 +10,6 @@ import { Plus, Search, UserPlus, Calendar,  } from 'lucide-vue-next'
 
 const store = useHrStore()
 const role = localStorage.getItem('role')
-const attendanceBusy = ref(false)
-const attendanceNotice = ref('')
-async function mark(employee, status) {
-  attendanceBusy.value = true
-  const ok = await store.markAttendance({employee_id: employee.id, date: new Date().toISOString().slice(0,10), status})
-  if (ok) attendanceNotice.value = `${employee.name}: ${status} saved for today.`
-  attendanceBusy.value = false
-}
 function load(page = 1) { return store.fetchEmployees({page,search:searchQuery.value}) }
 const activeTab = ref('employees')
 const showAddForm = ref(false)
@@ -67,10 +60,9 @@ const formatCurrency = (amount) => {
 </script>
 
 <template>
-  <MainLayout title="Staff" subtitle="View staff records and mark today’s attendance">
+  <MainLayout title="Staff" subtitle="View staff records, daily attendance and attendance history">
     <ErrorNotice v-if="!showAddForm" :error="store.employeeError" :retry="load" />
     <p v-if="store.loading" role="status">Loading staff…</p>
-    <p v-if="attendanceNotice" role="status" class="mb-3 text-green-800">{{ attendanceNotice }}</p>
     <!-- Tabs -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
       <div class="flex overflow-x-auto border-b border-gray-100">
@@ -189,30 +181,6 @@ const formatCurrency = (amount) => {
       </div>
     </div>
 
-    <!-- Attendance Tab -->
-    <div v-if="activeTab === 'attendance'" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h3 class="font-semibold text-gray-800 mb-4">Attendance Management</h3>
-      <p class="text-gray-500">Mark daily attendance for employees</p>
-      <div class="mt-6 grid gap-4">
-        <div v-for="emp in store.activeEmployees" :key="emp._id" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-gray-100 rounded-lg">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-medium">
-              {{ emp.name?.charAt(0) }}
-            </div>
-            <div>
-              <p class="font-medium text-gray-800">{{ emp.name }}</p>
-              <p class="text-sm text-gray-500">{{ emp.position }}</p>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button :disabled="attendanceBusy" @click="mark(emp, 'present')" class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors">Present</button>
-            <button :disabled="attendanceBusy" @click="mark(emp, 'absent')" class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors">Absent</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <p v-if="activeTab === 'attendance' && !store.activeEmployees.length" class="panel">No active staff on this page. Select Employees to find or add staff.</p>
-    <PaginationControls v-if="activeTab === 'attendance'" :pagination="store.pagination" :loading="store.loading" @change="load" />
+    <AttendancePanel v-if="activeTab === 'attendance'" />
   </MainLayout>
 </template>

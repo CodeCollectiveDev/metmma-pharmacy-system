@@ -1,5 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const messages = {
+  LEAVE_OVERLAP: 'This employee already has pending or approved leave covering these dates.',
+  PAYMENT_AMOUNT: 'Cash received must cover the total. For other payment methods, enter the exact total received.',
   VALIDATION: 'Please check the highlighted fields and try again.',
   SESSION_EXPIRED: 'Please sign in again to continue.',
   INVALID_CREDENTIALS: 'The username or password is incorrect.',
@@ -33,6 +35,6 @@ function errorHandler(error, req, res, next) {
   const requestId = req.requestId || randomUUID();
   // Full details stay in the server log. Never log request bodies or credentials.
   if (status >= 500 || !(error instanceof AppError)) console.error(JSON.stringify({ requestId, path: req.path, error: error.message, stack: error.stack }));
-  res.status(status).json({ success: false, code, message: messages[code], errors: (error.fields || []).map(field => ({ field, message: 'Please check this value.' })), requestId });
+  res.status(status).json({ ...(error instanceof AppError && error.unavailableItems ? {unavailableItems:error.unavailableItems} : {}), success: false, code, message: messages[code], errors: (error.fields || []).map(field => ({ field, message: 'Please check this value.' })), requestId });
 }
 module.exports = { AppError, requestContext, errorHandler };

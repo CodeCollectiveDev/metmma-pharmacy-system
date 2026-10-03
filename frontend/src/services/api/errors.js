@@ -1,4 +1,7 @@
 const messages = {
+  LEAVE_OVERLAP: 'This employee already has pending or approved leave covering these dates.',
+  BARCODE_AMBIGUOUS: 'More than one product matches this barcode. Search by name and select the correct batch.',
+  PAYMENT_AMOUNT: 'Cash received must cover the total. For other payment methods, enter the exact total received.',
   VALIDATION: 'Please check the highlighted fields and try again.',
   OFFLINE: 'You are offline. Check your connection, then try again.',
   NETWORK: 'We could not reach the pharmacy system. Check your connection and try again.',

@@ -5,13 +5,13 @@ const Joi = require('joi');
  * Fields: employee_id, date, status (matching the database), and optional notes
  */
 const attendanceSchema = Joi.object({
-  employee_id: Joi.number().integer().required()
+  employee_id: Joi.number().integer().positive().required()
     .messages({
       'number.base': 'Employee ID must be a number',
       'any.required': 'Employee ID is required'
     }),
   
-  date: Joi.date().iso().required()
+  date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).custom((value,helpers)=>{const date=new Date(value+'T00:00:00Z');return Number.isFinite(date.getTime()) && date.toISOString().slice(0,10)===value ? value : helpers.error('any.invalid')}).required()
     .messages({
       'date.format': 'Date must be in ISO format (YYYY-MM-DD)',
       'any.required': 'Date is required'
@@ -22,7 +22,7 @@ const attendanceSchema = Joi.object({
       'any.only': 'Status must be one of: present, absent, late, leave, or holiday'
     }),
     
-  check_in: Joi.string().regex(/^([0-9]{2}):([0-9]{2})$/).optional()
+  check_in: Joi.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/).optional()
     .description('Time in HH:mm format'),
 
   notes: Joi.string().max(255).allow('', null).optional()

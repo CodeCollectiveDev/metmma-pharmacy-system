@@ -81,3 +81,8 @@ test('attendance validation exactly matches the SQL domain and normalizes old ca
     assert.ok(attendanceSchema.validate({ employee_id: 1, date: '2026-01-01', status }).error);
   }
 });
+
+test('attendance rejects impossible dates and invalid check-in times',()=>{
+ for(const date of ['2026-02-30','2026-13-01','2026-01-01T12:00:00Z'])assert.ok(attendanceSchema.validate({employee_id:1,date,status:'present'}).error);
+ assert.ok(attendanceSchema.validate({employee_id:1,date:'2026-01-01',status:'present',check_in:'25:70'}).error);
+});

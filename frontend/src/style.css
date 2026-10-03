@@ -15,9 +15,11 @@
   .app-dialog { @apply m-auto w-[calc(100%-2rem)] max-w-xl rounded-xl bg-white text-slate-800 shadow-xl max-h-[90vh] overflow-auto p-0 border-0; }
   .app-dialog::backdrop { background: rgb(15 23 42 / .55); }
 }
+.receipt-print { display: none; }
 @media print {
-  body * { visibility: hidden; }
-  .receipt, .receipt * { visibility: visible; }
-  .receipt { position: absolute; left: 0; top: 0; width: 100%; }
-  .print-hide { display: none; }
+  @page { margin: 10mm; }
+  body > * { display: none !important; }
+  body > .receipt-print { display: block !important; width: 100%; max-width: 80mm; margin: 0 auto; color: #000; background: #fff; }
+  .receipt-print .sale-receipt { font: 12px/1.4 sans-serif; }
+  .receipt-print tr { break-inside: avoid; }
 }

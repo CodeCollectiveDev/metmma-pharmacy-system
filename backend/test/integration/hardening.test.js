@@ -30,7 +30,9 @@ async function product(quantity=10,price='10.00',extras={}){
 }
 function sale(p,quantity=1,overrides={}){return{idempotencyKey:randomUUID(),items:[{productId:p.id,quantity,unitPrice:p.selling_price,subtotal:(Number(p.selling_price)*quantity).toFixed(2)}],totalAmount:(Math.round(Number(p.selling_price)*quantity*100*1.165)/100).toFixed(2),paymentMethod:'cash',...overrides};}
 async function count(table,where='',params=[]){return Number((await pool.query(`SELECT COUNT(*) FROM ${table} ${where}`,params)).rows[0].count);}
-before(async()=>{await admin.query(`CREATE SCHEMA ${schema}`);await pool.query(readFileSync(require.resolve('../../../database/init.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261002_mvp.sql'),'utf8'));await pool.query('UPDATE users SET password_hash=$1',[await bcrypt.hash('TestPassword42',10)]);server=require('../../app').listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${server.address().port}/api`;});
+before(async()=>{await admin.query(`CREATE SCHEMA ${schema}`);await pool.query(readFileSync(require.resolve('../../../database/init.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261002_mvp.sql'),'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_staff_workflows.sql'),'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));await pool.query('UPDATE users SET password_hash=$1',[await bcrypt.hash('TestPassword42',10)]);server=require('../../app').listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${server.address().port}/api`;});
 after(async()=>{if(server)await new Promise(r=>server.close(r));await pool.end();await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin.end();});
 
 test('atomic checkout records exact stock, lines, authenticated actor and one linked income',async()=>{
@@ -160,4 +162,55 @@ test('delivery retries do not add the same stock twice',async()=>{
  const p=await product(10),body={idempotencyKey:randomUUID(),quantity:5,reason:'Supplier delivery'};
  const results=await Promise.all(Array.from({length:5},()=>request(`/products/${p.id}/restock`,{method:'POST',body})));
  assert.ok(results.every(r=>r.status===200));assert.equal((await pool.query('SELECT quantity FROM products WHERE id=$1',[p.id])).rows[0].quantity,15);assert.equal(await count('stock_movements','WHERE product_id=$1',[p.id]),1);
+});
+
+test('account provisioning links employees atomically and management protects access',async()=>{
+ const username='staff-'+randomUUID().slice(0,8);
+ const created=await request('/auth/register',{method:'POST',body:{username,password:'TestPassword42',full_name:'New Staff',role:'cashier',email:'new@example.com'}});
+ assert.equal(created.status,201,JSON.stringify(created.data));const id=created.data.user.id;
+ assert.equal(await count('employees','WHERE user_id=$1',[id]),1);
+ const list=await request('/accounts');assert.equal(list.status,200);assert.ok(list.data.data.every(u=>!('password_hash' in u)));
+ assert.equal((await request('/accounts',{role:'cashier'})).status,403);
+ assert.equal((await request('/accounts/1',{method:'PATCH',body:{is_active:false}})).status,403);
+ const login=await request('/auth/login',{method:'POST',authenticated:false,body:{username,password:'TestPassword42'}});assert.equal(login.status,200);
+ assert.equal((await request(`/accounts/${id}`,{method:'PATCH',body:{password:'ChangedPassword42'}})).status,200);
+ const old=await fetch(base+'/products',{headers:{Authorization:`Bearer ${login.data.token}`}});assert.equal(old.status,401);
+ assert.equal((await request('/auth/login',{method:'POST',authenticated:false,body:{username,password:'TestPassword42'}})).status,401);
+ assert.equal((await request('/auth/login',{method:'POST',authenticated:false,body:{username,password:'ChangedPassword42'}})).status,200);
+ const employee=(await pool.query('SELECT id FROM employees WHERE user_id=$1',[id])).rows[0];
+ const conflict=await request('/auth/register',{method:'POST',body:{username:username+'x',password:'TestPassword42',full_name:'Duplicate',role:'cashier',employee_id:employee.id}});
+ assert.equal(conflict.status,409);assert.equal(await count('users','WHERE username=$1',[username+'x']),0);
+});
+
+test('leave permissions, concurrent overlap protection and terminal transitions',async()=>{
+ const employee=(await pool.query("INSERT INTO employees(employee_id,first_name,last_name,hire_date) VALUES($1,'Leave','Test',CURRENT_DATE) RETURNING id",['LEAVE-'+randomUUID()])).rows[0];
+ const body={employee_id:employee.id,leave_type:'Annual',start_date:today,expected_return_date:today};
+ assert.equal((await request('/leave',{method:'POST',role:'cashier',body})).status,403);
+ const responses=await Promise.all([request('/leave',{method:'POST',role:'hr_officer',body}),request('/leave',{method:'POST',role:'hr_officer',body})]);
+ assert.deepEqual(responses.map(r=>r.status).sort(),[201,409]);
+ const id=responses.find(r=>r.status===201).data.data.id;
+ assert.equal((await request(`/leave/${id}`,{method:'PATCH',role:'hr_officer',body:{status:'approved'}})).status,200);
+ const current=await request(`/leave?status=current&employee_id=${employee.id}`);assert.equal(current.data.data.length,1);
+ assert.equal((await request(`/leave/${id}`,{method:'PATCH',body:{status:'completed'}})).status,200);
+ assert.equal((await request(`/leave/${id}`,{method:'PATCH',body:{status:'approved'}})).status,409);
+ assert.equal((await request(`/leave?status=current&employee_id=${employee.id}`)).data.data.length,0);
+});
+
+test('cash change is saved, replayed and excluded from income; other payments must match',async()=>{
+ const p=await product(10),body={...sale(p),amountReceived:'20.00'};
+ const r=await request('/sales/checkout',{method:'POST',body});assert.equal(r.status,201);assert.equal(r.data.data.amountReceived,'20.00');assert.equal(r.data.data.changeGiven,'8.35');
+ assert.equal((await pool.query('SELECT amount FROM financial_transactions WHERE sale_id=$1',[r.data.saleId])).rows[0].amount,'11.65');
+ const retry=await request('/sales/checkout',{method:'POST',body});assert.equal(retry.status,200);assert.equal(retry.data.data.changeGiven,'8.35');
+ for(const extra of [{amountReceived:'10.00'},{amountReceived:'20.00',paymentMethod:'card'}]){const invalid=await request('/sales/checkout',{method:'POST',body:{...sale(p),...extra}});assert.equal(invalid.status,400);assert.equal(invalid.data.code,'PAYMENT_AMOUNT');}
+});
+
+test('attendance day roster, historical ranges and corrections retain one record per day',async()=>{
+ const e=(await pool.query("INSERT INTO employees(employee_id,first_name,last_name,hire_date) VALUES($1,'Attendance','History',CURRENT_DATE) RETURNING id",['ATT-'+randomUUID()])).rows[0];
+ const body={employee_id:e.id,date:'2026-09-01',status:'present'};
+ assert.equal((await request('/attendance',{method:'POST',body})).status,201);
+ assert.equal((await request('/attendance',{method:'POST',body:{...body,status:'late'}})).status,201);
+ const result=await request(`/attendance?employee_id=${e.id}&start=2026-09-01&end=2026-09-01`);assert.equal(result.data.data.length,1);assert.equal(result.data.data[0].status,'late');assert.equal(result.data.data[0].date,'2026-09-01');
+ assert.equal((await request(`/attendance?employee_id=${e.id}&start=2026-09-02`)).data.data.length,0);
+ const roster=await request('/attendance/day?start=2026-09-01&search=Attendance');assert.ok(roster.data.data.some(r=>r.employee_id===e.id&&r.status==='late'));
+ assert.equal((await request('/attendance?start=2026-02-30')).status,400);
 });

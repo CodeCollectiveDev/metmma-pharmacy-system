@@ -21,7 +21,7 @@ async function signIn() {
     const previous = JSON.parse(localStorage.getItem('user') || '{}')
     const data = await authService.login(previous.username || previous.name, sessionPassword.value)
     if (data.user.id !== previous.id) throw new Error('Different account')
-    localStorage.setItem('token', data.token); localStorage.setItem('role', data.user.role)
+    localStorage.setItem('token', data.token); localStorage.setItem('role', data.user.role.toLowerCase())
     sessionExpired.value = false; sessionPassword.value = ''
   } catch (err) { sessionError.value = userError(err) } finally { signingIn.value = false }
 }
