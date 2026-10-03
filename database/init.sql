@@ -196,15 +196,6 @@ COMMENT ON TABLE financial_reports IS 'Financial performance reports for account
 -- SAMPLE DATA FOR DEVELOPMENT
 -- ============================================
 
--- Sample users (Joshua will update password hashing later)
-INSERT INTO users (username, password_hash, role, full_name, email) VALUES
-('admin', 'temp_hash_admin123', 'admin', 'System Administrator', 'admin@metmma.pharmacy'),
-('pharmacist1', 'temp_hash_pharm123', 'pharmacist', 'Dr. Jane Smith', 'jane@metmma.pharmacy'),
-('cashier1', 'temp_hash_cash123', 'cashier', 'John Doe', 'john@metmma.pharmacy'),
-('manager1', 'temp_hash_mgr123', 'store_manager', 'Sarah Johnson', 'sarah@metmma.pharmacy'),
-('hr1', 'temp_hash_hr123', 'hr_officer', 'Michael Brown', 'michael@metmma.pharmacy')
-ON CONFLICT (username) DO NOTHING;
-
 -- ============================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================

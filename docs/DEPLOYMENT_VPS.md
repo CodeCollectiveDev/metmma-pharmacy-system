@@ -103,9 +103,8 @@ Create the GitHub environment named **`production`**, with these environment sec
 | `VPS_USER` | `metmma` |
 | `VPS_PORT` | SSH port; optional, defaults to `22` |
 | `VPS_SSH_KEY` | Full private deployment SSH key, including BEGIN/END lines; a dedicated key usable without an interactive passphrase |
-| `VPS_KNOWN_HOSTS` | Verified OpenSSH known_hosts line(s) for that host and SSH port |
 
-Obtain the host public-key fingerprint through the VPS provider console (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`). Collect a known_hosts line on a trusted workstation with `ssh-keyscan -p 22 -t ed25519 VPS_HOST`, and compare its fingerprint with the console before storing it. For a custom port the known_hosts entry uses `[host]:port`. The workflow enforces host-key verification; it does not blindly trust a fresh scan during deployment.
+The workflow obtains the VPS ED25519 host key at deployment time with `ssh-keyscan`; `VPS_KNOWN_HOSTS` is not required. This keeps setup compatible with the existing SSH deployment pattern, but does not pin the VPS host key in GitHub. For strict host identity verification, add a verified known-hosts file and restore pinned host-key checking in the workflow.
 
 Database and R2 credentials stay in protected VPS files; GitHub needs only SSH access. Never put them in frontend variables or build arguments. GitHub's environment behavior is documented in [deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
 

@@ -33,6 +33,12 @@ before(async () => {
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261002_mvp.sql'), 'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_staff_workflows.sql'),'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));
+  await pool.query(`INSERT INTO users (username, password_hash, role, full_name, email) VALUES
+    ('test-admin', 'test-hash', 'admin', 'Test Admin', 'test-admin@example.com'),
+    ('test-pharmacist', 'test-hash', 'pharmacist', 'Test Pharmacist', 'test-pharmacist@example.com'),
+    ('test-cashier', 'test-hash', 'cashier', 'Test Cashier', 'test-cashier@example.com'),
+    ('test-manager', 'test-hash', 'store_manager', 'Test Manager', 'test-manager@example.com'),
+    ('test-hr', 'test-hash', 'hr_officer', 'Test HR', 'test-hr@example.com')`);
   await pool.query(`INSERT INTO products (product_code, name, batch_number, expiry_date, quantity, unit_price, selling_price, category)
     SELECT 'TEST-' || n, 'Product ' || LPAD(n::text, 3, '0'), 'B-' || n, '2030-01-01',
            CASE WHEN n = 103 THEN 2 ELSE 100 END, 10, 10, CASE WHEN n > 50 THEN 'Later' ELSE 'First' END
