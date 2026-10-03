@@ -1,0 +1,20 @@
+
+> frontend@0.0.0 test
+> vitest run
+
+
+ RUN  v4.0.18 /workspace/metmma-pharmacy-system-main/frontend
+
+ ✓ src/modules/hr/views/HrDashboard.spec.js (2 tests) 171ms
+ ✓ src/modules/pos/views/PosView.spec.js (3 tests) 135ms
+ ✓ src/modules/pos/store/posStore.spec.js (13 tests) 36ms
+ ✓ src/services/api/dataService.spec.js (4 tests) 10ms
+ ✓ src/services/data/catalogue.spec.js (2 tests) 9ms
+ ✓ src/composables/useTour.spec.js (3 tests) 5ms
+ ✓ src/services/api/errors.spec.js (8 tests) 6ms
+
+ Test Files  7 passed (7)
+      Tests  35 passed (35)
+   Start at  06:51:22
+   Duration  6.22s (transform 475ms, setup 0ms, import 1.34s, tests 372ms, environment 3.52s)
+

@@ -1,19 +1,13 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-
-const employeesRoutes = require('./api/routes/employeesRoutes');
-const reportsRoutes = require('./api/routes/reportsRoutes');
-const attendanceRoutes = require('./api/routes/attendanceRoutes');
-
+const { requestContext, errorHandler, AppError } = require('./lib/errors');
 const app = express();
-app.use(bodyParser.json());
-
-//register routes
-app.use('/api/employees', employeesRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/attendance', attendanceRoutes);
-
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`Pharmacy HR & Reports API running on port ${PORT}`);
-});
+app.disable('x-powered-by');
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY));
+app.use(requestContext);
+require('./middleware/security')(app);
+app.use(express.json({limit:'128kb'}));
+app.get('/',(req,res)=>res.json({service:'METMMA Pharmacy API'}));
+app.use('/api',require('./routes'));
+app.use((req,res,next)=>next(new AppError('NOT_FOUND',404)));
+app.use(errorHandler);
+module.exports = app;

@@ -4,15 +4,23 @@
   "description": "Express + PostgreSQL backend for METMMA Pharmacy System.",
   "main": "index.js",
   "scripts": {
+    "dev": "node scripts/local.js server",
+    "migrate:dev": "node scripts/local.js migrate",
+    "bootstrap:dev": "node scripts/local.js bootstrap",
+    "test:integration:local": "node scripts/local.js test",
+    "db:init": "node scripts/init-database.js",
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "test:integration": "node --test test/integration/*.test.js"
+    "test:integration": "node --test test/integration/*.test.js",
+    "check": "node scripts/check.js",
+    "migrate": "node scripts/migrate.js up",
+    "migrate:down": "node scripts/migrate.js down",
+    "bootstrap:admin": "node scripts/bootstrap-admin.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

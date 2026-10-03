@@ -1,59 +1,33 @@
-import apiClient from './apiClient';
-import { toSalePayload } from './salePayload';
-
+import apiClient from './apiClient'
+import { toSalePayload } from './salePayload'
 export const dataService = {
-    // PRODUCTS
-    getProductPage: (params = {}) => apiClient.get('/products', { params }),
-    // Existing views and offline search need the complete catalogue. Keep each
-    // request at the backend's normal page size and publish only a full result.
-    getProducts: async () => {
-        const products = [];
-        let page = 1;
-        let response;
-        do {
-            response = await dataService.getProductPage({ page });
-            const { data, pagination } = response.data;
-            if (!Array.isArray(data) || !pagination || pagination.page !== page || typeof pagination.hasMore !== 'boolean' ||
-                (pagination.hasMore && data.length === 0)) {
-                throw new Error('Incomplete product pagination response');
-            }
-            products.push(...data);
-            if (!pagination.hasMore) break;
-            page++;
-        } while (true);
-        return { ...response, data: { success: true, count: products.length, data: products } };
-    },
-    addProduct: (product) => apiClient.post('/products', product),
-    updateProduct: (product) => {
-        const productId = product.id || product._id;
-        return apiClient.put(`/products/${productId}`, product);
-    },
-    deleteProduct: (product) => {
-        const productId = product.id || product._id;
-        return apiClient.delete(`/products/${productId}`);
-    },
-
-    // SALES
-    recordSale: (saleData) => apiClient.post('/sales/checkout', toSalePayload(saleData)),
-    getSalesHistory: () => apiClient.get('/sales/history'),
-
-    // EMPLOYEES
-    getEmployees: () => apiClient.get('/employees'),
-    addEmployee: (employee) => apiClient.post('/employees', employee),
-    updateEmployee: (employee) => {
-        const empId = employee.id || employee._id;
-        return apiClient.put(`/employees/${empId}`, employee);
-    },
-    deleteEmployee: (employee) => {
-        const empId = employee.id || employee._id;
-        return apiClient.delete(`/employees/${empId}`);
-    },
-
-    // ATTENDANCE
-    getAttendance: (employeeId) => apiClient.get(`/attendance/${employeeId}`),
-    markAttendance: (record) => apiClient.post('/attendance', record),
-
-    // REPORTS
-    getDailySales: () => apiClient.get('/reports/sales-daily'),
-    getRecentActivity: () => apiClient.get('/reports/recent-activity'),
-};
+  getProductPage: (params = {}) => apiClient.get('/products', { params }),
+  getProduct: id => apiClient.get(`/products/${id}`),
+  getProductSummary: () => apiClient.get('/products/summary'),
+  getConfig: () => apiClient.get('/config'),
+  addProduct: product => apiClient.post('/products', product),
+  updateProduct: product => { const { id, _id, ...body } = product; return apiClient.put(`/products/${id || _id}`, body) },
+  restockProduct: (id, body) => apiClient.post(`/products/${id}/restock`, body),
+  deleteProduct: product => apiClient.delete(`/products/${product.id || product._id}`),
+  recordSale: sale => apiClient.post('/sales/checkout', toSalePayload(sale)),
+  getSalesHistory: (params = {}) => apiClient.get('/sales/history', { params }),
+  reverseSale: (id, body) => apiClient.post(`/sales/${id}/reverse`, body),
+  getEmployees: (params = {}) => apiClient.get('/employees', { params }),
+  addEmployee: employee => apiClient.post('/employees', employee),
+  updateEmployee: employee => { const { id, _id, ...body } = employee; return apiClient.put(`/employees/${id || _id}`, body) },
+  deleteEmployee: employee => apiClient.delete(`/employees/${employee.id || employee._id}`),
+  getAttendanceHistory: (params = {}) => apiClient.get('/attendance', { params }),
+  getAttendance: (id, params = {}) => apiClient.get(`/attendance/employee/${id}`, { params }),
+  markAttendance: record => apiClient.post('/attendance', record),
+  getRecentActivity: () => apiClient.get('/reports/recent-activity'),
+  getDashboard: () => apiClient.get('/dashboard'),
+  getNotifications: (params = {}) => apiClient.get('/notifications', { params }),
+  readNotification: id => apiClient.post(`/notifications/${id}/read`),
+  readAllNotifications: () => apiClient.post('/notifications/read-all'),
+  getTransactions: (params = {}) => apiClient.get('/finances/transactions', { params }),
+  getFinanceSummary: (params = {}) => apiClient.get('/finances/summary', { params }),
+  addExpense: body => apiClient.post('/finances/expenses', body),
+  updateExpense: (id, body) => apiClient.put(`/finances/expenses/${id}`, body),
+  deleteExpense: (id, version) => apiClient.delete(`/finances/expenses/${id}`, { data: { version } }),
+  getExpenseAudit: (id, params = {}) => apiClient.get(`/finances/expenses/${id}/audit`, { params })
+}

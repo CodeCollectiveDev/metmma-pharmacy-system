@@ -1,0 +1,15 @@
+Baseline, audit and implementation history. The final documentation commit follows these entries; git log shows the complete history.
+
+ccaba4f chore: preserve uploaded pharmacy system baseline
+2797f45 docs: record pre-change audit and measured MVP baseline
+7862cc6 feat: guide beginners through accessible server-backed pharmacy workflows
+4ce667c fix: centralize safe errors and enforce real authenticated staff roles
+1f17230 feat: migrate safely and provide atomic stock updates and real notifications
+2a18150 feat: make checkout idempotent and record reconciled income and audited expenses
+64d7b83 fix: make stock delivery retries idempotent and preserve rollback metadata
+7cb785e fix: preserve expense dates and strengthen readiness and input validation
+6ab4017 fix: improve keyboard dialogs expense review and tablet checkout speed
+6d43bdd chore: remove dead features dependencies and unsafe automatic replay
+020f0ad fix: prepare explicit hosting configuration and safe database backups
+9adea92 fix: show all expense changes and persist retry references before checkout
+987670b test: verify atomic checkout concurrent stock finance reconciliation and recovery

@@ -1,0 +1,249 @@
+Current source inventory, generated after implementation. Status is explained in FINAL_REPORT.md and REMOVALS.md.
+
+rg -n path:|router\.(get|post|put|patch|delete)|CREATE TABLE frontend/src/router backend/routes backend/api/routes database
+backend/routes/index.js:5:router.get('/',(req,res)=>res.json({service:'METMMA Pharmacy API'}));
+backend/routes/index.js:6:router.get('/health',async(req,res)=>{try{await db.query('SELECT 1');await db.query('SELECT s.idempotency_key,f.id FROM sales s CROSS JOIN financial_transactions f LIMIT 0');res.json({status:'OK'});}catch(err){console.error(JSON.stringify({requestId:req.requestId,event:'readiness_failed',error:err.message}));throw new AppError('UNAVAILABLE',503);}});
+backend/routes/index.js:7:router.get('/config',(req,res)=>res.json({currency:'MWK',taxRateBps:require('../lib/money').taxRate(),timeZone:process.env.PHARMACY_TIMEZONE || 'UTC'}));
+backend/routes/index.js:16:router.get('/dashboard',authenticate,authorize(ROLES.ADMIN,ROLES.STORE_MANAGER,ROLES.PHARMACIST,ROLES.HR_OFFICER),async(req,res)=>{
+backend/routes/authRoutes.js:19:router.post('/login',loginLimit,validate(loginSchema),loginHandler);
+backend/routes/authRoutes.js:20:router.post('/register',authenticate,authorize(ROLES.ADMIN),validate(registerSchema),async (req,res)=>res.status(201).json({message:'Staff account created.',user:await createUser(req.body)}));
+database/DATABASE_SETUP_GUIDE.md:195:2. Add your `CREATE TABLE` statements
+frontend/src/router/index.js:27:  { path: '/login', component: Login, meta: { requiresAuth: false } },
+frontend/src/router/index.js:28:  { path: '/register', component: Register, meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Create staff account' } },
+frontend/src/router/index.js:30:  { path: '/', redirect: '/dashboard' },
+frontend/src/router/index.js:33:    path: '/dashboard',
+frontend/src/router/index.js:43:    path: '/pos',
+frontend/src/router/index.js:53:    path: '/help',
+frontend/src/router/index.js:63:    path: '/inventory',
+frontend/src/router/index.js:74:    path: '/hr',
+frontend/src/router/index.js:85:    path: '/reports',
+frontend/src/router/index.js:95:  { path: '/sales', component: () => import('@/modules/sales/views/SalesView.vue'), meta: { requiresAuth: true, roles: Object.values(ROLES), label: 'Sales' } },
+frontend/src/router/index.js:96:  { path: '/finances', component: () => import('@/modules/finances/views/FinancesView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER], label: 'Finances' } },
+frontend/src/router/index.js:100:    path: '/:pathMatch(.*)*',
+database/migrations/20261002_mvp.sql:48:CREATE TABLE IF NOT EXISTS financial_transactions (
+database/migrations/20261002_mvp.sql:71:CREATE TABLE IF NOT EXISTS expense_audit (
+database/migrations/20261002_mvp.sql:81:CREATE TABLE IF NOT EXISTS notification_reads (
+database/migrations/20261002_mvp.down.sql:4:CREATE TABLE mvp_archive_sales_state AS SELECT id,idempotency_key,request_hash,subtotal_amount,tax_amount,tax_rate_bps,status,reversed_at,reversal_reason,reversal_kind,reversed_by FROM sales;
+database/migrations/20261002_mvp.down.sql:5:CREATE TABLE mvp_archive_stock_state AS SELECT id,idempotency_key,request_hash FROM stock_movements;
+database/migrations/20261002_mvp.down.sql:6:CREATE TABLE mvp_archive_item_state AS SELECT id,product_name FROM sale_items;
+database/init.sql:14:CREATE TABLE IF NOT EXISTS users (
+database/init.sql:37:CREATE TABLE IF NOT EXISTS products (
+database/init.sql:62:CREATE TABLE IF NOT EXISTS sales (
+database/init.sql:74:CREATE TABLE IF NOT EXISTS sale_items (
+database/init.sql:86:CREATE TABLE IF NOT EXISTS stock_movements (
+database/init.sql:109:CREATE TABLE IF NOT EXISTS employees (
+database/init.sql:139:CREATE TABLE IF NOT EXISTS attendance (
+database/init.sql:155:CREATE TABLE IF NOT EXISTS operation_reports (
+database/init.sql:169:CREATE TABLE IF NOT EXISTS compliance_reports (
+database/init.sql:182:CREATE TABLE IF NOT EXISTS financial_reports (
+backend/api/routes/attendanceRoutes.js:7:router.get('/employee/:employee_id',authorize(ROLES.ADMIN,ROLES.HR_OFFICER,ROLES.STORE_MANAGER,ROLES.PHARMACIST),validate(employeeIdParam,'params'),validate(pageQuery,'query'),c.getAttendanceByEmployee);
+backend/api/routes/attendanceRoutes.js:8:router.post('/',authorize(ROLES.ADMIN,ROLES.HR_OFFICER,ROLES.STORE_MANAGER),validate(attendanceSchema),c.addAttendance);
+backend/api/routes/notificationsRoutes.js:5:router.get('/',validate(pageQuery,'query'),c.getNotifications);
+backend/api/routes/notificationsRoutes.js:6:router.post('/read-all',c.readAllNotifications);
+backend/api/routes/notificationsRoutes.js:7:router.post('/:id/read',validate(Joi.object({id:Joi.string().pattern(/^[a-f0-9]{32}$/).required()}),'params'),c.readNotification);
+backend/api/routes/productsRoutes.js:8:router.get('/',validate(query,'query'),c.getAllProducts);
+backend/api/routes/productsRoutes.js:9:router.get('/summary',c.getSummary);
+backend/api/routes/productsRoutes.js:10:router.get('/low-stock',validate(query,'query'),(req,res,next)=>{req.validatedQuery.status='low';return c.getAllProducts(req,res,next);});
+backend/api/routes/productsRoutes.js:11:router.get('/expiring',validate(query,'query'),(req,res,next)=>{req.validatedQuery.days??=90;return c.getAllProducts(req,res,next);});
+backend/api/routes/productsRoutes.js:12:router.get('/:id',validate(idParam,'params'),c.getProductById);
+backend/api/routes/productsRoutes.js:13:router.post('/',authorize(ROLES.ADMIN,ROLES.PHARMACIST),validate(createProductSchema),c.createProduct);
+backend/api/routes/productsRoutes.js:14:router.put('/:id',authorize(ROLES.ADMIN,ROLES.PHARMACIST,ROLES.STORE_MANAGER),validate(idParam,'params'),validate(updateProductSchema),c.updateProduct);
+backend/api/routes/productsRoutes.js:15:router.post('/:id/restock',authorize(ROLES.ADMIN,ROLES.PHARMACIST,ROLES.STORE_MANAGER),validate(idParam,'params'),validate(Joi.object({idempotencyKey:Joi.string().guid({version:'uuidv4'}).required(),quantity:Joi.number().integer().min(1).max(1000000).required(),reason:Joi.string().trim().min(3).max(500).required()}).required()),c.restockProduct);
+backend/api/routes/productsRoutes.js:16:router.delete('/:id',authorize(ROLES.ADMIN),validate(idParam,'params'),c.deleteProduct);
+backend/api/routes/financesRoutes.js:9:router.get('/transactions',validate(Joi.object({...pageFields,...dateFields,type:Joi.string().valid('all','income','expense'),paymentMethod:Joi.string().valid('all',...payments),search:Joi.string().trim().max(100).allow(''),includeDeleted:Joi.boolean().default(false)}),'query'),c.getTransactions);
+backend/api/routes/financesRoutes.js:10:router.get('/summary',validate(Joi.object(dateFields),'query'),c.getSummary);
+backend/api/routes/financesRoutes.js:11:router.get('/expenses/:id/audit',validate(idParam,'params'),validate(pageQuery,'query'),c.getAudit);
+backend/api/routes/financesRoutes.js:12:router.post('/expenses',authorize(ROLES.ADMIN,ROLES.STORE_MANAGER),validate(Joi.object({...expenseFields,idempotencyKey:Joi.string().guid({version:'uuidv4'}).required()}).required()),c.createExpense);
+backend/api/routes/financesRoutes.js:13:router.put('/expenses/:id',authorize(ROLES.ADMIN,ROLES.STORE_MANAGER),validate(idParam,'params'),validate(Joi.object({...expenseFields,version:Joi.number().integer().min(1).required()}).required()),c.editExpense);
+backend/api/routes/financesRoutes.js:14:router.delete('/expenses/:id',authorize(ROLES.ADMIN,ROLES.STORE_MANAGER),validate(idParam,'params'),validate(Joi.object({version:Joi.number().integer().min(1).required()}).required()),c.deleteExpense);
+backend/api/routes/salesRoutes.js:7:router.post('/checkout',authorize(ROLES.ADMIN,ROLES.CASHIER,ROLES.PHARMACIST),validateSale,c.processSale);
+backend/api/routes/salesRoutes.js:8:router.get('/history',validate(Joi.object({...pageFields,...dateFields,search:Joi.string().trim().max(100).allow('')}),'query'),c.getSaleHistory);
+backend/api/routes/salesRoutes.js:9:router.post('/:id/reverse',authorize(ROLES.ADMIN),validate(idParam,'params'),validate(Joi.object({reason:Joi.string().trim().min(3).max(500).required(),kind:Joi.string().valid('refund','void').required()}).required()),c.reverseSale);
+backend/api/routes/reportsRoutes.js:10:router.get('/financial',read,validate(pageQuery,'query'),financial.getFinancialReports);
+backend/api/routes/reportsRoutes.js:11:router.post('/financial',write,validate(financialReportSchema),financial.createFinancialReport);
+backend/api/routes/reportsRoutes.js:12:router.get('/compliance',read,validate(pageQuery,'query'),compliance.getComplianceReports);
+backend/api/routes/reportsRoutes.js:13:router.post('/compliance',write,validate(complianceReportSchema),compliance.createComplianceReport);
+backend/api/routes/reportsRoutes.js:14:router.get('/recent-activity',validate(pageQuery,'query'),recent.getRecentActivity);
+backend/api/routes/employeesRoutes.js:7:router.get('/',validate(Joi.object({...pageFields,search:Joi.string().trim().max(100).allow('')}),'query'),c.getEmployees);
+backend/api/routes/employeesRoutes.js:8:router.get('/:id',validate(idParam,'params'),c.getEmployeeById);
+backend/api/routes/employeesRoutes.js:9:router.post('/',authorize(ROLES.ADMIN),validate(employeeCreateSchema),c.addEmployee);
+backend/api/routes/employeesRoutes.js:10:router.put('/:id',authorize(ROLES.ADMIN),validate(idParam,'params'),validate(employeeUpdateSchema),c.updateEmployee);
+backend/api/routes/employeesRoutes.js:11:router.delete('/:id',authorize(ROLES.ADMIN),validate(idParam,'params'),c.deleteEmployee);
+
+rg -n <button|router-link|@click|@submit frontend/src
+frontend/src/components/PaginationControls.vue:7:    <button class="secondary" :disabled="loading || pagination.page <= 1" @click="emit('change', pagination.page - 1)">Previous</button>
+frontend/src/components/PaginationControls.vue:9:    <button class="secondary" :disabled="loading || !pagination.hasMore" @click="emit('change', pagination.page + 1)">Next</button>
+frontend/src/components/NotificationsPanel.vue:35:  <button data-tour="notifications" class="relative p-2 rounded-lg hover:bg-gray-100" aria-label="Notifications" title="Read low stock and expiry notices" @click="open = true; load()">
+frontend/src/components/NotificationsPanel.vue:43:    <button v-if="unread" class="secondary mb-3" :disabled="busy" @click="mark()">Mark all as read</button>
+frontend/src/components/NotificationsPanel.vue:47:        <button class="font-semibold text-left underline" :disabled="busy" @click="mark(item, true)">{{ item.title }}</button>
+frontend/src/components/NotificationsPanel.vue:50:        <button v-if="!item.read" class="block mt-2 text-blue-800 underline" :disabled="busy" @click="mark(item)">Mark as read</button>
+frontend/src/components/NotificationsPanel.vue:53:    <div v-if="!loading && !error && rows.length === 0" class="py-5 text-center"><p class="font-medium">No stock or expiry notices.</p><p class="text-sm text-gray-600 my-2">You are up to date. Check again after stock changes.</p><button class="secondary" @click="load()">Check again</button></div>
+frontend/src/components/ErrorNotice.vue:11:    <button v-if="retry && notice.retryable" @click="retry()" class="mt-2 underline font-medium">Try again</button>
+frontend/src/components/GuidedTour.vue:16:      <button @click="pauseTour" class="secondary">Skip for now</button>
+frontend/src/components/GuidedTour.vue:17:      <button v-if="tour.index > 0" @click="advanceTour(-1)" class="secondary">Back</button>
+frontend/src/components/GuidedTour.vue:18:      <button @click="advanceTour(1)" class="primary">{{ tour.index === tour.steps.length - 1 ? 'Finish tour' : 'Next' }}</button>
+frontend/src/components/AppDialog.vue:33:    <dialog ref="dialog" :aria-labelledby="headingId" class="app-dialog" tabindex="-1" @keydown.tab="trapFocus" @cancel="close" @click="close">
+frontend/src/components/AppDialog.vue:34:      <div @click.stop class="p-5 sm:p-6">
+frontend/src/components/AppDialog.vue:37:          <button v-if="dismissible" class="px-3 py-1 rounded-lg hover:bg-gray-100" aria-label="Close window" @click="close">✕</button>
+frontend/src/components/PermissionDeniedModal.vue:9:  <AppDialog :open="open" title="Your account cannot open this page" @close="open = false"><p>Ask your administrator for help with {{ page }}. Your current work is still here.</p><button class="primary mt-4" @click="open = false">Back to my work</button></AppDialog>
+frontend/src/layouts/Sidebar.vue:111:      <button @click="emit('close')" class="ml-auto p-2 text-slate-300 hover:bg-slate-800 rounded-lg md:hidden" aria-label="Close navigation menu">
+frontend/src/layouts/Sidebar.vue:120:          <router-link 
+frontend/src/layouts/Sidebar.vue:130:            @click="emit('close')"
+frontend/src/layouts/Sidebar.vue:137:          </router-link>
+frontend/src/layouts/Sidebar.vue:153:      <button 
+frontend/src/layouts/Sidebar.vue:154:        @click="handleLogout"
+frontend/src/layouts/Sidebar.vue:166:    <button 
+frontend/src/layouts/Sidebar.vue:167:      aria-label="Expand or collapse navigation" @click="emit('toggle')"
+frontend/src/layouts/TopBar.vue:25:      <button @click="$emit('toggle-menu')" class="-ml-1 p-2 text-gray-600 hover:bg-gray-100 rounded-lg md:hidden" aria-label="Open navigation menu">
+frontend/src/layouts/TopBar.vue:37:      <router-link to="/help" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Short instructions and the guided tour" aria-label="Help and tour">
+frontend/src/layouts/TopBar.vue:39:      </router-link>
+frontend/src/layouts/MainLayout.vue:23:    <button
+frontend/src/layouts/MainLayout.vue:27:      @click="mobileMenuOpen = false"
+frontend/src/modules/auth/views/Register.vue:22:      <form @submit.prevent="register" class="space-y-4">
+frontend/src/modules/auth/views/Register.vue:85:        <button
+frontend/src/modules/auth/views/Register.vue:98:          <router-link to="/help" class="text-blue-600 hover:text-blue-700 font-medium">
+frontend/src/modules/auth/views/Register.vue:100:          </router-link>
+frontend/src/modules/auth/views/Login.vue:17:      <form @submit.prevent="login" class="space-y-4">
+frontend/src/modules/auth/views/Login.vue:40:        <button 
+frontend/src/modules/shared/views/NotFoundView.vue:13:        <router-link
+frontend/src/modules/shared/views/NotFoundView.vue:18:        </router-link>
+frontend/src/modules/shared/views/NotFoundView.vue:19:        <button
+frontend/src/modules/shared/views/NotFoundView.vue:20:          @click="$router.back()"
+frontend/src/modules/shared/views/HelpView.vue:30:    <div class="panel mb-4 flex flex-wrap items-center gap-3"><button class="primary" @click="startTour(true)">Take the tour</button><button class="secondary" @click="startTour()">Resume tour</button><router-link v-if="role === 'admin'" to="/register" class="secondary">Create staff account</router-link></div>
+frontend/src/modules/shared/views/HelpView.vue:31:    <div v-if="role === 'admin' && legacy && (legacy.transactions.length || legacy.products.length)" class="panel mb-4"><p>{{ legacy.transactions.length }} old pending receipts and {{ legacy.products.length }} pending products are kept in this browser. Compare them with saved server records before entering them again.</p><button class="secondary mt-3" @click="downloadLegacy">Download pending records for review</button></div>
+frontend/src/modules/shared/views/HelpView.vue:35:    <div v-if="!filtered.length" class="panel"><p>No matching instructions. Try a shorter word or take the tour.</p><button class="primary mt-3" @click="search = ''">Show all help</button></div>
+frontend/src/modules/inventory/views/InventoryDashboard.vue:53:    <div class="panel mb-4 flex flex-wrap items-end gap-3"><label class="flex-1">Find a product<input v-model="search" class="field mt-1" placeholder="Name, code or barcode" /></label><label>Show<select v-model="status" class="field mt-1"><option value="all">All products</option><option value="low">Low stock</option><option value="expired">Expired</option><option value="expiring">Expiry within 90 days</option></select></label><button v-if="canAdd" class="primary" @click="showForm = true; error = null">Add product</button><router-link v-if="route.query.product" to="/inventory" class="secondary">Show all products</router-link></div>
+frontend/src/modules/inventory/views/InventoryDashboard.vue:55:    <div class="panel overflow-x-auto p-0"><table class="w-full min-w-[760px]"><thead class="bg-gray-50"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-left">Batch / expiry</th><th class="p-3 text-left">Stock</th><th class="p-3 text-left">Price</th><th class="p-3 text-left">Actions</th></tr></thead><tbody><tr v-for="product in store.products" :key="product.id" class="border-t border-gray-200"><td class="p-3"><strong>{{ product.name }}</strong><p class="text-sm text-gray-600">{{ product.productCode }} · {{ product.supplier }}</p></td><td class="p-3">{{ product.batchNumber }}<p class="text-sm">{{ product.expiryDate?.slice(0,10) }}</p></td><td class="p-3">{{ product.quantity }}<p class="text-sm text-gray-600">Low at {{ product.reorderLevel }}</p><p class="text-sm text-red-800" v-if="product.expired">Expired — do not sell</p></td><td class="p-3">{{ currency(product.sellingPrice) }}</td><td class="p-3"><div class="flex gap-2"><button v-if="canEdit && !product.expired" class="secondary" :disabled="saving" title="Record units received in a delivery" @click="openRestock(product)">Add stock</button><button v-if="role === 'admin'" class="secondary text-red-800" :disabled="saving" @click="deactivate(product)">Deactivate</button></div></td></tr></tbody></table><div v-if="!store.loading && !store.products.length && !store.error" class="p-6 text-center"><p>No products match these filters.</p><p class="text-sm text-gray-600 my-2">Add your first product or clear the search to see available records.</p><button v-if="canAdd" class="primary" @click="showForm = true">Add product</button><button v-else class="secondary" @click="search = ''; status = 'all'; load()">Clear filters</button></div><PaginationControls :pagination="store.pagination" :loading="store.loading" @change="load" /></div>
+frontend/src/modules/inventory/views/InventoryDashboard.vue:57:      <form @submit.prevent="saveProduct"><ErrorNotice :error="error" /><div class="grid sm:grid-cols-2 gap-3"><label v-for="[name,label,type,help] in inputs" :key="name">{{ label }}<input :aria-label="label" v-model="form[name]" :type="type" :required="name !== 'barcode'" :min="type === 'number' ? 0 : undefined" :step="name === 'sellingPrice' ? '0.01' : type === 'number' ? '1' : undefined" :aria-invalid="invalid(name)" :aria-describedby="`help-${name}`" class="field mt-1" /><span :id="`help-${name}`" class="block text-sm text-gray-600">{{ invalid(name) ? 'Please check this value.' : help }}</span></label></div><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Save product' }}</button></form>
+frontend/src/modules/inventory/views/InventoryDashboard.vue:59:    <AppDialog :open="!!restock" title="Add stock" :dismissible="!saving" @close="restock = null"><form @submit.prevent="addStock"><p class="mb-3">Record a delivery of {{ restock?.name }}. New units are added to the latest stock count.</p><ErrorNotice :error="error" /><label class="block mb-3">Units received<input v-model.number="quantity" type="number" min="1" step="1" required class="field mt-1" /></label><label class="block">Delivery note or reason<input v-model="note" maxlength="500" required class="field mt-1" placeholder="Supplier and invoice, or a short reason" /></label><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Add stock' }}</button></form></AppDialog>
+frontend/src/modules/dashboard/views/Dashboard.vue:15:    <div class="panel mb-4"><h2 class="text-lg font-bold mb-3">What would you like to do?</h2><div class="flex flex-wrap gap-3"><router-link v-if="['admin','pharmacist'].includes(role)" to="/pos" class="primary">Sell items</router-link><router-link v-if="role !== 'hr_officer'" to="/inventory" class="secondary">Check stock</router-link><router-link to="/sales" class="secondary">Find a sale</router-link><router-link to="/finances" class="secondary">View finances</router-link><router-link to="/help" class="secondary">Help and tour</router-link></div></div>
+frontend/src/modules/dashboard/views/Dashboard.vue:16:    <div v-if="data" class="panel"><h2 class="text-lg font-bold mb-3">Stock needing attention</h2><ul><li v-for="item in data.lowStock" :key="item.id" class="border-t py-3"><span>{{ item.name }} · {{ item.quantity }} units left</span><router-link v-if="role !== 'hr_officer'" :to="{path:'/inventory',query:{product:item.id}}" class="ml-3 text-blue-800 underline">Open product</router-link></li></ul><div v-if="!data.lowStock.length"><p>No low stock items. Stock notices appear here when products reach their threshold.</p><router-link to="/help" class="inline-block secondary mt-3">Learn about stock notices</router-link></div></div>
+frontend/src/modules/hr/views/HrDashboard.vue:77:        <button 
+frontend/src/modules/hr/views/HrDashboard.vue:78:          @click="activeTab = 'employees'"
+frontend/src/modules/hr/views/HrDashboard.vue:83:        <button 
+frontend/src/modules/hr/views/HrDashboard.vue:84:          @click="activeTab = 'attendance'"
+frontend/src/modules/hr/views/HrDashboard.vue:106:        <button v-if="role === 'admin'" @click="showAddForm = !showAddForm" class="justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+frontend/src/modules/hr/views/HrDashboard.vue:112:      <form v-if="showAddForm" @submit.prevent="saveEmployee" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
+frontend/src/modules/hr/views/HrDashboard.vue:133:          <button type="button" @click="showAddForm = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+frontend/src/modules/hr/views/HrDashboard.vue:134:          <button type="submit" :disabled="saving" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">{{ saving ? 'Saving...' : 'Save Employee' }}</button>
+frontend/src/modules/hr/views/HrDashboard.vue:184:              <td colspan="5" class="px-6 py-8 text-center text-gray-400">No staff match this search. An administrator can add your first staff member.<button v-if="role === 'admin'" class="primary block mx-auto mt-3" @click="showAddForm = true">Add employee</button><button v-else class="secondary block mx-auto mt-3" @click="searchQuery = ''; load()">Clear search</button></td>
+frontend/src/modules/hr/views/HrDashboard.vue:208:            <button :disabled="attendanceBusy" @click="mark(emp, 'present')" class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors">Present</button>
+frontend/src/modules/hr/views/HrDashboard.vue:209:            <button :disabled="attendanceBusy" @click="mark(emp, 'absent')" class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors">Absent</button>
+frontend/src/modules/sales/views/SalesView.vue:26:    <div class="panel mb-4 flex flex-wrap gap-3 items-end"><label>From<input v-model="dates.start" type="date" class="field mt-1" /></label><label>Through<input v-model="dates.end" type="date" class="field mt-1" /></label><label class="flex-1">Find a receipt or customer<input v-model="search" class="field mt-1" placeholder="Receipt or customer name" /></label><button class="secondary" :disabled="page.loading.value" @click="load()">Refresh</button></div>
+frontend/src/modules/sales/views/SalesView.vue:28:    <div class="panel overflow-x-auto p-0"><table class="w-full min-w-[700px]"><thead class="bg-gray-50"><tr><th class="p-3 text-left">Receipt and date</th><th class="p-3 text-left">Items</th><th class="p-3 text-left">Payment</th><th class="p-3 text-left">Total</th><th class="p-3 text-left">Status</th></tr></thead><tbody><tr v-for="sale in page.rows.value" :key="sale.id" class="border-t"><td class="p-3">{{ sale.receiptNumber }}<p class="text-sm text-gray-600">{{ new Date(sale.date).toLocaleString() }}</p><p class="text-sm">{{ sale.customerName || 'Walk-in customer' }} · {{ sale.cashier || 'Previous staff member' }}</p></td><td class="p-3"><p v-for="line in sale.items" :key="line.productId">{{ line.name }} × {{ line.quantity }}</p></td><td class="p-3">{{ sale.paymentMethod.replaceAll('_',' ') }}</td><td class="p-3">{{ currency(sale.totalAmount) }}</td><td class="p-3"><p>{{ sale.status === 'completed' ? 'Completed' : 'Reversed' }}</p><button v-if="role === 'admin' && sale.status === 'completed'" class="secondary mt-2" @click="reverse = sale; reason = ''; error = null">Reverse sale</button></td></tr></tbody></table><div v-if="!page.loading.value && !page.error.value && !page.rows.value.length" class="p-6 text-center"><p>No sales match these dates or this search.</p><p class="text-sm text-gray-600 my-2">Completed sales appear here automatically. Try different dates or make your first sale.</p><router-link v-if="['admin','cashier','pharmacist'].includes(role)" to="/pos" class="primary inline-block">Sell items</router-link><button v-else class="secondary" @click="dates = periodDates('month'); search = ''">Show this month</button></div><PaginationControls :pagination="page.pagination.value" :loading="page.loading.value" @change="load" /></div>
+frontend/src/modules/sales/views/SalesView.vue:29:    <AppDialog :open="!!reverse" title="Reverse this sale?" :dismissible="!saving" @close="reverse = null"><form @submit.prevent="reverseSale"><p class="mb-3">{{ reverse?.receiptNumber }}: all sold units will return to stock and {{ currency(reverse?.totalAmount) }} will be recorded as money returned. Past records stay available. This can happen only once. Return the payment using your normal process.</p><ErrorNotice :error="error" /><label class="block mb-3">What happened?<select v-model="kind" class="field mt-1"><option value="refund">Customer refund</option><option value="void">Sale entered by mistake</option></select></label><label class="block">Reason<input v-model="reason" required minlength="3" maxlength="500" class="field mt-1" /></label><button class="primary mt-4" :disabled="saving">{{ saving ? 'Reversing…' : 'Confirm reversal' }}</button></form></AppDialog>
+frontend/src/modules/pos/views/PosView.vue:27:        <label class="block mb-3">Scan a barcode or enter a product code<div class="flex gap-2 mt-1"><input ref="scanner" id="barcode-input" v-model="barcode" :disabled="store.locked" @keydown.enter.prevent="scan" class="field" placeholder="Scan barcode or enter code" autocomplete="off" /><button class="primary" :disabled="store.locked || !barcode" @click="scan">Add scanned item</button></div></label>
+frontend/src/modules/pos/views/PosView.vue:32:          <button v-for="product in store.products" :key="product.id" :disabled="store.locked || product.stock <= 0" @click="store.addToCart(product)" class="text-left p-3 rounded-lg border border-gray-300 hover:bg-blue-50 hover:border-blue-700" :aria-label="`Add ${product.name} to cart`">
+frontend/src/modules/pos/views/PosView.vue:36:        <div v-if="!store.loading && !store.products.length && !store.error" class="py-6 text-center"><p>No products match this search.</p><p class="text-gray-600 text-sm my-2">Try a shorter name or ask the stock manager to add available stock.</p><button class="secondary" @click="store.searchQuery = ''; store.fetchProducts()">Show available products</button></div>
+frontend/src/modules/pos/views/PosView.vue:40:        <div v-if="!store.cart.length" class="py-5"><p>Your cart is empty.</p><p class="text-gray-600 text-sm mb-2">Search for a product or scan its barcode to begin.</p><button class="secondary" @click="scanner?.focus()">Scan your first item</button></div>
+frontend/src/modules/pos/views/PosView.vue:41:        <ul class="space-y-3 mb-4"><li v-for="item in store.cart" :key="item._id" class="p-3 rounded-lg bg-gray-50"><p class="font-medium">{{ item.name }}</p><p class="text-sm mb-2">{{ currency(item.price) }} each</p><div class="flex items-center gap-2"><button class="secondary px-3" :disabled="store.locked" :aria-label="`Decrease ${item.name} quantity`" @click="store.updateQuantity(item._id, -1)">−</button><span>{{ item.quantity }}</span><button class="secondary px-3" :disabled="store.locked" :aria-label="`Increase ${item.name} quantity`" @click="store.updateQuantity(item._id, 1)">+</button><button class="ml-auto underline text-red-800" :disabled="store.locked" :aria-label="`Remove ${item.name} from cart`" @click="store.removeFromCart(item._id)">Remove</button></div></li></ul>
+frontend/src/modules/pos/views/PosView.vue:49:          <button class="primary w-full" :disabled="store.processing || !store.cart.length || !configured" @click="pay">{{ store.processing ? 'Saving sale…' : store.pending ? 'Retry sale' : 'Complete Sale' }}</button>
+frontend/src/modules/pos/views/PosView.vue:50:          <button class="secondary w-full" :disabled="store.locked || !store.cart.length" @click="clear">Clear cart</button>
+frontend/src/modules/pos/views/PosView.vue:56:      <div class="flex gap-3 mt-5 print-hide"><button class="primary" @click="print">Print</button><button class="secondary" @click="showReceipt = false">Close</button></div>
+frontend/src/App.vue:31:  <div v-if="appFailure" role="alert" class="p-4 bg-red-50 text-red-800">{{ appFailure }} <button class="underline" @click="appFailure = ''">Close message</button></div>
+frontend/src/App.vue:36:    <div class="mt-5 flex gap-3"><button class="secondary" @click="answerConfirmation(false)">Cancel</button><button class="primary" @click="answerConfirmation(true)">{{ confirmation.label }}</button></div>
+frontend/src/App.vue:40:    <form @submit.prevent="signIn"><ErrorNotice :error="sessionError" /><label class="block mt-3">Your password<input v-model="sessionPassword" required type="password" autocomplete="current-password" class="field mt-1" /></label><button class="primary mt-4" :disabled="signingIn">{{ signingIn ? 'Signing in…' : 'Sign in' }}</button></form>
+frontend/src/modules/reports/views/ReportsDashboard.vue:23:    <div class="panel flex flex-wrap gap-3 mb-4"><button class="secondary" :aria-pressed="tab === 'sales'" @click="tab = 'sales'">Sales</button><button class="secondary" :aria-pressed="tab === 'stock'" @click="tab = 'stock'">Stock</button><button v-if="['admin','hr_officer'].includes(role)" class="secondary" :aria-pressed="tab === 'staff'" @click="tab = 'staff'">Staff</button><label v-if="tab === 'sales'">Period<select v-model="period" class="field"><option value="today">Today</option><option value="week">This week</option><option value="month">This month</option></select></label><button class="primary ml-auto" :disabled="page.loading.value || !page.rows.value.length" @click="exportPage">Export this page as CSV</button></div>
+frontend/src/modules/reports/views/ReportsDashboard.vue:25:    <div class="panel"><ul><li v-for="row in page.rows.value" :key="row.id" class="border-t py-3"><template v-if="tab === 'sales'"><strong>{{ row.receiptNumber }}</strong> · {{ currency(row.totalAmount) }}<p>{{ row.items.map(i=>`${i.name} × ${i.quantity}`).join(', ') }}</p></template><template v-else-if="tab === 'stock'"><strong>{{ row.name }}</strong> · {{ row.quantity }} in stock · {{ row.expiryDate?.slice(0,10) }}</template><template v-else><strong>{{ row.first_name }} {{ row.last_name }}</strong> · {{ row.position }} · {{ row.department }}</template></li></ul><div v-if="!page.loading.value && !page.rows.value.length && !page.error.value"><p>No records in this view. Choose another period or open the relevant tool to add a record.</p><router-link :to="tab === 'sales' ? '/sales' : tab === 'stock' ? '/inventory' : '/hr'" class="primary inline-block mt-3">Open {{ tab === 'staff' ? 'staff' : tab }}</router-link></div><PaginationControls :pagination="page.pagination.value" :loading="page.loading.value" @change="load" /></div>
+frontend/src/modules/finances/views/FinancesView.vue:50:    <div class="panel mb-4 flex flex-wrap gap-3 items-end"><label>Period<select v-model="period" class="field mt-1"><option value="today">Today</option><option value="week">This week</option><option value="month">This month</option><option value="custom">Choose dates</option></select></label><label>From<input v-model="dates.start" type="date" class="field mt-1" @change="period = 'custom'" /></label><label>Through<input v-model="dates.end" type="date" class="field mt-1" @change="period = 'custom'" /></label><button class="secondary" @click="refresh" :disabled="page.loading.value">Refresh</button><button v-if="canEdit" class="primary" @click="openForm()">Record expense</button></div>
+frontend/src/modules/finances/views/FinancesView.vue:58:    <div class="panel p-0 overflow-x-auto"><table class="w-full min-w-[800px]"><thead class="bg-gray-50"><tr><th class="p-3 text-left">Date</th><th class="p-3 text-left">Record</th><th class="p-3 text-left">Method</th><th class="p-3 text-left">Amount</th><th class="p-3 text-left">Actions</th></tr></thead><tbody><tr v-for="row in page.rows.value" :key="row.id" class="border-t"><td class="p-3">{{ row.type === 'expense' ? row.businessDate || row.date.slice(0,10) : new Date(row.date).toLocaleString() }}<p class="text-sm text-gray-600">{{ row.username || 'Previous staff member' }}</p></td><td class="p-3"><p class="font-medium">{{ row.type === 'refund' ? 'Refund / reversal' : row.type === 'income' ? 'Sale income' : row.category }}</p><router-link v-if="row.saleId" :to="{path:'/sales',query:{receipt:row.receiptNumber}}" class="text-blue-800 underline">{{ row.receiptNumber }}</router-link><p v-if="row.deletedAt" class="text-sm text-red-800">Deleted — excluded from totals</p><p class="text-sm">{{ row.note }}</p><p class="text-sm text-gray-600">{{ row.supplier }}</p></td><td class="p-3">{{ row.paymentMethod.replaceAll('_',' ') }}</td><td class="p-3 font-medium">{{ currency(row.amount) }}</td><td class="p-3"><div v-if="row.type === 'expense'" class="flex flex-wrap gap-2"><button v-if="canEdit && !row.deletedAt" class="secondary" :disabled="saving" @click="openForm(row)">Edit</button><button v-if="canEdit && !row.deletedAt" class="secondary text-red-800" :disabled="saving" @click="remove(row)">Delete</button><button class="secondary" @click="showAudit(row)">View changes</button></div><span v-else class="text-sm text-gray-600">Saved with sale</span></td></tr></tbody></table><div v-if="!page.loading.value && !page.error.value && !page.rows.value.length" class="p-6 text-center"><p>No money records match these filters.</p><p class="text-sm text-gray-600 my-2">Sales add income here. Record an expense when the pharmacy spends money.</p><button v-if="canEdit" class="primary" @click="openForm()">Record expense</button><button v-else class="secondary" @click="search = ''; type = 'all'; payment = 'all'; load()">Clear filters</button></div><PaginationControls :pagination="page.pagination.value" :loading="page.loading.value" @change="load" /></div>
+frontend/src/modules/finances/views/FinancesView.vue:59:    <AppDialog :open="formOpen" :title="form.id ? 'Edit expense' : 'Record expense'" :dismissible="!saving" @close="formOpen = false"><form @submit.prevent="saveExpense"><ErrorNotice :error="error" /><div class="grid sm:grid-cols-2 gap-3"><label>Date<input v-model="form.date" required type="date" :aria-invalid="invalid('date')" class="field mt-1" /></label><label>Amount spent (MWK)<input aria-label="Amount spent (MWK)" v-model="form.amount" required type="number" min="0.01" step="0.01" :aria-invalid="invalid('amount')" class="field mt-1" /><span v-if="invalid('amount')" class="text-sm text-red-800">Enter a positive amount with up to two decimal places.</span></label><label>Category<select v-model="form.category" class="field mt-1"><option v-for="category in categories" :key="category">{{ category }}</option></select></label><label>Payment method<select v-model="form.paymentMethod" class="field mt-1"><option v-for="method in payments" :key="method" :value="method">{{ method.replaceAll('_',' ') }}</option></select></label><label>Supplier (optional)<input v-model="form.supplier" maxlength="200" class="field mt-1" /></label><label>Note (optional)<input v-model="form.note" maxlength="500" class="field mt-1" /></label></div><p class="text-sm text-gray-600 mt-3">Enter the amount paid once. If this was a stock delivery, add its units in Inventory too.</p><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Save expense' }}</button></form></AppDialog>
+
+rg --files frontend/src backend database -g !node_modules -g !package-lock.json
+frontend/src/components/PaginationControls.vue
+frontend/src/components/NotificationsPanel.vue
+frontend/src/components/ErrorNotice.vue
+frontend/src/components/GuidedTour.vue
+frontend/src/components/AppDialog.vue
+frontend/src/components/PermissionDeniedModal.vue
+frontend/src/router/index.js
+frontend/src/layouts/Sidebar.vue
+frontend/src/layouts/TopBar.vue
+frontend/src/layouts/MainLayout.vue
+frontend/src/style.css
+frontend/src/composables/usePage.js
+frontend/src/composables/useTour.js
+frontend/src/composables/useRole.js
+frontend/src/composables/useTour.spec.js
+frontend/src/composables/useFeedback.js
+frontend/src/services/api/apiClient.js
+frontend/src/services/api/errors.spec.js
+frontend/src/services/api/authService.js
+frontend/src/services/api/salePayload.js
+frontend/src/services/api/errors.js
+frontend/src/services/api/money.js
+frontend/src/services/api/dataService.js
+frontend/src/services/api/dataService.spec.js
+frontend/src/services/data/catalogue.spec.js
+frontend/src/modules/auth/views/Register.vue
+frontend/src/modules/auth/views/Login.vue
+frontend/src/modules/shared/views/NotFoundView.vue
+frontend/src/modules/shared/views/HelpView.vue
+frontend/src/modules/inventory/store/inventoryStore.js
+frontend/src/modules/inventory/views/InventoryDashboard.vue
+backend/routes/index.js
+backend/routes/authRoutes.js
+frontend/src/modules/dashboard/views/Dashboard.vue
+backend/models/user.js
+frontend/src/modules/hr/store/hrStore.js
+frontend/src/modules/hr/views/HrDashboard.spec.js
+frontend/src/modules/hr/views/HrDashboard.vue
+frontend/src/modules/sales/views/SalesView.vue
+backend/api/routes/notificationsRoutes.js
+backend/api/routes/financesRoutes.js
+backend/api/routes/reportsRoutes.js
+backend/api/routes/attendanceRoutes.js
+backend/api/routes/productsRoutes.js
+backend/api/routes/salesRoutes.js
+backend/api/routes/employeesRoutes.js
+frontend/src/modules/pos/store/posStore.js
+frontend/src/modules/pos/store/posStore.spec.js
+frontend/src/modules/pos/views/PosView.vue
+frontend/src/modules/pos/views/PosView.spec.js
+backend/api/validators/attendanceValidators.js
+backend/api/validators/productValidator.js
+backend/api/validators/salesValidator.js
+backend/api/validators/reportValidators.js
+backend/api/validators/employeeValidators.js
+frontend/src/modules/reports/views/ReportsDashboard.vue
+frontend/src/modules/finances/views/FinancesView.vue
+frontend/src/pouchdb/index.js
+frontend/src/App.vue
+frontend/src/main.js
+frontend/src/assets/metmma_pharmacy_logo.svg
+backend/api/controllers/recentActivityController.js
+backend/api/controllers/attendanceControllers.js
+backend/api/controllers/notificationsController.js
+backend/api/controllers/complianceReportControllers.js
+backend/api/controllers/finincialReportController.js
+database/DATABASE_SETUP_GUIDE.md
+database/clear-sample-data.sql
+backend/api/controllers/salesController.js
+backend/api/controllers/employeesController.js
+backend/api/controllers/financesController.js
+backend/api/controllers/productsController.js
+database/migrations/20260917_employee_email.sql
+database/migrations/20261002_mvp.sql
+database/migrations/20261002_mvp.down.sql
+database/init.sql
+backend/api/db/index.js
+backend/middleware/security.js
+backend/middleware/roleMiddleware.js
+backend/test-db.js
+backend/server.js
+backend/app.js
+backend/README.md
+backend/lib/validation.js
+backend/lib/errors.js
+backend/test/products.test.js
+backend/lib/money.js
+backend/test/integration/hardening.test.js
+backend/test/integration/contracts.test.js
+backend/test/contracts.test.js
+backend/package.json
+backend/.env.example
+backend/ROLE_VALIDATION.md
+backend/scripts/migrate.js
+backend/scripts/check.js
+backend/scripts/bootstrap-admin.js
+

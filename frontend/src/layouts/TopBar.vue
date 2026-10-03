@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { Bell, HelpCircle, Menu } from 'lucide-vue-next'
+import NotificationsPanel from '@/components/NotificationsPanel.vue'
+import { HelpCircle, Menu } from 'lucide-vue-next'
 
 defineProps({
   title: { type: String, required: true },
@@ -33,14 +34,11 @@ const currentDate = computed(() => {
     <div class="flex shrink-0 items-center gap-1 sm:gap-4">
       <div class="text-sm text-gray-500 hidden md:block">{{ currentDate }}</div>
       
-      <router-link to="/help" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Help Center">
+      <router-link to="/help" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Short instructions and the guided tour" aria-label="Help and tour">
         <HelpCircle class="w-5 h-5" />
       </router-link>
 
-      <button class="relative p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
-        <Bell class="w-5 h-5" />
-        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-      </button>
+      <NotificationsPanel />
     </div>
   </header>
 </template>

@@ -1,0 +1,62 @@
+name: metmma-production
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  api:
+    image: metmma-api:${RELEASE_ID:?Release ID is required}
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    env_file:
+      - path: /opt/metmma/backend.env
+        format: raw
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      TRUST_PROXY: "1"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    logging: *logging
+  proxy:
+    image: metmma-proxy:${RELEASE_ID:?Release ID is required}
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in /opt/metmma/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+  backup:
+    image: metmma-backup:${RELEASE_ID:?Release ID is required}
+    pull_policy: never
+    profiles: [tools]
+    env_file:
+      - path: /opt/metmma/backup.env
+        format: raw
+    volumes:
+      - backups:/backups
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+volumes:
+  caddy_data:
+  caddy_config:
+  backups:

@@ -1,0 +1,26 @@
+
+> frontend@0.0.0 build
+> vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 1803 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                  0.73 kB │ gzip:  0.40 kB
+dist/assets/metmma_pharmacy_logo-DGBOMDfz.svg   53.22 kB │ gzip: 24.66 kB
+dist/assets/index-DSadIkGE.css                  25.51 kB │ gzip:  5.49 kB
+dist/assets/usePage-C_M8Yo5Y.js                  0.43 kB │ gzip:  0.29 kB
+dist/assets/money-BMdUZVK8.js                    0.82 kB │ gzip:  0.50 kB
+dist/assets/NotFoundView-B07iUZQR.js             1.14 kB │ gzip:  0.67 kB
+dist/assets/Dashboard-CFGlOW7H.js                2.85 kB │ gzip:  1.30 kB
+dist/assets/ReportsDashboard-C-uGGWXY.js         3.95 kB │ gzip:  1.89 kB
+dist/assets/SalesView-C4D0RhYm.js                5.41 kB │ gzip:  2.45 kB
+dist/assets/InventoryDashboard-BynMNY_d.js       9.30 kB │ gzip:  3.63 kB
+dist/assets/PosView-C8xKM7eG.js                 11.56 kB │ gzip:  4.55 kB
+dist/assets/FinancesView-BFUcSm8U.js            11.73 kB │ gzip:  4.21 kB
+dist/assets/HrDashboard-ByLn8bMZ.js             13.23 kB │ gzip:  4.14 kB
+dist/assets/MainLayout-T5Ti5HIH.js              17.04 kB │ gzip:  6.59 kB
+dist/assets/HelpView-BbSHO7T6.js                34.86 kB │ gzip: 11.97 kB
+dist/assets/index-C-kZa7Om.js                  159.70 kB │ gzip: 61.17 kB
+✓ built in 3.07s

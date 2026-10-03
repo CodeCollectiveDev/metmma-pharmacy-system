@@ -6,6 +6,7 @@ const { employeeCreateSchema, employeeUpdateSchema } = require('../api/validator
 const { attendanceSchema } = require('../api/validators/attendanceValidators');
 
 const sale = {
+  idempotencyKey: '123e4567-e89b-42d3-a456-426614174000',
   items: [{ productId: 1, quantity: 2, unitPrice: 10, subtotal: 20 }],
   totalAmount: 23.30, paymentMethod: 'cash', customerName: 'Customer', userId: 1
 };
@@ -34,11 +35,13 @@ test('checkout accepts the established contract and rejects invalid required fie
   ]) assert.ok(saleSchema.validate(invalid).error);
 });
 
-test('checkout validation returns field errors before invoking the controller', () => {
-  let body;
-  const res = { status(code) { assert.equal(code, 400); return this; }, json(data) { body = data; } };
-  validateSale({ body: { items: [], totalAmount: -1 } }, res, () => assert.fail('Invalid sale reached controller'));
-  assert.deepEqual(body.errors.map(error => error.field), ['items', 'totalAmount']);
+test('checkout validation passes safe field paths to the error handler', () => {
+  let failure;
+  validateSale({body:{items:[],totalAmount:-1}}, {}, error => { failure=error; });
+  assert.equal(failure.status,400);
+  assert.equal(failure.code,'VALIDATION');
+  assert.ok(failure.fields.includes('items'));
+  assert.ok(failure.fields.includes('totalAmount'));
 });
 
 test('employee creation keeps required persistence fields, including an optional role', () => {
@@ -77,4 +80,9 @@ test('attendance validation exactly matches the SQL domain and normalizes old ca
   for (const status of ['Excused', 'sick', '', 'unknown']) {
     assert.ok(attendanceSchema.validate({ employee_id: 1, date: '2026-01-01', status }).error);
   }
+});
+
+test('attendance rejects impossible dates and invalid check-in times',()=>{
+ for(const date of ['2026-02-30','2026-13-01','2026-01-01T12:00:00Z'])assert.ok(attendanceSchema.validate({employee_id:1,date,status:'present'}).error);
+ assert.ok(attendanceSchema.validate({employee_id:1,date:'2026-01-01',status:'present',check_in:'25:70'}).error);
 });

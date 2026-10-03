@@ -15,7 +15,7 @@ const financialReportSchema = Joi.object({
   
   net_profit: Joi.number().precision(2).required(),
   
-  currency: Joi.string().length(3).uppercase().default('USD'),
+  currency: Joi.string().length(3).uppercase().default('MWK'),
   
   period_start: Joi.date().iso().required(),
   
@@ -32,7 +32,7 @@ const financialReportSchema = Joi.object({
  * Focuses on regulatory status and audit trails
  */
 const complianceReportSchema = Joi.object({
-  policy_name: Joi.string().required().trim(),
+  policy_name: Joi.string().max(100).required().trim(),
   
   status: Joi.string().valid('Compliant', 'Non-Compliant', 'Under Review', 'Pending').required(),
   

@@ -1,0 +1,223 @@
+frontend/src/router/index.js:27:  { path: '/login', component: Login, meta: { requiresAuth: false } },
+frontend/src/router/index.js:28:  { path: '/register', component: Register, meta: { requiresAuth: false } },
+frontend/src/router/index.js:30:  { path: '/', redirect: '/dashboard' },
+frontend/src/router/index.js:33:    path: '/dashboard',
+frontend/src/router/index.js:38:      label: 'Dashboard'
+frontend/src/router/index.js:43:    path: '/pos',
+frontend/src/router/index.js:48:      label: 'Point of Sale'
+frontend/src/router/index.js:53:    path: '/help',
+frontend/src/router/index.js:58:      label: 'Help'
+frontend/src/router/index.js:63:    path: '/inventory',
+frontend/src/router/index.js:68:      label: 'Inventory Management',
+frontend/src/router/index.js:74:    path: '/hr',
+frontend/src/router/index.js:79:      label: 'HR Management',
+frontend/src/router/index.js:85:    path: '/reports',
+frontend/src/router/index.js:90:      label: 'Reports',
+frontend/src/router/index.js:97:    path: '/:pathMatch(.*)*',
+frontend/src/layouts/Sidebar.vue:41:    path: '/dashboard', 
+frontend/src/layouts/Sidebar.vue:42:    label: 'Dashboard', 
+frontend/src/layouts/Sidebar.vue:47:    path: '/pos', 
+frontend/src/layouts/Sidebar.vue:48:    label: 'Point of Sale', 
+frontend/src/layouts/Sidebar.vue:53:    path: '/inventory', 
+frontend/src/layouts/Sidebar.vue:54:    label: 'Inventory', 
+frontend/src/layouts/Sidebar.vue:59:    path: '/hr', 
+frontend/src/layouts/Sidebar.vue:60:    label: 'HR Management', 
+frontend/src/layouts/Sidebar.vue:66:    path: '/reports', 
+frontend/src/layouts/Sidebar.vue:67:    label: 'Reports', 
+backend/routes/index.js:5:router.get('/', (req, res) => {
+backend/routes/index.js:11:router.use('/auth', authRoutes);
+backend/routes/index.js:13:router.use('/login', authRoutes.loginRouter);
+backend/routes/index.js:25:router.use('/attendance', attendanceRoutes);
+backend/routes/index.js:26:router.use('/employees', employeesRoutes);
+backend/routes/index.js:27:router.use('/reports', reportsRoutes);
+backend/routes/index.js:28:router.use('/products', productRoutes); 
+backend/routes/index.js:29:router.use('/sales', saleRoutes);
+backend/routes/index.js:32:router.get('/health', (req, res) => {
+backend/routes/authRoutes.js:87:router.post('/register', async (req, res) => {
+backend/routes/authRoutes.js:135:router.post('/login', loginHandler);
+database/init.sql:14:CREATE TABLE IF NOT EXISTS users (
+database/init.sql:37:CREATE TABLE IF NOT EXISTS products (
+database/init.sql:62:CREATE TABLE IF NOT EXISTS sales (
+database/init.sql:74:CREATE TABLE IF NOT EXISTS sale_items (
+database/init.sql:86:CREATE TABLE IF NOT EXISTS stock_movements (
+database/init.sql:109:CREATE TABLE IF NOT EXISTS employees (
+database/init.sql:139:CREATE TABLE IF NOT EXISTS attendance (
+database/init.sql:155:CREATE TABLE IF NOT EXISTS operation_reports (
+database/init.sql:169:CREATE TABLE IF NOT EXISTS compliance_reports (
+database/init.sql:182:CREATE TABLE IF NOT EXISTS financial_reports (
+database/init.sql:247:CREATE OR REPLACE VIEW low_stock_products AS
+database/init.sql:264:CREATE OR REPLACE VIEW expiring_products AS
+backend/api/routes/reportsRoutes.js:15:      details: error.details.map((d) => ({ message: d.message, path: d.path }))
+backend/api/routes/reportsRoutes.js:22:router.get('/financial', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER), financialController.getFinancialReports);
+backend/api/routes/reportsRoutes.js:23:router.post('/financial', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER), validateSchema(financialReportSchema, 'body'), financialController.createFinancialReport);
+backend/api/routes/reportsRoutes.js:25:router.get('/compliance', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER), complianceController.getComplianceReports);
+backend/api/routes/reportsRoutes.js:26:router.post('/compliance', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER), validateSchema(complianceReportSchema, 'body'), complianceController.createComplianceReport);
+backend/api/routes/reportsRoutes.js:28:router.get('/recent-activity', authenticate, authorize(ROLES.ADMIN, ROLES.STORE_MANAGER, ROLES.PHARMACIST, ROLES.HR_OFFICER, ROLES.CASHIER), getRecentActivity);
+backend/api/routes/attendanceRoutes.js:12:      details: error.details.map((d) => ({ message: d.message, path: d.path }))
+backend/api/routes/attendanceRoutes.js:19:router.get('/employee/:employee_id', authenticate, authorize(ROLES.ADMIN, ROLES.HR_OFFICER, ROLES.STORE_MANAGER, ROLES.PHARMACIST), validateSchema(employeeIdParam, 'params'), attendanceController.getAttendanceByEmployee);
+backend/api/routes/attendanceRoutes.js:20:router.post('/', authenticate, authorize(ROLES.ADMIN, ROLES.HR_OFFICER, ROLES.STORE_MANAGER), validateSchema(attendanceSchema, 'body'), attendanceController.addAttendance);
+backend/api/routes/productsRoutes.js:7:router.get('/', authenticate, productController.getAllProducts);
+backend/api/routes/productsRoutes.js:8:router.get('/low-stock', authenticate, productController.getLowStockProducts);
+backend/api/routes/productsRoutes.js:9:router.get('/expiring', authenticate, productController.getExpiringProducts);
+backend/api/routes/productsRoutes.js:10:router.get('/:id', authenticate, productController.getProductById);
+backend/api/routes/productsRoutes.js:12:router.post('/', authenticate, authorize(ROLES.ADMIN, ROLES.PHARMACIST), validateProduct(createProductSchema), productController.createProduct);
+backend/api/routes/productsRoutes.js:13:router.put('/:id', authenticate, authorize(ROLES.ADMIN, ROLES.PHARMACIST, ROLES.STORE_MANAGER), validateProduct(updateProductSchema), productController.updateProduct);
+backend/api/routes/productsRoutes.js:14:router.delete('/:id', authenticate, authorize(ROLES.ADMIN), productController.deleteProduct);
+backend/api/routes/salesRoutes.js:7:router.post('/checkout', authenticate, authorize(ROLES.ADMIN, ROLES.CASHIER, ROLES.PHARMACIST), validateSale, salesController.processSale);
+backend/api/routes/salesRoutes.js:8:router.get('/history', authenticate, salesController.getSaleHistory);
+backend/api/routes/employeesRoutes.js:31:        path: d.path
+backend/api/routes/employeesRoutes.js:45:router.get(
+backend/api/routes/employeesRoutes.js:53:router.get(
+backend/api/routes/employeesRoutes.js:62:router.post(
+backend/api/routes/employeesRoutes.js:71:router.put(
+backend/api/routes/employeesRoutes.js:81:router.delete(
+frontend/src/components/PermissionDeniedModal.vue:25:        <button
+frontend/src/components/PermissionDeniedModal.vue:26:          @click="goToLogin"
+frontend/src/components/PermissionDeniedModal.vue:31:        <button
+frontend/src/components/PermissionDeniedModal.vue:32:          @click="goBack"
+frontend/src/components/PermissionDeniedModal.vue:43:import { ref, watch } from 'vue';
+frontend/src/components/PermissionDeniedModal.vue:44:import { useRouter } from 'vue-router';
+frontend/src/layouts/Sidebar.vue:2:import { computed } from 'vue'
+frontend/src/layouts/Sidebar.vue:3:import { useRoute, useRouter } from 'vue-router'
+frontend/src/layouts/Sidebar.vue:107:      <button @click="emit('close')" class="ml-auto p-2 text-slate-300 hover:bg-slate-800 rounded-lg md:hidden" aria-label="Close navigation menu">
+frontend/src/layouts/Sidebar.vue:116:          <router-link 
+frontend/src/layouts/Sidebar.vue:147:      <button 
+frontend/src/layouts/Sidebar.vue:148:        @click="handleLogout"
+frontend/src/layouts/Sidebar.vue:160:    <button 
+frontend/src/layouts/Sidebar.vue:161:      @click="emit('toggle')"
+frontend/src/layouts/TopBar.vue:2:import { computed } from 'vue'
+frontend/src/layouts/TopBar.vue:3:import { Bell, HelpCircle, Menu } from 'lucide-vue-next'
+frontend/src/layouts/TopBar.vue:24:      <button @click="$emit('toggle-menu')" class="-ml-1 p-2 text-gray-600 hover:bg-gray-100 rounded-lg md:hidden" aria-label="Open navigation menu">
+frontend/src/layouts/TopBar.vue:36:      <router-link to="/help" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Help Center">
+frontend/src/layouts/TopBar.vue:40:      <button class="relative p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
+frontend/src/layouts/MainLayout.vue:2:import { ref } from 'vue'
+frontend/src/layouts/MainLayout.vue:3:import Sidebar from './Sidebar.vue'
+frontend/src/layouts/MainLayout.vue:4:import TopBar from './TopBar.vue'
+frontend/src/layouts/MainLayout.vue:23:    <button
+frontend/src/layouts/MainLayout.vue:27:      @click="mobileMenuOpen = false"
+frontend/src/modules/auth/views/Register.vue:22:      <form @submit.prevent="register" class="space-y-4">
+frontend/src/modules/auth/views/Register.vue:85:        <button 
+frontend/src/modules/auth/views/Register.vue:98:          <router-link to="/login" class="text-blue-600 hover:text-blue-700 font-medium">
+frontend/src/modules/auth/views/Register.vue:108:import { ref } from "vue";
+frontend/src/modules/auth/views/Register.vue:109:import { useRouter } from "vue-router";
+frontend/src/modules/auth/views/Login.vue:17:      <form @submit.prevent="login" class="space-y-4">
+frontend/src/modules/auth/views/Login.vue:40:        <button 
+frontend/src/modules/auth/views/Login.vue:53:          <router-link to="/register" class="text-blue-600 hover:text-blue-700 font-medium">
+frontend/src/modules/auth/views/Login.vue:63:import { ref } from "vue";
+frontend/src/modules/auth/views/Login.vue:64:import { useRouter } from "vue-router";
+frontend/src/modules/shared/components/BaseButton.vue:2:  <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+frontend/src/modules/shared/views/NotFoundView.vue:14:        <router-link
+frontend/src/modules/shared/views/NotFoundView.vue:20:        <button
+frontend/src/modules/shared/views/NotFoundView.vue:21:          @click="$router.back()"
+frontend/src/modules/shared/views/NotFoundView.vue:38:import { useRouter } from 'vue-router'
+frontend/src/modules/shared/views/HelpView.vue:2:import { ref } from 'vue'
+frontend/src/modules/shared/views/HelpView.vue:3:import MainLayout from '@/layouts/MainLayout.vue'
+frontend/src/modules/shared/views/HelpView.vue:4:import { ChevronDown, ChevronRight, Search, Phone, Mail, HelpCircle } from 'lucide-vue-next'
+frontend/src/modules/shared/views/HelpView.vue:93:        <button
+frontend/src/modules/shared/views/HelpView.vue:94:          @click="toggleSection(topic.id)"
+frontend/src/modules/inventory/components/AddProduct.vue:5:    <form @submit.prevent="saveProduct" class="space-y-4">
+frontend/src/modules/inventory/components/AddProduct.vue:57:        <button type="button" @click="$emit('cancel')" class="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg">Cancel</button>
+frontend/src/modules/inventory/components/AddProduct.vue:58:        <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors" :disabled="loading">
+frontend/src/modules/inventory/components/AddProduct.vue:67:import { reactive, ref } from 'vue';
+frontend/src/modules/pos/components/PosLayout.vue:2:import PosHeader from './PosHeader.vue'
+frontend/src/modules/inventory/components/StockTable.vue:32:                     <button @click="$emit('edit', product)" class="font-medium text-blue-600 hover:underline mr-3">Edit</button>
+frontend/src/modules/inventory/components/StockTable.vue:33:                    <!-- <button @click="$emit('delete', product)" class="font-medium text-red-600 hover:underline">Delete</button> -->
+frontend/src/modules/pos/components/CartSection.vue:3:import { Trash2, Plus, Minus, CreditCard, Banknote, Percent } from 'lucide-vue-next'
+frontend/src/modules/pos/components/CartSection.vue:37:              <button 
+frontend/src/modules/pos/components/CartSection.vue:38:                @click="store.updateQuantity(item.id, -1)"
+frontend/src/modules/pos/components/CartSection.vue:44:              <button 
+frontend/src/modules/pos/components/CartSection.vue:45:                @click="store.updateQuantity(item.id, 1)"
+frontend/src/modules/pos/components/CartSection.vue:52:            <button 
+frontend/src/modules/pos/components/CartSection.vue:53:              @click="store.removeFromCart(item.id)"
+frontend/src/modules/pos/components/CartSection.vue:82:        <button class="flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm">
+frontend/src/modules/pos/components/CartSection.vue:85:        <button @click="store.clearCart" class="flex items-center justify-center gap-2 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium text-sm">
+frontend/src/modules/pos/components/CartSection.vue:90:      <button class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all font-semibold flex items-center justify-center gap-2">
+frontend/src/modules/pos/components/ProductGrid.vue:2:import { onMounted } from 'vue'
+frontend/src/modules/pos/components/ProductGrid.vue:4:import { Search } from 'lucide-vue-next'
+frontend/src/modules/pos/components/ProductGrid.vue:38:        <button 
+frontend/src/modules/pos/components/ProductGrid.vue:41:          @click="setCategory(cat)"
+frontend/src/modules/pos/components/ProductGrid.vue:60:          @click="store.addToCart(product)"
+frontend/src/modules/inventory/views/InventoryDashboard.vue:2:import { ref, computed, onMounted } from 'vue'
+frontend/src/modules/inventory/views/InventoryDashboard.vue:3:import MainLayout from '@/layouts/MainLayout.vue'
+frontend/src/modules/inventory/views/InventoryDashboard.vue:5:import { Plus, Search, Package, AlertTriangle, Calendar, Edit, ScanBarcode } from 'lucide-vue-next'
+frontend/src/modules/inventory/views/InventoryDashboard.vue:180:        <button @click="showAddForm = !showAddForm" class="w-full h-full flex items-center justify-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+frontend/src/modules/inventory/views/InventoryDashboard.vue:203:        <button @click="saveProduct" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+frontend/src/modules/inventory/views/InventoryDashboard.vue:213:          <button @click="filter = 'all'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
+frontend/src/modules/inventory/views/InventoryDashboard.vue:216:          <button @click="filter = 'low'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'low' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
+frontend/src/modules/inventory/views/InventoryDashboard.vue:219:          <button @click="filter = 'expired'" :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors', filter === 'expired' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
+frontend/src/modules/inventory/views/InventoryDashboard.vue:225:            <input v-model="barcodeSearch" @keyup.enter="handleBarcodeSearch" type="text" placeholder="Scan barcode..." class="w-full pl-10 pr-4 py-2 border rounded-lg sm:w-48 focus:ring-2 focus:ring-blue-500 outline-none">
+frontend/src/modules/inventory/views/InventoryDashboard.vue:232:          <button
+frontend/src/modules/inventory/views/InventoryDashboard.vue:234:            @click="removeAllExpired"
+frontend/src/modules/inventory/views/InventoryDashboard.vue:262:          <button @click="showRestockModal = false" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+frontend/src/modules/inventory/views/InventoryDashboard.vue:263:          <button @click="confirmRestock" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Confirm Restock</button>
+frontend/src/modules/inventory/views/InventoryDashboard.vue:308:                <button
+frontend/src/modules/inventory/views/InventoryDashboard.vue:310:                  @click="openRestockModal(product)"
+frontend/src/modules/inventory/views/InventoryDashboard.vue:315:                <button
+frontend/src/modules/inventory/views/InventoryDashboard.vue:317:                  @click="ignoreLowStock(product)"
+frontend/src/modules/inventory/views/InventoryDashboard.vue:322:                <button
+frontend/src/modules/inventory/views/InventoryDashboard.vue:324:                  @click="removeExpired(product)"
+frontend/src/modules/pos/views/PosView.vue:2:import { ref, computed, onMounted } from 'vue'
+frontend/src/modules/pos/views/PosView.vue:3:import { useRouter } from 'vue-router'
+frontend/src/modules/pos/views/PosView.vue:4:import MainLayout from '@/layouts/MainLayout.vue'
+frontend/src/modules/pos/views/PosView.vue:6:import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Printer, ScanBarcode, HelpCircle } from 'lucide-vue-next'
+frontend/src/modules/pos/views/PosView.vue:104:                @keyup.enter="handleBarcodeScan"
+frontend/src/modules/pos/views/PosView.vue:111:            <button @click="handleBarcodeScan" class="shrink-0 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+frontend/src/modules/pos/views/PosView.vue:114:            <button @click="goToHelp" class="px-3 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center">
+frontend/src/modules/pos/views/PosView.vue:133:            <button
+frontend/src/modules/pos/views/PosView.vue:136:              @click="store.selectedCategory = cat"
+frontend/src/modules/pos/views/PosView.vue:155:              @click="store.addToCart(product)"
+frontend/src/modules/pos/views/PosView.vue:196:              <button @click="store.updateQuantity(item._id, -1)" class="w-7 h-7 flex items-center justify-center bg-white border border-gray-200 rounded-md hover:bg-gray-100">
+frontend/src/modules/pos/views/PosView.vue:200:              <button @click="store.updateQuantity(item._id, 1)" class="w-7 h-7 flex items-center justify-center bg-white border border-gray-200 rounded-md hover:bg-gray-100">
+frontend/src/modules/pos/views/PosView.vue:203:              <button @click="store.removeFromCart(item._id)" class="p-1 text-red-400 hover:text-red-600">
+frontend/src/modules/pos/views/PosView.vue:227:            <button
+frontend/src/modules/pos/views/PosView.vue:228:              @click="paymentMethod = 'cash'"
+frontend/src/modules/pos/views/PosView.vue:233:            <button
+frontend/src/modules/pos/views/PosView.vue:234:              @click="paymentMethod = 'card'"
+frontend/src/modules/pos/views/PosView.vue:241:          <button
+frontend/src/modules/pos/views/PosView.vue:242:            @click="processPayment"
+frontend/src/modules/pos/views/PosView.vue:250:          <button @click="store.clearCart" class="w-full py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors">
+frontend/src/modules/pos/views/PosView.vue:289:          <button @click="printReceipt" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center justify-center gap-2">
+frontend/src/modules/pos/views/PosView.vue:292:          <button @click="showReceipt = false" class="flex-1 py-2 border border-gray-200 text-gray-700 rounded-lg font-medium">
+frontend/src/modules/dashboard/components/DashboardStats.vue:2:import { Package, ShoppingCart, Users, DollarSign } from 'lucide-vue-next'
+frontend/src/modules/dashboard/components/DashboardActions.vue:5:      <button
+frontend/src/modules/dashboard/components/DashboardActions.vue:6:        @click="$router.push('/pos')"
+frontend/src/modules/dashboard/components/DashboardActions.vue:12:      <button
+frontend/src/modules/dashboard/components/DashboardActions.vue:18:      <button
+frontend/src/modules/dashboard/components/DashboardActions.vue:29:import { ref, onMounted } from 'vue'
+frontend/src/modules/reports/views/ReportsDashboard.vue:2:import { ref, computed, onMounted } from 'vue'
+frontend/src/modules/reports/views/ReportsDashboard.vue:3:import MainLayout from '@/layouts/MainLayout.vue'
+frontend/src/modules/reports/views/ReportsDashboard.vue:6:import { FileText, Download, Filter, TrendingUp, Package, Users, Calendar } from 'lucide-vue-next'
+frontend/src/modules/reports/views/ReportsDashboard.vue:67:        <button 
+frontend/src/modules/reports/views/ReportsDashboard.vue:68:          @click="activeTab = 'sales'"
+frontend/src/modules/reports/views/ReportsDashboard.vue:73:        <button 
+frontend/src/modules/reports/views/ReportsDashboard.vue:74:          @click="activeTab = 'stock'"
+frontend/src/modules/reports/views/ReportsDashboard.vue:79:        <button 
+frontend/src/modules/reports/views/ReportsDashboard.vue:80:          @click="activeTab = 'hr'"
+frontend/src/modules/reports/views/ReportsDashboard.vue:99:        <button @click="exportToCsv(salesData, 'sales-report')" class="justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+frontend/src/modules/reports/views/ReportsDashboard.vue:146:        <button @click="exportToCsv(products, 'stock-report')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+frontend/src/modules/reports/views/ReportsDashboard.vue:197:        <button @click="exportToCsv(employees, 'employees-report')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+frontend/src/modules/dashboard/views/Dashboard.vue:2:import { ref, computed, onMounted } from 'vue'
+frontend/src/modules/dashboard/views/Dashboard.vue:3:import MainLayout from '@/layouts/MainLayout.vue'
+frontend/src/modules/dashboard/views/Dashboard.vue:6:import { Package, ShoppingCart, Users, AlertTriangle, TrendingUp, Clock } from 'lucide-vue-next'
+frontend/src/modules/dashboard/views/Dashboard.vue:126:          <router-link to="/inventory" class="text-sm text-blue-600 hover:underline">View All</router-link>
+frontend/src/modules/dashboard/views/Dashboard.vue:178:        <router-link v-if="role === 'cashier' || role === 'admin'" to="/pos" class="justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+frontend/src/modules/dashboard/views/Dashboard.vue:181:        <router-link v-if="role !== 'cashier'" to="/inventory" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+frontend/src/modules/dashboard/views/Dashboard.vue:184:        <router-link v-if="role === 'admin' || role === 'hr_officer'" to="/hr" class="justify-center px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors flex items-center gap-2">
+frontend/src/App.vue:2:import { ref } from 'vue'
+frontend/src/App.vue:4:import PermissionDeniedModal from '@/components/PermissionDeniedModal.vue'
+frontend/src/modules/hr/views/HrDashboard.vue:2:import { ref, onMounted } from 'vue'
+frontend/src/modules/hr/views/HrDashboard.vue:3:import MainLayout from '@/layouts/MainLayout.vue'
+frontend/src/modules/hr/views/HrDashboard.vue:5:import { Plus, Search, UserPlus, Calendar, DollarSign, MoreVertical } from 'lucide-vue-next'
+frontend/src/modules/hr/views/HrDashboard.vue:66:        <button 
+frontend/src/modules/hr/views/HrDashboard.vue:67:          @click="activeTab = 'employees'"
+frontend/src/modules/hr/views/HrDashboard.vue:72:        <button 
+frontend/src/modules/hr/views/HrDashboard.vue:73:          @click="activeTab = 'attendance'"
+frontend/src/modules/hr/views/HrDashboard.vue:78:        <button 
+frontend/src/modules/hr/views/HrDashboard.vue:79:          @click="activeTab = 'payroll'"
+frontend/src/modules/hr/views/HrDashboard.vue:100:        <button @click="showAddForm = !showAddForm" class="justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+frontend/src/modules/hr/views/HrDashboard.vue:106:      <form v-if="showAddForm" @submit.prevent="saveEmployee" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
+frontend/src/modules/hr/views/HrDashboard.vue:127:          <button type="button" @click="showAddForm = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+frontend/src/modules/hr/views/HrDashboard.vue:128:          <button type="submit" :disabled="saving" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">{{ saving ? 'Saving...' : 'Save Employee' }}</button>
+frontend/src/modules/hr/views/HrDashboard.vue:175:                <button class="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+frontend/src/modules/hr/views/HrDashboard.vue:204:            <button class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors">Present</button>
+frontend/src/modules/hr/views/HrDashboard.vue:205:            <button class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors">Absent</button>

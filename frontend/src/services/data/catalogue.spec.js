@@ -1,59 +1,8 @@
-import { beforeEach, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { mount, flushPromises } from '@vue/test-utils'
-import { getAll, save, clearCollection } from '@/pouchdb'
-import apiClient from '../api/apiClient'
-import { useInventoryStore } from '@/modules/inventory/store/inventoryStore'
-import { usePosStore } from '@/modules/pos/store/posStore'
-import Dashboard from '@/modules/dashboard/views/Dashboard.vue'
-
-vi.mock('@/pouchdb', () => ({ getAll: vi.fn(), save: vi.fn(), clearCollection: vi.fn(), remove: vi.fn() }))
-vi.mock('../api/apiClient', () => ({ default: { get: vi.fn() } }))
-
-beforeEach(() => {
-    vi.resetAllMocks()
-    setActivePinia(createPinia())
-    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(true)
-    const collections = new Map()
-    getAll.mockImplementation(async collection => [...(collections.get(collection)?.values() || [])])
-    save.mockImplementation(async (collection, item) => {
-        if (!collections.has(collection)) collections.set(collection, new Map())
-        collections.get(collection).set(item._id, item)
-        return { ok: true }
-    })
-    clearCollection.mockImplementation(async collection => collections.set(collection, new Map()))
-    const products = Array.from({ length: 103 }, (_, index) => ({
-        id: index + 1, name: `Product ${index + 1}`, quantity: index === 102 ? 2 : 100,
-        sellingPrice: 10, reorderLevel: 10, category: 'Test'
-    }))
-    apiClient.get.mockImplementation(async (path, options) => {
-        if (path !== '/products') return { data: { data: [] } }
-        const page = options.params.page
-        return { data: { data: products.slice((page - 1) * 50, page * 50), pagination: { page, hasMore: page < 3 } } }
-    })
-})
-
-it('makes the last page searchable at POS and includes it in inventory counts and low stock', async () => {
-    const inventory = useInventoryStore()
-    await inventory.fetchProducts()
-    expect(inventory.products).toHaveLength(103)
-    expect(inventory.lowStockProducts.map(product => product.id)).toEqual([103])
-    const pos = usePosStore()
-    await pos.fetchProducts()
-    pos.searchQuery = 'Product 103'
-    expect(pos.filteredProducts.map(product => product.id)).toEqual([103])
-    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
-    await pos.fetchProducts()
-    expect(pos.filteredProducts.map(product => product.id)).toEqual([103])
-})
-
-it('uses the full catalogue for dashboard counts and low-stock summaries', async () => {
-    const wrapper = mount(Dashboard, { global: { stubs: {
-        MainLayout: { template: '<main><slot /></main>' }, RouterLink: { template: '<a><slot /></a>' }
-    } } })
-    await flushPromises()
-    expect(wrapper.text()).toContain('103')
-    expect(wrapper.text()).toContain('Product 103')
-    expect(wrapper.text()).toMatch(/Low Stock Alerts\s*1/)
-    wrapper.unmount()
-})
+import {beforeEach,expect,it,vi} from 'vitest'
+import {createPinia,setActivePinia} from 'pinia'
+import {useInventoryStore} from '@/modules/inventory/store/inventoryStore'
+import {dataService} from '@/services/api/dataService'
+vi.mock('@/services/api/dataService',()=>({dataService:{getProductPage:vi.fn(),getProductSummary:vi.fn()}}))
+beforeEach(()=>{vi.resetAllMocks();setActivePinia(createPinia())})
+it('inventory requests one bounded page and uses server-wide summary counts',async()=>{dataService.getProductPage.mockResolvedValue({data:{data:[{id:103}],pagination:{page:5,total:103,hasMore:false}}});dataService.getProductSummary.mockResolvedValue({data:{total:103,low:1,expired:0}});const s=useInventoryStore();await s.fetchProducts({page:5});await s.refreshSummary();expect(s.summary.total).toBe(103);expect(s.products[0].id).toBe(103);expect(dataService.getProductPage).toHaveBeenCalledWith({page:5,limit:25})})
+it('API failures remain failures rather than being replaced by cached money or stock',async()=>{const error={request:{}};dataService.getProductPage.mockRejectedValue(error);const s=useInventoryStore();await s.fetchProducts();expect(s.error).toEqual(error);expect(s.products).toEqual([])})

@@ -1,126 +1,34 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { usePosStore } from '../store/posStore'
-import { dataOrchestrator } from '@/services/data/dataOrchestrator'
+import { usePosStore } from './posStore'
 import { dataService } from '@/services/api/dataService'
-import { save } from '@/pouchdb'
-
-vi.mock('@/services/data/dataOrchestrator', () => ({
-    dataOrchestrator: { fetchCollection: vi.fn(), saveItem: vi.fn() }
-}))
-vi.mock('@/services/api/dataService', () => ({
-    dataService: { getProducts: vi.fn(), recordSale: vi.fn() }
-}))
-
-// Mock the DB service
-vi.mock('@/pouchdb', () => ({
-    getAll: vi.fn(),
-    save: vi.fn(),
-    remove: vi.fn()
-}))
-
-
-describe('POS Store', () => {
-    beforeEach(() => {
-        setActivePinia(createPinia())
-        vi.resetAllMocks()
-        localStorage.setItem('user', JSON.stringify({ id: 3, name: 'Cashier' }))
-        dataOrchestrator.saveItem.mockImplementation(async (collection, item) => ({
-            ok: true, offline: false, data: { ...item, id: 9, receiptNumber: 'REC-9' }
-        }))
-
-        // Mock return value for products
-        dataOrchestrator.fetchCollection.mockResolvedValue([
-            { _id: '1', name: 'Test Product', price: 10, stock: 100 },
-            { _id: '2', name: 'P2', price: 5, stock: 50 },
-            { _id: '3', name: 'Low Stock', price: 20, stock: 0 }
-        ])
-    })
-
-    it('fetches products on init', async () => {
-        const store = usePosStore()
-        await store.fetchProducts()
-
-        expect(dataOrchestrator.fetchCollection).toHaveBeenCalledWith('products', dataService.getProducts)
-        expect(store.products).toHaveLength(3)
-    })
-
-    it('adds items to cart', async () => {
-        const store = usePosStore()
-        await store.fetchProducts()
-        const product = store.products.find(p => p._id === '1')
-
-        store.addToCart(product)
-
-        expect(store.cart).toHaveLength(1)
-        expect(store.cart[0].quantity).toBe(1)
-    })
-
-    it('prevents adding out of stock items', async () => {
-        const store = usePosStore()
-        await store.fetchProducts()
-        const product = store.products.find(p => p._id === '3')
-
-        window.alert = vi.fn()
-        store.addToCart(product)
-
-        expect(store.cart).toHaveLength(0)
-        expect(window.alert).toHaveBeenCalled()
-    })
-
-    it('calculates total correctly', async () => {
-        const store = usePosStore()
-        await store.fetchProducts()
-
-        store.addToCart(store.products[0])
-        store.addToCart(store.products[0])
-        store.addToCart(store.products[1])
-
-        expect(store.cartTotal).toBe(25)
-    })
-    it('checks out with database IDs and canonical money fields, then refreshes stock', async () => {
-        const store = usePosStore()
-        await store.fetchProducts()
-        store.addToCart({ ...store.products[0], _id: 'legacy-local-key', id: 1 })
-        const result = await store.checkout('card')
-        const [collection, sale, method] = dataOrchestrator.saveItem.mock.calls[0]
-        expect(collection).toBe('transactions')
-        expect(method).toBe(dataService.recordSale)
-        expect(sale).toMatchObject({ totalAmount: 11.65, userId: 3, paymentMethod: 'card' })
-        expect(sale.items[0]).toMatchObject({ productId: 1, unitPrice: 10, subtotal: 10, quantity: 1 })
-        expect(result.transaction.receiptNumber).toBe('REC-9')
-        expect(save).not.toHaveBeenCalled()
-        expect(store.cart).toHaveLength(0)
-        expect(dataOrchestrator.fetchCollection).toHaveBeenCalledTimes(2)
-    })
-
-    it('keeps the cart on API rejection and does not write stock', async () => {
-        const store = usePosStore()
-        await store.fetchProducts()
-        store.addToCart(store.products[0])
-        dataOrchestrator.saveItem.mockRejectedValue(new Error('Insufficient stock'))
-        await expect(store.checkout('cash')).rejects.toThrow('Insufficient stock')
-        expect(store.cart).toHaveLength(1)
-        expect(save).not.toHaveBeenCalled()
-    })
-
-    it('refuses to sell a product with only an unsynchronized local identifier', async () => {
-        const store = usePosStore()
-        store.addToCart({ _id: 'products_local', name: 'Local', price: 10, stock: 10 })
-        await expect(store.checkout('cash')).rejects.toThrow('must be synchronized')
-        expect(dataOrchestrator.saveItem).not.toHaveBeenCalled()
-    })
-
-    it('queues offline sales and changes only the cached stock without a product API write', async () => {
-        const store = usePosStore()
-        await store.fetchProducts()
-        store.addToCart(store.products[0])
-        dataOrchestrator.saveItem.mockImplementation(async (collection, item) => ({ ok: true, offline: true, data: item }))
-        const result = await store.checkout('cash')
-        expect(result.offline).toBe(true)
-        expect(save).toHaveBeenCalledWith('products', expect.objectContaining({ _id: '1', stock: 99, quantity: 99 }))
-        expect(dataOrchestrator.saveItem).toHaveBeenCalledTimes(1)
-        expect(dataOrchestrator.fetchCollection).toHaveBeenCalledTimes(1)
-    })
-
+vi.mock('@/services/api/dataService',()=>({dataService:{getConfig:vi.fn(),getProductPage:vi.fn(),getProduct:vi.fn(),recordSale:vi.fn()}}))
+const products=[{id:1,name:'Medicine',quantity:10,sellingPrice:'10.00',reorderLevel:2},{id:103,name:'Last product',quantity:2,sellingPrice:'0.20'}]
+beforeEach(()=>{vi.resetAllMocks();localStorage.clear();localStorage.setItem('user',JSON.stringify({id:3,name:'Cashier'}));setActivePinia(createPinia());dataService.getConfig.mockResolvedValue({data:{taxRateBps:1650}});dataService.getProductPage.mockResolvedValue({data:{data:products}});dataService.recordSale.mockResolvedValue({data:{data:{id:9,receiptNumber:'REC-9',items:[{productId:1,remainingStock:9}]}}})})
+async function ready(){const s=usePosStore();await s.configure();await s.fetchProducts();return s}
+it('requests bounded authoritative POS results including products beyond the first catalogue page',async()=>{const s=await ready();s.searchQuery='Last';await s.fetchProducts();expect(dataService.getProductPage).toHaveBeenLastCalledWith(expect.objectContaining({search:'Last',page:1,limit:40}));expect(s.products[1].id).toBe(103)})
+it('uses integer minor units for cart and VAT totals',async()=>{const s=await ready();s.addToCart({...s.products[0],price:'0.10'});s.addToCart(s.products[1]);expect(s.cartTotal).toBe(0.30);expect(s.taxMinor).toBe(5);expect(s.totalAmount).toBe(0.35)})
+it('prevents overselling and keeps errors in readable UI state',async()=>{const s=await ready();s.addToCart({...s.products[0],stock:0});expect(s.cart).toHaveLength(0);expect(s.error.code).toBe('INSUFFICIENT_STOCK')})
+it('successful checkout clears the cart and uses the response stock without a catalogue request',async()=>{const s=await ready();s.addToCart(s.products[0]);const result=await s.checkout('cash');expect(result.transaction.receiptNumber).toBe('REC-9');expect(s.cart).toHaveLength(0);expect(s.products[0].stock).toBe(9);expect(dataService.getProductPage).toHaveBeenCalledTimes(1);expect(dataService.recordSale.mock.calls[0][0]).toMatchObject({totalAmount:'11.65',items:[{productId:1,quantity:1,unitPrice:'10.00',subtotal:'10.00'}]})})
+it.each([400,401,403,409,500])('retains the cart for rejected HTTP %s',async status=>{const s=await ready();s.addToCart(s.products[0]);dataService.recordSale.mockRejectedValue({response:{status,data:{code:status===409?'INSUFFICIENT_STOCK':undefined}}});await expect(s.checkout('cash')).rejects.toBeDefined();expect(s.cart).toHaveLength(1)})
+it('ambiguous network failure retains the checkout key across reload and retry',async()=>{const s=await ready();s.addToCart(s.products[0]);dataService.recordSale.mockRejectedValueOnce({request:{}});await expect(s.checkout('cash')).rejects.toBeDefined();const key=s.pending.idempotencyKey;s.updateQuantity('1',1);expect(s.cart[0].quantity).toBe(1);setActivePinia(createPinia());const restored=usePosStore();restored.restoreCart();expect(restored.pending.idempotencyKey).toBe(key);expect(restored.cart).toHaveLength(1);await restored.checkout('card');expect(dataService.recordSale.mock.calls[1][0].idempotencyKey).toBe(key);expect(dataService.recordSale.mock.calls[1][0].paymentMethod).toBe('cash')})
+it('never restores another staff member’s cart',async()=>{const s=await ready();s.addToCart(s.products[0]);localStorage.setItem('user',JSON.stringify({id:4}));s.restoreCart();expect(s.cart).toHaveLength(0)})
+it('scanner resolves a real barcode through the server',async()=>{const s=await ready();dataService.getProductPage.mockResolvedValueOnce({data:{data:[products[0]]}});expect(await s.scan('900123')).toBe(true);expect(dataService.getProductPage).toHaveBeenLastCalledWith({barcode:'900123',sellable:true,limit:2});expect(s.cart).toHaveLength(1)})
+it('does not submit when the retry reference cannot survive a reload',async()=>{
+ const s=await ready();s.addToCart(s.products[0]);
+ const quota=vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new Error('quota detail')});
+ try{await expect(s.checkout('cash')).rejects.toMatchObject({code:'UNEXPECTED'});expect(dataService.recordSale).not.toHaveBeenCalled();expect(s.cart).toHaveLength(1);}
+ finally{quota.mockRestore();}
+ const key=s.pending.idempotencyKey;await s.checkout('cash');expect(dataService.recordSale).toHaveBeenCalledTimes(1);expect(dataService.recordSale.mock.calls[0][0].idempotencyKey).toBe(key);
+})
+it('does not silently pick a product for an ambiguous barcode',async()=>{const s=await ready();expect(await s.scan('shared')).toBe(false);expect(s.cart).toHaveLength(0);expect(s.error.code).toBe('BARCODE_AMBIGUOUS')})
+it('ignores empty scans and preserves stock-limit failures',async()=>{const s=await ready();dataService.getProductPage.mockClear();expect(await s.scan('  ')).toBe(false);expect(dataService.getProductPage).not.toHaveBeenCalled();dataService.getProductPage.mockResolvedValue({data:{data:[{...products[1],quantity:1}]}});expect(await s.scan('code')).toBe(true);expect(await s.scan('code')).toBe(false);expect(s.cart[0].quantity).toBe(1);expect(s.error.code).toBe('INSUFFICIENT_STOCK')})
+it('rejects underpayment and non-cash overpayment before sending a sale',async()=>{const s=await ready();s.addToCart(s.products[0]);await expect(s.checkout('cash','','10.00')).rejects.toMatchObject({code:'PAYMENT_AMOUNT'});await expect(s.checkout('card','','20.00')).rejects.toMatchObject({code:'PAYMENT_AMOUNT'});expect(dataService.recordSale).not.toHaveBeenCalled();expect(s.pending).toBeNull()})
+it('preserves received cash in a pending retry',async()=>{const s=await ready();s.addToCart(s.products[0]);dataService.recordSale.mockRejectedValueOnce({request:{}});await expect(s.checkout('cash','','20.00')).rejects.toBeDefined();expect(s.pending.amountReceived).toBe('20.00');await s.checkout('card','','11.65');expect(dataService.recordSale.mock.calls[1][0]).toMatchObject({paymentMethod:'cash',amountReceived:'20.00'})})
+it('keeps unavailable products visible but prevents adding them',async()=>{const s=await ready();dataService.getProductPage.mockResolvedValueOnce({data:{data:[{...products[0],expired:true}],pagination:{page:2}}});await s.fetchProducts(2);expect(s.products).toHaveLength(1);expect(s.pagination.page).toBe(2);expect(s.addToCart(s.products[0])).toBe(false);expect(s.cart).toHaveLength(0)})
+it('refreshes a restored cart and identifies expired stock before submission',async()=>{
+ localStorage.setItem('mpms:cart:v1:3',JSON.stringify({cart:[{id:1,_id:'1',name:'Medicine',price:'10.00',stock:10,quantity:1}]}));dataService.getProduct.mockResolvedValue({data:{data:{...products[0],expired:true,isActive:true,expiryDate:'2020-01-01'}}});const s=await ready();expect(s.cart[0].unavailableReason).toBe('expired');expect(s.cart[0].expiryDate).toBe('2020-01-01');await expect(s.checkout('cash')).rejects.toMatchObject({code:'PRODUCT_UNAVAILABLE'});expect(dataService.recordSale).not.toHaveBeenCalled()
+})
+it('marks only the unavailable line identified by the checkout response',async()=>{
+ const s=await ready();s.addToCart(s.products[0]);s.addToCart(s.products[1]);dataService.recordSale.mockRejectedValue({response:{status:409,data:{code:'PRODUCT_UNAVAILABLE',unavailableItems:[{productId:103,reason:'inactive'}]}}});await expect(s.checkout('cash')).rejects.toBeDefined();expect(s.pending).toBeNull();expect(s.cart[0].unavailableReason).toBeUndefined();expect(s.cart[1].unavailableReason).toBe('inactive');s.removeFromCart('103');dataService.recordSale.mockResolvedValue({data:{data:{receiptNumber:'REC-fixed',items:[]}}});expect((await s.checkout('cash')).transaction.receiptNumber).toBe('REC-fixed')
 })

@@ -8,7 +8,8 @@ import {
   ShoppingCart, 
   Users, 
   FileText, 
-  Settings, 
+  HelpCircle,
+  Wallet, 
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -37,6 +38,8 @@ const user = computed(() => {
 
 // All available menu items with visibility conditions
 const allMenuItems = [
+  { path: '/accounts', label: 'Accounts', icon: Users, show: computed(() => userRole.value === 'admin') },
+  { path: '/leave', label: 'Leave', icon: FileText, show: canAccessHr },
   { 
     path: '/dashboard', 
     label: 'Dashboard', 
@@ -45,10 +48,13 @@ const allMenuItems = [
   },
   { 
     path: '/pos', 
-    label: 'Point of Sale', 
+    label: 'Sell items', 
     icon: ShoppingCart, 
     show: canAccessPos
   },
+  { path: '/sales', label: 'Sales', icon: FileText, show: computed(() => true) },
+  { path: '/finances', label: 'Finances', icon: Wallet, show: canAccessReports },
+  { path: '/help', label: 'Help and tour', icon: HelpCircle, show: computed(() => true) },
   { 
     path: '/inventory', 
     label: 'Inventory', 
@@ -57,7 +63,7 @@ const allMenuItems = [
   },
   { 
     path: '/hr', 
-    label: 'HR Management', 
+    label: 'Staff', 
     icon: Users, 
     show: canAccessHr,
     restricted: true // Marks as sensitive/restricted feature
@@ -92,7 +98,7 @@ const handleLogout = () => {
   >
     <!-- Logo -->
     <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3" :class="{ 'md:hidden': collapsed }">
         <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
           <img src="@/assets/metmma_pharmacy_logo.svg" alt="METMMA Pharmacy Logo" class="w-7 h-7 object-contain">
         </div>
@@ -121,7 +127,9 @@ const handleLogout = () => {
                 ? 'bg-blue-600 text-white' 
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white'
             ]"
-            :title="item.restricted ? 'Restricted to HR Officers and Admins' : ''"
+            :title="item.restricted ? 'Staff records for administrators and HR officers' : `Open ${item.label}`"
+            :aria-current="isActive(item.path) ? 'page' : undefined"
+            @click="emit('close')"
           >
             <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
             <span class="text-sm font-medium flex items-center gap-2" :class="{ 'md:hidden': collapsed }">
@@ -158,7 +166,7 @@ const handleLogout = () => {
 
     <!-- Toggle Button -->
     <button 
-      @click="emit('toggle')"
+      aria-label="Expand or collapse navigation" @click="emit('toggle')"
       class="hidden md:flex absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full items-center justify-center text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600"
     >
       <ChevronLeft v-if="!collapsed" class="w-4 h-4" />

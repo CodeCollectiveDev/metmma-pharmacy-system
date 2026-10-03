@@ -1,19 +1,38 @@
-version: "3.9"
-
+name: metmma-development
 services:
   postgres:
     image: postgres:16
-    container_name: metmma-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: metmma_pharmacy
       POSTGRES_USER: metmma_user
-      POSTGRES_PASSWORD: SecurePass123!
+      # Disposable local credentials; never use these for Neon/production.
+      POSTGRES_PASSWORD: metmma_local_only
     ports:
-      - "5432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metmma_user -d metmma_pharmacy"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  postgres-test:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: metmma_test
+      POSTGRES_USER: metmma_test
+      POSTGRES_PASSWORD: metmma_test_only
+    ports:
+      - "127.0.0.1:55433:5432"
+    # Integration fixtures create their own schemas. Test data is disposable.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metmma_test -d metmma_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 volumes:
   postgres_data:

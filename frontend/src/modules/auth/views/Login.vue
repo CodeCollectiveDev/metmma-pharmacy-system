@@ -16,9 +16,9 @@
 
       <form @submit.prevent="login" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+          <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
           <input 
-            v-model="email" 
+            id="username" autocomplete="username" v-model="email" 
             type="text" 
             placeholder="username" 
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -27,9 +27,9 @@
         </div>
         
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
           <input 
-            v-model="password" 
+            id="password" autocomplete="current-password" v-model="password" 
             type="password" 
             placeholder="••••••••" 
             class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -47,14 +47,7 @@
         </button>
       </form>
 
-      <div class="mt-6 pt-6 border-t border-gray-200 text-center">
-        <p class="text-sm text-gray-600">
-          Don't have an account?
-          <router-link to="/register" class="text-blue-600 hover:text-blue-700 font-medium">
-            Create one here
-          </router-link>
-        </p>
-      </div>
+      <p class="mt-6 text-sm text-gray-600">Ask your administrator if you need an account or help signing in.</p>
     </div>
   </div>
 </template>
@@ -70,7 +63,7 @@ const loading = ref(false);
 const router = useRouter();
 
 import { authService } from '@/services/api/authService';
-import { getAll } from '@/pouchdb';
+import { userError } from '@/services/api/errors';
 
 async function login() {
   error.value = "";
@@ -98,29 +91,10 @@ async function login() {
         router.push("/dashboard");
       }
     } else {
-      error.value = "Invalid server response.";
+      error.value = "We could not sign you in. Please try again.";
     }
   } catch (err) {
-    console.error('[Login] API Error:', err);
-    if (err.response && err.response.status === 401) {
-      error.value = "Invalid credentials. Please try again.";
-    } else {
-      // Offline fallback: Check local storage for emergency login if backend is down
-      try {
-        const users = await getAll('users');
-        const user = users.find(u => u.email === email.value && u.password === password.value);
-        if (user) {
-          localStorage.setItem("token", "pouchdb-session-" + user._id);
-          localStorage.setItem("role", user.role);
-          localStorage.setItem("user", JSON.stringify(user));
-          router.push(user.role === 'cashier' ? '/pos' : '/dashboard');
-          return;
-        }
-      } catch (localErr) {
-        console.error('[Login] Local fallback failed:', localErr);
-      }
-      error.value = "Server unreachable. Only offline login for existing sessions available.";
-    }
+    error.value = userError(err).message;
   } finally {
     loading.value = false;
   }

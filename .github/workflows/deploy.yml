@@ -1,0 +1,152 @@
+name: Validate and deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      initialize_database:
+        description: 'First installation only: initialize an EMPTY Neon database'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    outputs:
+      release_id: ${{ steps.release.outputs.id }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: metmma_test
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: metmma_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U metmma_test -d metmma_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://metmma_test:ci-only-password@127.0.0.1:5432/metmma_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install and validate
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          npm run check --prefix backend
+          npm test --prefix backend
+          npm run test:integration --prefix backend
+          npm run check --prefix frontend
+          npm test --prefix frontend
+          npm run build --prefix frontend
+          bash -n deploy/deploy.sh deploy/backup-now.sh deploy/backup/backup.sh
+          python3 -m unittest discover -s deploy/tests -p 'test_*.py'
+      - name: Identify immutable release
+        id: release
+        run: echo "id=${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+      - name: Build images on GitHub (linux/amd64 VPS)
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+        run: |
+          docker build --pull -f backend/Dockerfile -t "metmma-api:$RELEASE_ID" .
+          docker build --pull -f deploy/backup/Dockerfile -t "metmma-backup:$RELEASE_ID" .
+          docker pull caddy:2-alpine
+          docker tag caddy:2-alpine "metmma-proxy:$RELEASE_ID"
+      - name: Smoke test the packaged API and first-install commands
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          DB_SSL: 'false'
+          JWT_SECRET: ci-only-secret-with-at-least-32-characters
+        run: |
+          args=(--network host -e DATABASE_URL -e DB_SSL -e JWT_SECRET)
+          docker run --rm "${args[@]}" "metmma-api:$RELEASE_ID" npm run db:init
+          docker run --rm "${args[@]}" "metmma-api:$RELEASE_ID" npm run migrate
+          docker run --rm "${args[@]}" "metmma-api:$RELEASE_ID" npm run migrate
+          # Refuse to seed an initialized database.
+          if docker run --rm "${args[@]}" "metmma-api:$RELEASE_ID" npm run db:init; then
+            echo 'Initialization unexpectedly accepted a non-empty database.' >&2
+            exit 1
+          fi
+          docker run -d --name metmma-smoke "${args[@]}" "metmma-api:$RELEASE_ID"
+          trap 'docker logs metmma-smoke; docker rm -f metmma-smoke' EXIT
+          curl --fail --retry 20 --retry-all-errors --retry-delay 2 --max-time 10 http://127.0.0.1:3000/api/health
+      - name: Package prebuilt images and release files
+        if: github.event_name != 'pull_request'
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+        run: |
+          mkdir artifact
+          docker save "metmma-api:$RELEASE_ID" "metmma-backup:$RELEASE_ID" "metmma-proxy:$RELEASE_ID" | gzip > artifact/images.tar.gz
+          cp deploy/compose.yml deploy/Caddyfile deploy/deploy.sh deploy/backup-now.sh artifact/
+          cd artifact
+          sha256sum images.tar.gz > images.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: vps-release
+          path: artifact/
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: production
+    concurrency:
+      group: metmma-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vps-release
+          path: artifact
+      - name: Upload and deploy the prebuilt release
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          RELEASE_ID: ${{ needs.build.outputs.release_id }}
+          INITIALIZE_DATABASE: ${{ inputs.initialize_database && 'true' || 'false' }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $VPS_HOST =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
+          [[ $VPS_USER =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ $VPS_PORT =~ ^[0-9]+$ ]]
+          test -n "$VPS_SSH_KEY"
+          test -n "$VPS_KNOWN_HOSTS"
+          umask 077
+          ssh_dir=$(mktemp -d "$RUNNER_TEMP/metmma-ssh.XXXXXX")
+          trap 'rm -rf "$ssh_dir"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          opts=(-i "$ssh_dir/key" -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          target="$VPS_USER@$VPS_HOST"
+          scp_target="$target"
+          if [[ $VPS_HOST == *:* ]]; then scp_target="$VPS_USER@[$VPS_HOST]"; fi
+          remote="metmma-incoming/$RELEASE_ID"
+          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "mkdir -p '$remote'"
+          scp "${opts[@]}" -P "$VPS_PORT" artifact/* "$scp_target:$remote/"
+          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "bash '$remote/deploy.sh' '$RELEASE_ID' '$INITIALIZE_DATABASE'"

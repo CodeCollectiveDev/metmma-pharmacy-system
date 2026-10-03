@@ -11,14 +11,14 @@ if (!process.env.TEST_DATABASE_URL) throw new Error('Set TEST_DATABASE_URL to an
 const schema = `contract_test_${randomUUID().replaceAll('-', '')}`;
 const admin = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
 const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, options: `-c search_path=${schema}` });
-require.cache[require.resolve('../../api/db')] = { exports: { pool, query: (...args) => pool.query(...args) } };
+require.cache[require.resolve('../../api/db')] = { exports: { pool, query: (...args) => pool.query(...args), transaction: async work => {const c=await pool.connect();try{await c.query('BEGIN');const r=await work(c);await c.query('COMMIT');return r;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}} } };
 process.env.JWT_SECRET = 'isolated-contract-test-key';
 let server;
 let base;
 let employeeId;
 
 const request = async (path, { method = 'GET', body, role = 'admin', authenticated = true } = {}) => {
-  const token = jwt.sign({ id: 1, username: 'test', role }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: {admin:1,pharmacist:2,cashier:3,store_manager:4,hr_officer:5}[role], username: 'test', role }, process.env.JWT_SECRET);
   const response = await fetch(`${base}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) },
@@ -30,6 +30,9 @@ const request = async (path, { method = 'GET', body, role = 'admin', authenticat
 before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`);
   await pool.query(readFileSync(require.resolve('../../../database/init.sql'), 'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261002_mvp.sql'), 'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_staff_workflows.sql'),'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));
   await pool.query(`INSERT INTO products (product_code, name, batch_number, expiry_date, quantity, unit_price, selling_price, category)
     SELECT 'TEST-' || n, 'Product ' || LPAD(n::text, 3, '0'), 'B-' || n, '2030-01-01',
            CASE WHEN n = 103 THEN 2 ELSE 100 END, 10, 10, CASE WHEN n > 50 THEN 'Later' ELSE 'First' END
@@ -40,6 +43,7 @@ before(async () => {
   app.use('/products', require('../../api/routes/productsRoutes'));
   app.use('/employees', require('../../api/routes/employeesRoutes'));
   app.use('/attendance', require('../../api/routes/attendanceRoutes'));
+  app.use(require('../../lib/errors').errorHandler);
   server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   base = `http://127.0.0.1:${server.address().port}`;
@@ -73,39 +77,39 @@ test('all catalogue pages, filters, metadata and low-stock products remain reach
 test('frontend checkout payload persists sale fields, lines and a single stock decrement', async () => {
   const { toSalePayload } = await import('../../../frontend/src/services/api/salePayload.js');
   const payload = toSalePayload({
-    totalAmount: 23.3, paymentMethod: 'card', customerName: 'Customer', userId: 1,
+    idempotencyKey:randomUUID(),totalAmount: 23.3, paymentMethod: 'card', customerName: 'Customer', userId: 1,
     items: [{ productId: 103, name: 'Product 103', quantity: 2, unitPrice: 10, subtotal: 20 }]
   });
   const response = await request('/sales/checkout', { method: 'POST', body: payload, role: 'cashier' });
   assert.equal(response.status, 201, JSON.stringify(response.data));
-  assert.equal(response.data.data.totalAmount, 23.3);
+  assert.equal(response.data.data.totalAmount, '23.30');
   assert.equal(response.data.data.receiptNumber, response.data.receiptNumber);
   const sale = (await pool.query('SELECT * FROM sales WHERE id = $1', [response.data.saleId])).rows[0];
   assert.equal(sale.total_amount, '23.30');
   assert.equal(sale.payment_method, 'card');
   assert.equal(sale.customer_name, 'Customer');
-  assert.equal(sale.user_id, 1);
+  assert.equal(sale.user_id, 3);
   const line = (await pool.query('SELECT * FROM sale_items WHERE sale_id = $1', [sale.id])).rows[0];
   assert.equal(line.subtotal, '20.00');
   assert.equal(line.quantity, 2);
   assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 103')).rows[0].quantity, 0);
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 103')).rowCount, 1);
   const history = await request('/sales/history');
-  assert.equal(history.data.data[0].items[0].product_id, 103);
+  assert.equal(history.data.data[0].items[0].productId, 103);
 
   const retry = await request('/sales/checkout', { method: 'POST', body: {
-    ...payload,
+    ...payload,idempotencyKey:randomUUID(),
     items: [{ productId: 1, quantity: 1, unitPrice: 10, subtotal: 10 }, ...payload.items]
   } });
-  assert.equal(retry.status, 400);
-  assert.match(retry.data.message, /Insufficient stock/);
+  assert.equal(retry.status, 409);
+  assert.equal(retry.data.code,'INSUFFICIENT_STOCK');
   assert.equal((await pool.query('SELECT * FROM sales')).rowCount, 1, 'failed checkout rolled back');
   assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 1')).rows[0].quantity, 100);
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 1')).rowCount, 0);
 });
 
 test('invalid checkout and unauthorized writes are rejected without inserting records', async () => {
-  const body = { totalAmount: 10, items: [{ productId: 1, quantity: -1, unitPrice: 10, subtotal: 10 }] };
+  const body = { idempotencyKey:randomUUID(),totalAmount: 10, items: [{ productId: 1, quantity: -1, unitPrice: 10, subtotal: 10 }] };
   const response = await request('/sales/checkout', { method: 'POST', body });
   assert.equal(response.status, 400);
   assert.equal(response.data.errors[0].field, 'items.0.quantity');
@@ -129,7 +133,7 @@ test('employee creation persists all submitted fields, generates its identifier 
   assert.equal(employee.phone_number, '+265991234567');
   assert.equal(employee.is_active, true);
   assert.equal((await request(`/employees/${employeeId}`)).data.employee_id, employee.employee_id);
-  assert.ok((await request('/employees')).data.some(row => row.id === employeeId));
+  assert.ok((await request('/employees')).data.data.some(row => row.id === employeeId));
   // The existing full update path remains supported; partial-update repair is #59.
   assert.equal((await request(`/employees/${employeeId}`, { method: 'PUT', body: { ...body, salary: 1200 } })).status, 200);
   assert.equal((await request(`/employees/${employeeId}`)).data.salary, '1200.00');
@@ -138,7 +142,7 @@ test('employee creation persists all submitted fields, generates its identifier 
   const invalid = await request('/employees', { method: 'POST', body: { first_name: 'Jane', last_name: 'Smith' } });
   assert.equal(invalid.status, 400);
   for (const field of ['email', 'department', 'job_title', 'salary']) {
-    assert.ok(invalid.data.details.some(detail => detail.path[0] === field));
+    assert.ok(invalid.data.errors.some(detail => detail.field === field));
   }
   assert.equal((await request('/employees', { method: 'POST', body, role: 'hr_officer' })).status, 403);
 });
@@ -151,7 +155,7 @@ test('every supported attendance status persists; Excused fails before PostgreSQ
   }
   const response = await request('/attendance', { method: 'POST', body: { employee_id: employeeId, date: '2026-02-20', status: 'Excused' } });
   assert.equal(response.status, 400);
-  const records = (await request(`/attendance/employee/${employeeId}`)).data;
+  const records = (await request(`/attendance/employee/${employeeId}`)).data.data;
   assert.equal(records.length, statuses.length);
   assert.deepEqual(new Set(records.map(row => row.status)), new Set(statuses.slice(0, 5)));
 });

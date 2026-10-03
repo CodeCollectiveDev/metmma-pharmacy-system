@@ -12,7 +12,7 @@ const employeeFields = {
   job_title: Joi.string().trim().max(100),
   role: Joi.string().trim().max(50),
   hire_date: Joi.date().iso().less('now'),
-  salary: Joi.number().positive().precision(2)
+  salary: Joi.number().positive().max(99999999.99).precision(2).strict()
 };
 
 /**
@@ -45,10 +45,7 @@ const employeeCreateSchema = Joi.object({
  * Schema for PUT /api/employees/:id (Update)
  * Uses .fork() to make all fields optional for partial updates
  */
-const employeeUpdateSchema = employeeCreateSchema.fork(
-  Object.keys(employeeFields), 
-  (field) => field.optional()
-);
+const employeeUpdateSchema = Joi.object(employeeFields).min(1).required();
 
 module.exports = {
   idParam,
