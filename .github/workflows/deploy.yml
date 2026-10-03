@@ -146,8 +146,8 @@ jobs:
           fi
           chmod 600 "$key"
           ssh-keygen -y -f "$key" >/dev/null 2>&1
-          ssh-keyscan -p "$VPS_PORT" -t ed25519 "$VPS_HOST" > "$ssh_dir/known_hosts" 2>/dev/null
-          test -s "$ssh_dir/known_hosts"
+          ssh-keyscan -p "$VPS_PORT" "$VPS_HOST" > "$ssh_dir/known_hosts" 2>/dev/null
+          test -s "$ssh_dir/known_hosts" || { echo "Unable to fetch host key from $VPS_HOST:$VPS_PORT" >&2; exit 1; }
           opts=(-i "$key" -o IdentitiesOnly=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
           target="$VPS_USER@$VPS_HOST"
           scp_target="$target"
