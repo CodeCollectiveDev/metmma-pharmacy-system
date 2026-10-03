@@ -6,6 +6,12 @@ I've put together this index to help you navigate the Role-Based Access Control 
 
 ## Quick Links
 
+### Setup
+
+- **[Development Setup](docs/DEVELOPMENT_SETUP.md)** - Run the application locally with Docker and npm.
+- **[Production Setup](docs/PRODUCTION_SETUP.md)** - Deploy the frontend, API, database, and backups.
+- **[Detailed VPS Runbook](docs/DEPLOYMENT_VPS.md)** - Full production deployment and restore procedures.
+
 ### 🚀 Where I Recommend Starting
 
 1. **[README_RBAC.md](https://www.google.com/search?q=README_RBAC.md)** - My 5-minute crash course.

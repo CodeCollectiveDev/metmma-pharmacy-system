@@ -6,6 +6,8 @@ Deployment: follow the [VPS + Neon + R2 runbook](docs/DEPLOYMENT_VPS.md) for Git
 
 ## Development
 
+For the complete local setup, see [docs/DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md). For production deployment, see [docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md) and the detailed [VPS runbook](docs/DEPLOYMENT_VPS.md).
+
 Use Node 22.12+ and PostgreSQL 16. Install both supplied lockfiles:
 
 ~~~sh
