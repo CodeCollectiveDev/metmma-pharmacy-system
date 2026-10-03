@@ -32,6 +32,12 @@ function sale(p,quantity=1,overrides={}){return{idempotencyKey:randomUUID(),item
 async function count(table,where='',params=[]){return Number((await pool.query(`SELECT COUNT(*) FROM ${table} ${where}`,params)).rows[0].count);}
 before(async()=>{await admin.query(`CREATE SCHEMA ${schema}`);await pool.query(readFileSync(require.resolve('../../../database/init.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261002_mvp.sql'),'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_staff_workflows.sql'),'utf8'));
+  await pool.query(`INSERT INTO users (username, password_hash, role, full_name, email) VALUES
+    ('test-admin', 'test-hash', 'admin', 'Test Admin', 'test-admin@example.com'),
+    ('test-pharmacist', 'test-hash', 'pharmacist', 'Test Pharmacist', 'test-pharmacist@example.com'),
+    ('test-cashier', 'test-hash', 'cashier', 'Test Cashier', 'test-cashier@example.com'),
+    ('manager1', 'test-hash', 'store_manager', 'Test Manager', 'test-manager@example.com'),
+    ('test-hr', 'test-hash', 'hr_officer', 'Test HR', 'test-hr@example.com')`);
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));await pool.query('UPDATE users SET password_hash=$1',[await bcrypt.hash('TestPassword42',10)]);server=require('../../app').listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${server.address().port}/api`;});
 after(async()=>{if(server)await new Promise(r=>server.close(r));await pool.end();await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin.end();});
 
