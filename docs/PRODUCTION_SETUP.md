@@ -73,9 +73,12 @@ Create a GitHub environment named `production` with these secrets:
 - `VPS_USER` set to `metmma`
 - `VPS_PORT`, if not using 22
 - `VPS_SSH_KEY`
-- `VPS_KNOWN_HOSTS`
 
-Verify the VPS fingerprint before storing `VPS_KNOWN_HOSTS`. The deployment workflow builds AMD64 images, uploads them over SSH, takes a database backup, migrates, and starts the release.
+Add these as **Environment secrets** under `Settings -> Environments -> production`, not only as repository secrets. The deployment job uses the `production` environment.
+
+The workflow uses the existing `VPS_SSH_KEY` to authenticate and automatically obtains the VPS ED25519 host key with `ssh-keyscan` on the GitHub runner. You do not need a `VPS_KNOWN_HOSTS` secret. This matches the simpler SSH deployment pattern, but it does not pin the host key in GitHub; use a pre-verified known-hosts secret instead if strict host identity verification is required.
+
+The deployment workflow builds AMD64 images, uploads them over SSH, takes a database backup, migrates, and starts the release.
 
 For a brand-new empty Neon database, run the workflow's initialization option once. Do not enable initialization for an existing database or later releases.
 
