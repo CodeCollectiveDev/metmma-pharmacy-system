@@ -12,6 +12,7 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +45,24 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+
+          require_env() {
+            local name="$1"
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required production environment secret: $name"
+              exit 1
+            fi
+          }
+
+          require_env VPS_HOST
+          require_env VPS_USER
+          require_env VPS_SSH_KEY
+
+          if ! [[ "$VPS_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::VPS_PORT must be numeric."
+            exit 1
+          fi
+
           umask 077
           ssh_dir=$(mktemp -d "$RUNNER_TEMP/metmma-ssh.XXXXXX")
           trap 'rm -rf "$ssh_dir"' EXIT
