@@ -34,8 +34,11 @@ jobs:
 
       - name: Package Release
         run: |
+          set -Eeuo pipefail
           # Copy repository database folder into backend directory before packaging
-          cp -r database backend/database 2>/dev/null || true
+          cp -r database backend/database
+          test -s backend/database/init.sql
+          test -d backend/database/migrations
           tar -czf release.tar.gz -C backend .
 
       - name: Deploy to VPS via SSH
@@ -101,15 +104,9 @@ jobs:
               chmod -R +x node_modules/.bin/
             fi
 
-            # Prevent ENOENT path errors for migration script if directory structure expects ~/database
-            mkdir -p ~/database
-            if [ ! -d "~/database/migrations" ]; then
-              ln -sfn ~/metmma-backend/database/migrations ~/database/migrations
-            fi
-
             # Initialize database if fresh, then execute pending migrations
             echo "Running database initialization and migrations on Neon DB..."
-            npm run db:init || true
+            npm run db:init -- --if-empty
             npm run migrate
 
             # Reload or start process using server.js as entry point
