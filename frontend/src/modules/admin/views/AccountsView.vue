@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import AppDialog from '@/components/AppDialog.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import PasswordInput from '@/components/PasswordInput.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
 import api from '@/services/api/apiClient'
 import { confirmAction } from '@/composables/useFeedback'
@@ -34,15 +35,15 @@ onMounted(load)
 <form class="space-y-3" @submit.prevent="save"><ErrorNotice :error="error"/>
 <template v-if="!selected"><label class="block">Username<input v-model="form.username" required minlength="3" maxlength="50" autocomplete="off" class="field"/></label><label class="block">Full name<input v-model="form.full_name" required maxlength="100" class="field"/></label><label class="block">Email<input v-model="form.email" type="email" maxlength="100" class="field"/></label></template>
 <label class="block">Role<select v-model="form.role" :disabled="selected?.id===self" class="field"><option v-for="role in roles" :key="role" :value="role">{{role.replaceAll('_',' ')}}</option></select></label>
-<label class="block">{{selected?'New password (leave blank to keep current password)':'Password'}}<input v-model="form.password" type="password" :required="!selected" minlength="10" maxlength="72" autocomplete="new-password" class="field"/></label><p class="text-sm text-gray-600">Use at least 10 characters. Password and access changes end existing sessions.</p>
+<PasswordInput v-model="form.password" :label="selected?'New password (leave blank to keep current password)':'Password'" :required="!selected" minlength="10" maxlength="72" autocomplete="new-password"/><p class="text-sm text-gray-600">Use at least 10 characters. Password and access changes end existing sessions.</p>
 <div v-if="!selected?.employee_id" class="space-y-2"><label class="block">Find existing staff<input v-model="employeeSearch" class="field" maxlength="100" @keydown.enter.prevent="findEmployees()"/></label><button type="button" class="secondary" @click="findEmployees()">Search staff</button><label class="block">Link staff record<select v-model="form.employee_id" class="field" @change="chooseEmployee"><option value="">{{selected?'Keep current link':'Create a new staff record'}}</option><option v-for="e in employees" :key="e.id" :value="e.id">{{e.first_name}} {{e.last_name}} · {{e.employee_id}}</option></select></label><PaginationControls :pagination="employeePage" @change="findEmployees"/></div>
 <button class="primary" :disabled="saving">{{saving?'Saving…':'Save account'}}</button></form>
 </AppDialog>
 <AppDialog :open="passwordOpen" title="Change my password" :dismissible="!passwordSaving" @close="passwordOpen=false">
 <form class="space-y-3" @submit.prevent="changePassword"><ErrorNotice :error="passwordError"/>
-<label class="block">Current password<input v-model="passwordForm.current_password" type="password" required maxlength="72" autocomplete="current-password" class="field"/></label>
-<label class="block">New password<input v-model="passwordForm.password" type="password" required minlength="10" maxlength="72" autocomplete="new-password" class="field"/></label>
-<label class="block">Confirm new password<input v-model="passwordForm.confirm" type="password" required minlength="10" maxlength="72" autocomplete="new-password" class="field"/></label>
+<PasswordInput v-model="passwordForm.current_password" label="Current password" required maxlength="72" autocomplete="current-password"/>
+<PasswordInput v-model="passwordForm.password" label="New password" required minlength="10" maxlength="72" autocomplete="new-password"/>
+<PasswordInput v-model="passwordForm.confirm" label="Confirm new password" required minlength="10" maxlength="72" autocomplete="new-password"/>
 <p v-if="passwordHint" role="alert" class="text-sm text-red-700">{{passwordHint}}</p>
 <p class="text-sm text-gray-600">Use at least 10 characters. Saving signs out every other device signed in as you.</p>
 <button class="primary" :disabled="passwordSaving">{{passwordSaving?'Saving…':'Change password'}}</button></form>

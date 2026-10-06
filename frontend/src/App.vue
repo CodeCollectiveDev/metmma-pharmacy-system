@@ -8,6 +8,7 @@ import { confirmation, answerConfirmation, sessionExpired, appFailure } from '@/
 import { authService } from '@/services/api/authService'
 import { userError } from '@/services/api/errors'
 import ErrorNotice from '@/components/ErrorNotice.vue'
+import PasswordInput from '@/components/PasswordInput.vue'
 import { autoTour } from '@/composables/useTour'
 const router = useRouter()
 const route = useRoute()
@@ -37,6 +38,6 @@ async function signIn() {
   </AppDialog>
   <AppDialog :open="sessionExpired" title="Sign in again" @close="sessionExpired = false">
     <p>Your session ended. Sign in to continue. Your cart and open form are still here.</p>
-    <form @submit.prevent="signIn"><ErrorNotice :error="sessionError" /><label class="block mt-3">Your password<input v-model="sessionPassword" required type="password" autocomplete="current-password" class="field mt-1" /></label><button class="primary mt-4" :disabled="signingIn">{{ signingIn ? 'Signing in…' : 'Sign in' }}</button></form>
+    <form @submit.prevent="signIn"><ErrorNotice :error="sessionError" /><PasswordInput v-model="sessionPassword" label="Your password" label-class="block mt-3" input-class="field mt-1" required autocomplete="current-password" /><button class="primary mt-4" :disabled="signingIn">{{ signingIn ? 'Signing in…' : 'Sign in' }}</button></form>
   </AppDialog>
 </template>

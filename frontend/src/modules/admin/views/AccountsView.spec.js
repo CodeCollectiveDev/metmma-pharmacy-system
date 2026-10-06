@@ -36,3 +36,13 @@ it('blocks a confirmation that does not match the new password before calling th
  expect(api.post).not.toHaveBeenCalled()
  expect(w.text()).toContain('New passwords do not match');w.unmount()
 })
+it('reveals each password field while it is being typed',async()=>{
+ const w=mount(AccountsView,{global:{stubs}});await flushPromises()
+ const section=await openPasswordDialog(w)
+ const types=()=>section.findAll('input').map(i=>i.attributes('type'))
+ expect(types()).toEqual(['password','password','password'])
+ const toggles=section.findAll('button').filter(b=>b.attributes('aria-label')==='Show password')
+ expect(toggles).toHaveLength(3)
+ await toggles[1].trigger('click')
+ expect(types()).toEqual(['password','text','password']);w.unmount()
+})
