@@ -99,14 +99,16 @@ jobs:
               chmod -R +x node_modules/.bin/
             fi
 
-            # Run Prisma migrations if Prisma schema directory exists
-            if [ -d "prisma" ]; then
-              if [ -f "./node_modules/.bin/prisma" ]; then
-                ./node_modules/.bin/prisma migrate deploy || true
-              else
-                npx prisma migrate deploy || true
-              fi
+            # Prevent ENOENT path errors for migration script if directory structure expects ~/database
+            mkdir -p ~/database
+            if [ ! -d "~/database/migrations" ]; then
+              ln -sfn ~/metmma-backend/database/migrations ~/database/migrations
             fi
+
+            # Initialize database if fresh, then execute pending migrations
+            echo "Running database initialization and migrations on Neon DB..."
+            npm run db:init || true
+            npm run migrate
 
             # Reload or start process using server.js as entry point
             if pm2 describe metmma-backend > /dev/null 2>&1; then
