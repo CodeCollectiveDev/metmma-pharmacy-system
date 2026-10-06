@@ -26,16 +26,16 @@
           />
         </div>
         
-        <div>
-          <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input 
-            id="password" autocomplete="current-password" v-model="password" 
-            type="password" 
-            placeholder="••••••••" 
-            class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            required
-          />
-        </div>
+        <PasswordInput
+          v-model="password"
+          label="Password"
+          label-class="block text-sm font-medium text-gray-700 mb-1"
+          input-class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+          input-id="password"
+          placeholder="••••••••"
+          autocomplete="current-password"
+          required
+        />
 
         <button 
           type="submit" 
@@ -64,6 +64,7 @@ const router = useRouter();
 
 import { authService } from '@/services/api/authService';
 import { userError } from '@/services/api/errors';
+import PasswordInput from '@/components/PasswordInput.vue';
 
 async function login() {
   error.value = "";
