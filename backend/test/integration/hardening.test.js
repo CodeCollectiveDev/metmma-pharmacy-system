@@ -218,5 +218,26 @@ test('attendance day roster, historical ranges and corrections retain one record
  const result=await request(`/attendance?employee_id=${e.id}&start=2026-09-01&end=2026-09-01`);assert.equal(result.data.data.length,1);assert.equal(result.data.data[0].status,'late');assert.equal(result.data.data[0].date,'2026-09-01');
  assert.equal((await request(`/attendance?employee_id=${e.id}&start=2026-09-02`)).data.data.length,0);
  const roster=await request('/attendance/day?start=2026-09-01&search=Attendance');assert.ok(roster.data.data.some(r=>r.employee_id===e.id&&r.status==='late'));
- assert.equal((await request('/attendance?start=2026-02-30')).status,400);
+ assert.equal((await request(`/attendance?start=2026-02-30`)).status,400);
+});
+
+test('administrators rotate their own password, retire signed sessions and keep the seeded access intact',async()=>{
+ const sign=sessionVersion=>jwt.sign({id:ids.admin,role:'admin',...(sessionVersion===undefined?{}:{sessionVersion})},process.env.JWT_SECRET,{expiresIn:'3600'});
+ const change=async(body,token)=>{const response=await fetch(base+'/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body)});return{status:response.status,data:await response.json()};};
+ const cashier=jwt.sign({id:ids.cashier,role:'cashier'},process.env.JWT_SECRET,{expiresIn:'3600'});
+ assert.equal((await change({current_password:'TestPassword42',password:'BrandNewPassword9'},cashier)).status,403);
+ const wrong=await change({current_password:'WrongPassword1',password:'BrandNewPassword9'},sign());
+ assert.equal(wrong.status,401);assert.equal(wrong.data.code,'CURRENT_PASSWORD_INVALID');
+ const reused=await change({current_password:'TestPassword42',password:'TestPassword42'},sign());
+ assert.equal(reused.status,400);assert.equal(reused.data.code,'PASSWORD_REUSE');
+ const issued=await change({current_password:'TestPassword42',password:'BrandNewPassword9'},sign());
+ assert.equal(issued.status,200,JSON.stringify(issued.data));assert.ok(issued.data.token);
+ assert.equal((await request('/accounts')).status,401);
+ const rotated=await fetch(base+'/accounts',{headers:{Authorization:`Bearer ${issued.data.token}`}});
+ assert.equal(rotated.status,200);
+ assert.equal((await request('/auth/login',{method:'POST',authenticated:false,body:{username:'test-admin',password:'TestPassword42'}})).status,401);
+ assert.equal((await request('/auth/login',{method:'POST',authenticated:false,body:{username:'test-admin',password:'BrandNewPassword9'}})).status,200);
+ // Put the seeded administrator back exactly as the suite found them.
+ assert.equal((await change({current_password:'BrandNewPassword9',password:'TestPassword42'},issued.data.token)).status,200);
+ await pool.query('UPDATE users SET session_version=0 WHERE id=$1',[ids.admin]);
 });

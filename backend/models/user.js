@@ -22,4 +22,10 @@ async function createUser({username,password,role,full_name,email,employee_id}) 
   });
 }
 async function findUserByUsername(username) { return (await db.query('SELECT id,username,password_hash,role,is_active,session_version FROM users WHERE username = $1',[username])).rows[0] || null; }
-module.exports = { createUser, findUserByUsername, normalizeRole, DB_ROLES };
+async function findUserById(id) { return (await db.query('SELECT id,username,password_hash,role,is_active,session_version FROM users WHERE id = $1',[id])).rows[0] || null; }
+// A password change always retires every previously issued session token.
+async function setPassword(id, passwordHash) {
+ const row=(await db.query('UPDATE users SET password_hash=$2, session_version=session_version+1, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id,username,role,session_version',[id,passwordHash])).rows[0];
+ return row || null;
+}
+module.exports = { createUser, findUserByUsername, findUserById, setPassword, normalizeRole, DB_ROLES };

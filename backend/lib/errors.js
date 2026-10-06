@@ -5,6 +5,8 @@ const messages = {
   VALIDATION: 'Please check the highlighted fields and try again.',
   SESSION_EXPIRED: 'Please sign in again to continue.',
   INVALID_CREDENTIALS: 'The username or password is incorrect.',
+  CURRENT_PASSWORD_INVALID: 'Your current password is incorrect.',
+  PASSWORD_REUSE: 'Your new password must be different from your current password.',
   PERMISSION_DENIED: 'Your account cannot do this. Please ask your administrator for help.',
   NOT_FOUND: 'This item is no longer available.',
   INSUFFICIENT_STOCK: 'There is not enough stock for this sale. Check the quantities and try again.',

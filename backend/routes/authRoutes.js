@@ -5,11 +5,14 @@ const rateLimit = require('express-rate-limit');
 const { Joi, validate } = require('../lib/validation');
 const { AppError } = require('../lib/errors');
 const { authenticate, authorize, ROLES } = require('../middleware/roleMiddleware');
-const { createUser, findUserByUsername, normalizeRole, DB_ROLES } = require('../models/user');
+const { createUser, findUserByUsername, findUserById, setPassword, normalizeRole, DB_ROLES } = require('../models/user');
 const router = express.Router();
-const registerSchema = Joi.object({ employee_id:Joi.number().integer().positive(), username: Joi.string().trim().min(3).max(50).required(), password: Joi.string().min(10).max(72).custom((value,h)=>Buffer.byteLength(value)<=72?value:h.error('any.invalid')).required(), full_name: Joi.string().trim().min(1).max(100).required(), email: Joi.string().trim().email().max(100).allow(''), role: Joi.string().custom((value,helpers) => normalizeRole(value) || helpers.error('any.invalid')).valid(...DB_ROLES).required() }).required();
-const loginSchema = Joi.object({ username:Joi.string().trim().max(50).required(), password:Joi.string().max(72).required() }).required();
+const passwordRule = Joi.string().min(10).max(72).custom((value,h)=>Buffer.byteLength(value)<=72?value:h.error('any.invalid'));
+const registerSchema = Joi.object({ employee_id:Joi.number().integer().positive(), username: Joi.string().trim().min(3).max(50).required(), password: passwordRule.required(), full_name: Joi.string().trim().min(1).max(100).required(), email: Joi.string().trim().email().max(100).allow(''), role: Joi.string().custom((value,helpers) => normalizeRole(value) || helpers.error('any.invalid')).valid(...DB_ROLES).required() }).required();
+const loginSchema = Joi.object({ username:Joi.string().trim().max(50).required(), password: Joi.string().max(72).required() }).required();
+const changePasswordSchema = Joi.object({ current_password:Joi.string().max(72).required(), password:passwordRule.required() }).required();
 const loginLimit = rateLimit({windowMs:15*60000,limit:20,skipSuccessfulRequests:true,standardHeaders:'draft-8',legacyHeaders:false,handler:(req,res,next)=>next(new AppError('RATE_LIMITED',429))});
+const changePasswordLimit = rateLimit({windowMs:15*60000,limit:10,skipSuccessfulRequests:true,standardHeaders:'draft-8',legacyHeaders:false,handler:(req,res,next)=>next(new AppError('RATE_LIMITED',429))});
 const loginHandler = async (req,res) => {
   const user = await findUserByUsername(req.body.username);
   if (!user || !user.is_active || !(await bcrypt.compare(req.body.password,user.password_hash))) throw new AppError('INVALID_CREDENTIALS',401);
@@ -20,6 +23,20 @@ const loginHandler = async (req,res) => {
 };
 router.post('/login',loginLimit,validate(loginSchema),loginHandler);
 router.post('/register',authenticate,authorize(ROLES.ADMIN),validate(registerSchema),async (req,res)=>res.status(201).json({message:'Staff account created.',user:await createUser(req.body)}));
+// Self-service reset: only an administrator can rotate their own credentials.
+router.post('/change-password',authenticate,authorize(ROLES.ADMIN),changePasswordLimit,validate(changePasswordSchema),async (req,res)=>{
+  const { current_password, password } = req.body;
+  const user = await findUserById(req.user.id);
+  if (!user || !user.is_active) throw new AppError('SESSION_EXPIRED',401);
+  if (!(await bcrypt.compare(current_password, user.password_hash))) throw new AppError('CURRENT_PASSWORD_INVALID',401,['current_password']);
+  if (current_password === password) throw new AppError('PASSWORD_REUSE',400,['password']);
+  const role = normalizeRole(user.role);
+  if (!role) throw new AppError('SESSION_EXPIRED',401);
+  const updated = await setPassword(user.id, await bcrypt.hash(password,12));
+  if (!updated) throw new AppError('SESSION_EXPIRED',401);
+  const token = jwt.sign({id:updated.id,username:updated.username,role,sessionVersion:updated.session_version || 0},process.env.JWT_SECRET,{expiresIn:'12h',algorithm:'HS256'});
+  res.json({success:true,token,user:{id:updated.id,username:updated.username,role}});
+});
 const loginRouter = express.Router();
 loginRouter.post('/',loginLimit,validate(loginSchema),loginHandler);
 module.exports = router; module.exports.loginRouter = loginRouter;

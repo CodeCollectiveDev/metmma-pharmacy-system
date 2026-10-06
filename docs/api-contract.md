@@ -39,6 +39,32 @@ Response:
     "role": "admin"
   }
 }
+
+### POST /api/auth/change-password
+**Role:** Admin only — an administrator resets their own password. Provisioning other staff is done with `PATCH /api/accounts/:id`.
+**Rate limit:** 10 failed attempts per 15 minutes.
+
+Request:
+{
+  "current_password": "password",
+  "password": "new-password"
+}
+
+Response:
+{
+  "success": true,
+  "token": "jwt-token",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "role": "admin"
+  }
+}
+
+Notes:
+- `password` must be 10–72 characters and different from `current_password`.
+- A wrong `current_password` returns `401 CURRENT_PASSWORD_INVALID`; reusing the current one returns `400 PASSWORD_REUSE`.
+- Changing the password bumps `session_version`, so every previously issued token stops working. The response carries a replacement token for the session that performed the change.
 ---
 
 ## PRODUCTS (Medicines)
