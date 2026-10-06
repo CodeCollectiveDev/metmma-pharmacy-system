@@ -7,6 +7,8 @@ const messages = {
   NETWORK: 'We could not reach the pharmacy system. Check your connection and try again.',
   SESSION_EXPIRED: 'Please sign in again to continue. Your work is still here.',
   INVALID_CREDENTIALS: 'The username or password is incorrect. Please try again.',
+  CURRENT_PASSWORD_INVALID: 'Your current password is incorrect. Please try again.',
+  PASSWORD_REUSE: 'Your new password must be different from your current password.',
   PERMISSION_DENIED: 'Your account cannot do this. Please ask your administrator for help.',
   NOT_FOUND: 'This item is no longer available. Refresh the list and try again.',
   INSUFFICIENT_STOCK: 'There is not enough stock for this sale. Check the quantities and try again.',
