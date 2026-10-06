@@ -34,6 +34,8 @@ jobs:
 
       - name: Package Release
         run: |
+          # Copy repository database folder into backend directory before packaging
+          cp -r database backend/database 2>/dev/null || true
           tar -czf release.tar.gz -C backend .
 
       - name: Deploy to VPS via SSH
