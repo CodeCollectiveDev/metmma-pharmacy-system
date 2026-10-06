@@ -1,7 +1,14 @@
 import axios from 'axios'
 import { userError } from './errors'
 import { sessionExpired } from '@/composables/useFeedback'
-const apiClient = axios.create({ baseURL: import.meta.env.VITE_API_BASE_URL || '/api', timeout: 10000, headers: { 'Content-Type': 'application/json' } })
+
+const configuredBaseURL = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') || '/api'
+// Accept a backend origin as well as an explicit API path (including existing /api URLs).
+const baseURL = /^https?:\/\/[^/]+$/i.test(configuredBaseURL)
+  ? `${configuredBaseURL}/api`
+  : configuredBaseURL
+
+const apiClient = axios.create({ baseURL, timeout: 10000, headers: { 'Content-Type': 'application/json' } })
 apiClient.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`

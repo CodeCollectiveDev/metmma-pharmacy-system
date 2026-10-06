@@ -91,7 +91,13 @@ Set the frontend provider to use the `frontend` directory as its project root.
 | Build command | `npm run build` |
 | Output directory | `dist` |
 | Node version | 22 |
-| Build variable | `VITE_API_BASE_URL=https://api.your-domain.example/api` |
+| Build variable | `VITE_API_BASE_URL=https://api.metmmapharmacy.com` |
+
+In Vercel, add `VITE_API_BASE_URL` under **Project Settings -> Environment Variables** for **Production**, then deploy or redeploy. Vite embeds this public value during the build; changing it requires a new deployment. See [Vite on Vercel](https://vercel.com/docs/frameworks/frontend/vite).
+
+The API client accepts a bare origin and adds `/api`, so login calls `https://api.metmmapharmacy.com/api/auth/login`. An explicit base URL such as `https://api.metmmapharmacy.com/api` also works without duplicating `/api`; surrounding whitespace and trailing slashes are removed. All frontend API requests use this shared client. Preview deployments should set the variable to their staging API.
+
+Without this variable, requests use same-origin `/api`. `npm run dev` always uses the local Vite proxy to `localhost:3000`, even if a production URL exists in a local `.env` file.
 
 Use the same production branch as the backend workflow. Configure backend `ALLOWED_ORIGINS` to match the deployed frontend URL exactly, without a trailing slash or `/api`.
 
