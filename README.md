@@ -25,7 +25,7 @@ npm run bootstrap:dev --prefix backend
 npm run dev --prefix backend
 ~~~
 
-In another terminal run npm run dev from frontend. Vite serves localhost:5173 and proxies /api to localhost:3000. Separately hosted production frontends need VITE_API_BASE_URL at build time; see frontend/.env.example.
+In another terminal run npm run dev from frontend. Vite serves localhost:5173 and proxies /api to localhost:3000. For Vercel, use `frontend` as the project root and set `VITE_API_BASE_URL=https://api.metmmapharmacy.com` before building. The client adds `/api` when given a bare origin. See [frontend/.env.example](frontend/.env.example) and [frontend production setup](docs/PRODUCTION_SETUP.md#4-configure-the-frontend).
 
 ## Verification
 
