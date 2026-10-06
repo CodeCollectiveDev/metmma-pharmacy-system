@@ -79,21 +79,36 @@ jobs:
           # 2. SCP lightweight tarball directly to target
           scp "${opts[@]}" -P "$VPS_PORT" release.tar.gz "$target:~/metmma-backend/"
           
-          # 3. Extract, run DB migrations, reload PM2
+          # 3. Extract, load Node environment, fix permissions, run DB migrations, reload PM2
           ssh "${opts[@]}" -p "$VPS_PORT" "$target" "bash -s" << 'EOF'
             set -e
+
+            # Source user profile to ensure Node/NVM/PM2 binaries are loaded in PATH
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
+
             cd ~/metmma-backend
             
             # Extract over existing files (.env is untouched)
             tar -xzf release.tar.gz
             rm release.tar.gz
             
+            # Fix executable permissions for node_modules binaries
+            if [ -d "node_modules/.bin" ]; then
+              chmod -R +x node_modules/.bin/
+            fi
+
             # Run Prisma migrations if Prisma exists
             if [ -d "prisma" ]; then
-              npx prisma migrate deploy || true
+              if [ -f "./node_modules/.bin/prisma" ]; then
+                ./node_modules/.bin/prisma migrate deploy || true
+              else
+                npx prisma migrate deploy || true
+              fi
             fi
             
-            # Reload PM2 smoothly
-            pm2 reload metmma-backend || pm2 restart metmma-backend || pm2 start server.js --name "metmma-backend"
+            # Reload PM2 smoothly using explicit full PATH resolution
+            pm2 reload metmma-backend || pm2 restart metmma-backend || pm2 start dist/main.js --name "metmma-backend"
             pm2 save
           EOF
