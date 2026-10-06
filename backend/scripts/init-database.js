@@ -1,8 +1,9 @@
-// Explicit first-install operation. Deployment never initializes an existing DB.
+// Strict first-install operation; --if-empty lets deployments skip an existing DB.
 require('dotenv').config({ quiet: true });
 if (process.env.MIGRATION_DATABASE_URL) process.env.DATABASE_URL = process.env.MIGRATION_DATABASE_URL;
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
+const databasePath = require('./database-path');
 const { pool } = require('../api/db');
 (async () => {
   const client = await pool.connect();
@@ -10,8 +11,13 @@ const { pool } = require('../api/db');
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('metmma:migrations',0))");
     const { rows } = await client.query("SELECT count(*)::int AS count FROM pg_tables WHERE schemaname='public'");
-    if (rows[0].count) throw new Error('Initialization requires an empty public schema. Existing database preserved.');
-    await client.query(readFileSync(resolve(__dirname, '../../database/init.sql'), 'utf8'));
+    if (rows[0].count) {
+      if (!process.argv.includes('--if-empty')) throw new Error('Initialization requires an empty public schema. Existing database preserved.');
+      await client.query('COMMIT');
+      console.info('Existing database detected; skipping initialization and preserving data.');
+      return;
+    }
+    await client.query(readFileSync(resolve(databasePath, 'init.sql'), 'utf8'));
     // init.sql is also the development fixture. Production starts without demo users.
     await client.query('DELETE FROM users');
     await client.query('COMMIT');
