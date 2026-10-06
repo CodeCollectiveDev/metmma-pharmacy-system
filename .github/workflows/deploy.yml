@@ -79,18 +79,18 @@ jobs:
           # 2. SCP lightweight tarball directly to target
           scp "${opts[@]}" -P "$VPS_PORT" release.tar.gz "$target:~/metmma-backend/"
           
-          # 3. Extract, load Node environment, fix permissions, run DB migrations, reload PM2
+          # 3. Extract, set PATH, fix permissions, run DB migrations, reload PM2
           ssh "${opts[@]}" -p "$VPS_PORT" "$target" "bash -s" << 'EOF'
             set -e
 
-            # Source user profile to ensure Node/NVM/PM2 binaries are loaded in PATH
+            # Export Node / PM2 PATH for non-interactive SSH shells
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
 
             cd ~/metmma-backend
             
-            # Extract over existing files (.env is untouched)
+            # Extract tarball over existing files (.env remains untouched)
             tar -xzf release.tar.gz
             rm release.tar.gz
             
@@ -99,7 +99,7 @@ jobs:
               chmod -R +x node_modules/.bin/
             fi
 
-            # Run Prisma migrations if Prisma exists
+            # Run Prisma migrations if Prisma schema directory exists
             if [ -d "prisma" ]; then
               if [ -f "./node_modules/.bin/prisma" ]; then
                 ./node_modules/.bin/prisma migrate deploy || true
@@ -107,8 +107,13 @@ jobs:
                 npx prisma migrate deploy || true
               fi
             fi
-            
-            # Reload PM2 smoothly using explicit full PATH resolution
-            pm2 reload metmma-backend || pm2 restart metmma-backend || pm2 start dist/main.js --name "metmma-backend"
+
+            # Reload or start process using server.js as entry point
+            if pm2 describe metmma-backend > /dev/null 2>&1; then
+              pm2 reload metmma-backend --update-env
+            else
+              pm2 start server.js --name "metmma-backend"
+            fi
+
             pm2 save
           EOF
