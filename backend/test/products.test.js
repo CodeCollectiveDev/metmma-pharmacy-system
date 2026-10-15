@@ -41,6 +41,31 @@ test('empty and past-end pages have no more results', async () => {
   assert.equal((await request({ page: '3' })).response.pagination.hasMore, false);
 });
 
+test('product validation accepts lowercase codes and localized expiry dates', () => {
+  const { createProductSchema } = require('../api/validators/productValidator');
+
+  const payload = {
+    productCode: 'lofnaC',
+    name: 'Lofnac AP',
+    genericName: 'Lofnac',
+    batchNumber: 'DLT529',
+    expiryDate: '30/11/2028',
+    quantity: 20,
+    unitPrice: 50,
+    sellingPrice: 1000,
+    costPrice: 40,
+    supplier: 'Mylan',
+    category: 'Painkillers',
+    reorderLevel: 10,
+    barcode: '123456789'
+  };
+
+  const result = createProductSchema.validate(payload, { abortEarly: false });
+  assert.equal(result.error, undefined);
+  assert.equal(result.value.productCode, 'LOFNAC');
+  assert.equal(result.value.expiryDate, '2028-11-30');
+});
+
 test('page validation caps oversized requests and rejects invalid pagination', () => {
   const {Joi,pageFields}=require('../lib/validation');
   const schema=Joi.object(pageFields);

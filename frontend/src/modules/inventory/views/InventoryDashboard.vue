@@ -19,6 +19,33 @@ const form = ref(blank())
 const inputs = [ ['productCode','Product code','text','A unique code, such as PARA-001.'], ['name','Product name','text','The name staff will search for.'], ['batchNumber','Batch number','text','Use the number on the pack.'], ['expiryDate','Expiry date','date','Use the expiry date on the pack.'], ['quantity','Starting quantity','number','Number of units available.'], ['sellingPrice','Selling price (MWK)','number','Price for one unit, before VAT.'], ['supplier','Supplier','text','Who supplied this product.'], ['category','Category','text','For example, Painkillers or Vitamins.'], ['reorderLevel','Low stock threshold','number','You get a notice at or below this quantity.'], ['barcode','Barcode (optional)','text','The number read by your scanner.'] ]
 const restockKey = ref('')
 const cameraOpen = ref(false), barcodeProduct = ref(null), barcodeValue = ref('')
+function normalizeExpiryDate(value) {
+  if (!value || typeof value !== 'string') return value
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const match = /^([0-9]{1,2})[/-]([0-9]{1,2})[/-]([0-9]{4})$/.exec(value.trim())
+  if (!match) return value
+  const [, day, month, year] = match
+  const normalized = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const check = new Date(`${normalized}T00:00:00Z`)
+  return Number.isFinite(check.getTime()) && check.toISOString().slice(0, 10) === normalized ? normalized : value
+}
+function normalizeProductPayload(raw = {}) {
+  const productCode = String(raw.productCode ?? '').trim();
+  return {
+    ...raw,
+    productCode: productCode.toUpperCase(),
+    expiryDate: normalizeExpiryDate(raw.expiryDate),
+    name: String(raw.name ?? '').trim(),
+    batchNumber: String(raw.batchNumber ?? '').trim(),
+    supplier: String(raw.supplier ?? '').trim(),
+    category: String(raw.category ?? '').trim(),
+    barcode: String(raw.barcode ?? '').trim(),
+    sellingPrice: Number(raw.sellingPrice),
+    unitPrice: Number(raw.sellingPrice),
+    quantity: Number(raw.quantity ?? 0),
+    reorderLevel: Number(raw.reorderLevel ?? 10)
+  }
+}
 function cameraScan(code) { cameraOpen.value = false; if (barcodeProduct.value) barcodeValue.value = code; else if (showForm.value) form.value.barcode = code; else search.value = code }
 async function saveBarcode() { if (saving.value) return; saving.value = true; error.value = null; try { await dataService.updateProduct({id:barcodeProduct.value.id,barcode:barcodeValue.value}); barcodeProduct.value = null; notice.value = 'Barcode saved.'; await refresh() } catch (err) { error.value = err } finally { saving.value = false } }
 let timer
@@ -33,7 +60,11 @@ function openRestock(product) {
 async function saveProduct() {
   if (saving.value) return
   saving.value = true; error.value = null; fields.value = []
-  try { await dataService.addProduct({ ...form.value, unitPrice: form.value.sellingPrice }); showForm.value = false; form.value = blank(); notice.value = 'Product saved.'; await refresh(); window.dispatchEvent(new Event('stock-changed')) }
+  try {
+    const payload = normalizeProductPayload(form.value)
+    await dataService.addProduct(payload)
+    showForm.value = false; form.value = blank(); notice.value = 'Product saved.'; await refresh(); window.dispatchEvent(new Event('stock-changed'))
+  }
   catch (err) { error.value = err; fields.value = userError(err).fields }
   finally { saving.value = false }
 }
