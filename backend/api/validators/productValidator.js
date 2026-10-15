@@ -1,8 +1,18 @@
 const { Joi,validate }=require('../../lib/validation');
 const {money}=require('./salesValidator');
+const normalizeExpiryDate=(value)=>{
+ if(typeof value!=='string') return value;
+ const trimmed=value.trim();
+ if(!trimmed) return value;
+ const iso=/^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+ if(iso){const d=new Date(`${trimmed}T00:00:00Z`); if(Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===trimmed) return trimmed;}
+ const locale=/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(trimmed);
+ if(locale){const yyyy=locale[3],mm=String(locale[2]).padStart(2,'0'),dd=String(locale[1]).padStart(2,'0'); const normalized=`${yyyy}-${mm}-${dd}`; const d=new Date(`${normalized}T00:00:00Z`); if(Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===normalized) return normalized;}
+ return null;
+};
 const fields={
- productCode:Joi.string().trim().pattern(/^[A-Z0-9-]+$/).min(3).max(50),name:Joi.string().trim().min(2).max(200),genericName:Joi.string().trim().max(200).allow('',null),batchNumber:Joi.string().trim().min(2).max(100),
- expiryDate:Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).custom((value,h)=>{const d=new Date(value+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value?value:h.error('any.invalid');}),
+ productCode:Joi.string().trim().uppercase().pattern(/^[A-Z0-9-]+$/).min(3).max(50),name:Joi.string().trim().min(2).max(200),genericName:Joi.string().trim().max(200).allow('',null),batchNumber:Joi.string().trim().min(2).max(100),
+ expiryDate:Joi.string().trim().custom((value,h)=>{const normalized=normalizeExpiryDate(value); return normalized===null?h.error('any.invalid'):normalized;}),
  quantity:Joi.number().integer().min(0).max(2147483647),unitPrice:money,sellingPrice:money,costPrice:money.allow(null),supplier:Joi.string().trim().min(2).max(200),category:Joi.string().trim().min(2).max(100),reorderLevel:Joi.number().integer().min(0).max(2147483647),location:Joi.string().trim().max(100).allow('',null),barcode:Joi.string().trim().max(100).allow('',null),isActive:Joi.boolean()
 };
 const createProductSchema=Joi.object({...fields,productCode:fields.productCode.required(),name:fields.name.required(),batchNumber:fields.batchNumber.required(),expiryDate:fields.expiryDate.required(),unitPrice:fields.unitPrice.required(),sellingPrice:fields.sellingPrice.required(),supplier:fields.supplier.required(),category:fields.category.required(),quantity:fields.quantity.default(0),reorderLevel:fields.reorderLevel.default(10)}).required();
