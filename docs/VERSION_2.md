@@ -17,7 +17,7 @@ Version 2 is developed on `version-2`. It uses the existing GitHub Actions → S
 
 ## 1. Separate GitHub environment
 
-Create a GitHub environment named **version-2** and add its own environment secrets:
+Use the existing GitHub environment named **production** and its deployment secrets:
 
 - `VPS_HOST`
 - `VPS_USER`
@@ -29,7 +29,7 @@ Branch selection in `.github/workflows/deploy.yml` is explicit:
 | Branch | GitHub environment | Server directory | PM2 process |
 | --- | --- | --- | --- |
 | `main` | `production` | `~/metmma-backend` | `metmma-backend` |
-| `version-2` | `version-2` | `~/metmma-backend` | `metmma-backend` |
+| `version-2` | `production` | `~/metmma-backend` | `metmma-backend` |
 
 Both push deployments and manual dispatch use this mapping. Other branches cannot run the deployment job. The frontend is checked and built by Actions; Vercel publishes it separately.
 
