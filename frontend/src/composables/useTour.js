@@ -7,14 +7,15 @@ const allSteps = [
   { path: '/sales', title: 'Find a past sale', description: 'Sales shows receipts and the items sold. Use the dates and receipt search to find one. An administrator can reverse a sale with a reason.', roles: ['admin', 'store_manager', 'pharmacist', 'hr_officer', 'cashier'] },
   { path: null, title: 'Check notifications', description: 'The bell at the top shows how many stock or expiry notices you have not read. Open it to read them and go to the product. Reading a notice does not change stock.', roles: ['admin', 'store_manager', 'pharmacist', 'hr_officer', 'cashier'] },
   { path: '/finances', title: 'Track money', description: 'Sales add income automatically. Record money spent as an expense. Choose a period to see income, expenses and the amount left. The list below shows each record.', roles: ['admin', 'store_manager', 'pharmacist', 'hr_officer'] },
-  { path: '/help', title: 'Help is always here', description: 'Use Help for short instructions. You can take this tour again or resume it after a break.', roles: ['admin', 'store_manager', 'pharmacist', 'hr_officer', 'cashier'] }
+  { path: '/help', title: 'Help is always here', description: 'Use the question mark at the top for short instructions. You can take this tour again or resume it after a break.', roles: ['admin', 'store_manager', 'pharmacist', 'hr_officer', 'cashier'] }
 ]
-function key() { const user = JSON.parse(localStorage.getItem('user') || '{}'); return `mpms:tour:v1:${user.id || user.username || 'unknown'}` }
+function key() { let user = {}; try { user = JSON.parse(localStorage.getItem('user') || '{}') } catch {}; return `mpms:tour:v1:${user.id || user.username || 'unknown'}` }
 function save(done = false) { localStorage.setItem(key(), JSON.stringify({ index: tour.index, done })) }
 export function startTour(restart = false) {
-  const state = JSON.parse(localStorage.getItem(key()) || '{}')
+  let state = {}
+  try { state = JSON.parse(localStorage.getItem(key()) || '{}') || {} } catch {}
   tour.steps = allSteps.filter(s => s.roles.includes(localStorage.getItem('role')))
-  tour.index = restart ? 0 : Math.min(state.index || 0, Math.max(0, tour.steps.length - 1))
+  tour.index = restart ? 0 : Math.min(Math.max(0, Number.isInteger(state.index) ? state.index : 0), Math.max(0, tour.steps.length - 1))
   tour.open = true
   save()
 }

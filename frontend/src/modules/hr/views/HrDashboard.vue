@@ -1,10 +1,12 @@
 <script setup>
+import SectionNav from '@/components/SectionNav.vue'
 import { ref, onMounted, watch } from 'vue'
 import AttendancePanel from '../components/AttendancePanel.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
-import { userError } from '@/services/api/errors'
+import { periodDates } from '@/services/api/money'
+const today = periodDates('today').start
 import { useHrStore } from '../store/hrStore'
 import { Plus, Search, UserPlus, Calendar,  } from 'lucide-vue-next'
 
@@ -60,19 +62,20 @@ const formatCurrency = (amount) => {
 </script>
 
 <template>
-  <MainLayout title="Staff" subtitle="View staff records, daily attendance and attendance history">
+  <MainLayout title="Staff & attendance" subtitle="View staff records, daily attendance and attendance history">
+    <SectionNav section="team" />
     <ErrorNotice v-if="!showAddForm" :error="store.employeeError" :retry="load" />
     <p v-if="store.loading" role="status">Loading staff…</p>
     <!-- Tabs -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
       <div class="flex overflow-x-auto border-b border-gray-100">
-        <button 
+        <button
           @click="activeTab = 'employees'"
           :class="['px-6 py-4 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'employees' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
         >
           <UserPlus class="w-4 h-4" /> Employees
         </button>
-        <button 
+        <button
           @click="activeTab = 'attendance'"
           :class="['px-6 py-4 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'attendance' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
         >
@@ -87,10 +90,10 @@ const formatCurrency = (amount) => {
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div class="relative w-full sm:w-auto">
-          <input 
+          <input
             v-model="searchQuery"
-            type="text" 
-            aria-label="Search employees..." placeholder="Search employees..." 
+            type="text"
+            aria-label="Search employees..." placeholder="Search employees..."
             class="w-full sm:w-72 pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           >
           <Search class="w-4 h-4 text-gray-400 absolute left-3 top-3" />
@@ -101,37 +104,30 @@ const formatCurrency = (amount) => {
       </div>
 
       <!-- Add Employee Form -->
-      <form v-if="showAddForm" @submit.prevent="saveEmployee" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
+      <form v-if="showAddForm" v-form-feedback="store.employeeError" @submit.prevent="saveEmployee" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6">
         <h3 class="font-semibold text-gray-800 mb-4">Add New Employee</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input v-model="newEmployee.first_name" required minlength="2" maxlength="50" type="text" aria-label="First Name *" placeholder="First Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <input v-model="newEmployee.last_name" required minlength="2" maxlength="50" type="text" aria-label="Last Name *" placeholder="Last Name *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <input v-model="newEmployee.email" required maxlength="255" type="email" aria-label="Email *" placeholder="Email *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <input v-model="newEmployee.role" maxlength="50" type="text" aria-label="Role (optional)" placeholder="Role (optional)" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <input v-model="newEmployee.position" required maxlength="100" type="text" aria-label="Position *" placeholder="Position *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <label class="block">Department<select v-model="newEmployee.department" required class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-            <option value="">Select Department</option>
-            <option>Pharmacy</option>
-            <option>Sales</option>
-            <option>Operations</option>
-            <option>Human Resources</option>
-            <option>Administration</option>
-          </select></label>
-          <input v-model.number="newEmployee.salary" required min="0.01" step="0.01" type="number" aria-label="Salary (MWK) *" placeholder="Salary (MWK) *" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-          <label class="block">Start date<input aria-label="Start date" v-model="newEmployee.startDate" type="date" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></label>
-          <input v-model="newEmployee.phone" type="tel" aria-label="Phone Number" placeholder="Phone Number" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <p class="form-note">Fields marked * are required. This creates a staff record. Add sign-in access from Accounts when needed.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label>First name<input v-model.trim="newEmployee.first_name" name="first_name" required minlength="2" maxlength="50" class="field mt-1" autocomplete="given-name"/></label>
+          <label>Last name<input v-model.trim="newEmployee.last_name" name="last_name" required minlength="2" maxlength="50" class="field mt-1" autocomplete="family-name"/></label>
+          <label>Email<input v-model.trim="newEmployee.email" name="email" required maxlength="255" type="email" class="field mt-1" autocomplete="email"/></label>
+          <label>Phone (optional)<input v-model.trim="newEmployee.phone" name="phone" type="tel" pattern="[0-9+\s\-]{10,15}" maxlength="15" class="field mt-1" placeholder="e.g. +265991234567"/></label>
+          <label>Position<input v-model.trim="newEmployee.position" name="job_title" required maxlength="100" class="field mt-1" placeholder="e.g. Pharmacist"/></label>
+          <label>Department<select v-model="newEmployee.department" name="department" required class="field mt-1"><option value="">Choose a department</option><option>Pharmacy</option><option>Sales</option><option>Operations</option><option>Human Resources</option><option>Administration</option></select></label>
+          <label>Monthly salary (MWK)<input v-model.number="newEmployee.salary" name="salary" required min="0.01" max="99999999.99" step="0.01" type="number" class="field mt-1"/></label>
+          <label>Start date (optional)<input v-model="newEmployee.startDate" name="hire_date" type="date" :max="today" class="field mt-1"/><span class="text-xs text-slate-500">Defaults to today when left blank.</span></label>
         </div>
         <div class="flex justify-end gap-3 mt-4">
           <button type="button" @click="showAddForm = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
           <button type="submit" :disabled="saving" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">{{ saving ? 'Saving...' : 'Save Employee' }}</button>
         </div>
         <ErrorNotice :error="store.employeeError" />
-        <p v-for="field in userError(store.employeeError).fields" :key="field.field" class="text-red-800 text-sm">Check {{ field.field.replaceAll('_',' ') }}.</p>
+
       </form>
 
       <div v-if="createdEmployee" role="status" class="mb-6 p-4 bg-green-50 text-green-800 rounded-lg">
         <p class="font-semibold">Employee created: {{ createdEmployee.first_name }} {{ createdEmployee.last_name }}</p>
-        <p>{{ createdEmployee.employee_id }} · {{ createdEmployee.position }} · {{ createdEmployee.department }}</p>
+        <p>{{ createdEmployee.position }} · {{ createdEmployee.department }}</p>
         <p v-if="createdEmployee.role">Role: {{ createdEmployee.role }}</p>
         <p>{{ createdEmployee.email }} · Start date: {{ new Date(createdEmployee.hire_date).toLocaleDateString() }} · {{ createdEmployee.is_active ? 'Active' : 'Inactive' }}</p>
       </div>

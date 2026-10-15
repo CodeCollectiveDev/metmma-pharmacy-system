@@ -32,11 +32,18 @@ function errorHandler(error, req, res, next) {
   let status = error instanceof AppError ? error.status : 500;
   if (error.type === 'entity.parse.failed') { code = 'VALIDATION'; status = 400; }
   if (['23505', '23503', '40001', '40P01'].includes(error.code)) { code = 'CONFLICT'; status = 409; }
+  if (error.code === '23505') {
+    const duplicate = {
+      users_username_key: { field: 'username', message: 'This username is already in use. Choose another.' },
+      products_product_code_key: { field: 'productCode', message: 'This product code is already in use. Choose another.' }
+    }[error.constraint];
+    if (duplicate) error.fieldDetails = [duplicate];
+  }
   if (['23514','22003','22P02'].includes(error.code)) { code = 'VALIDATION'; status = 400; }
   if (error.type === 'entity.too.large') { code = 'VALIDATION'; status = 413; }
   const requestId = req.requestId || randomUUID();
   // Full details stay in the server log. Never log request bodies or credentials.
   if (status >= 500 || !(error instanceof AppError)) console.error(JSON.stringify({ requestId, path: req.path, error: error.message, stack: error.stack }));
-  res.status(status).json({ ...(error instanceof AppError && error.unavailableItems ? {unavailableItems:error.unavailableItems} : {}), success: false, code, message: messages[code], errors: (error.fields || []).map(field => ({ field, message: 'Please check this value.' })), requestId });
+  res.status(status).json({ ...(error instanceof AppError && error.unavailableItems ? {unavailableItems:error.unavailableItems} : {}), success: false, code, message: messages[code], errors: (error.fieldDetails || error.fields || []).map(field => typeof field === 'string' ? { field, message: 'Please check this value.' } : field), requestId });
 }
 module.exports = { AppError, requestContext, errorHandler };

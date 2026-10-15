@@ -60,7 +60,12 @@ async function processSale(req,res) {
 async function getSaleHistory(req,res) {
   const query=req.validatedQuery, values=[], where=dateFilter(query,values,'s.created_at');
   if(req.user.role==='cashier'){values.push(req.user.id);where.push(`s.user_id=$${values.length}`);}
-  if(query.search){values.push(`%${query.search}%`);where.push(`(s.receipt_number ILIKE $${values.length} OR s.customer_name ILIKE $${values.length})`);}
+  if(query.search){
+    values.push(`%${query.search}%`);const textIndex=values.length;
+    const receiptId=/^R-0*(\d+)$/i.exec(query.search.trim());
+    const shortMatch=receiptId?(values.push(receiptId[1]),` OR s.id::text=$${values.length}`):'';
+    where.push(`(s.receipt_number ILIKE $${textIndex} OR s.customer_name ILIKE $${textIndex}${shortMatch})`);
+  }
   const filter=where.length?`WHERE ${where.join(' AND ')}`:'';
   const count=(await db.query(`SELECT COUNT(*) FROM sales s ${filter}`,values)).rows[0].count;
   values.push(query.limit,(query.page-1)*query.limit);
