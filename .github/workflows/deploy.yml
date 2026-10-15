@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.ref_name }}
+  group: deploy-metmma-backend
   cancel-in-progress: false
 
 jobs:
@@ -61,8 +61,8 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          DEPLOY_DIRECTORY: ${{ github.ref_name == 'version-2' && 'metmma-backend-v2' || 'metmma-backend' }}
-          PM2_APP_NAME: ${{ github.ref_name == 'version-2' && 'metmma-backend-v2' || 'metmma-backend' }}
+          DEPLOY_DIRECTORY: metmma-backend
+          PM2_APP_NAME: metmma-backend
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -112,10 +112,6 @@ jobs:
             deploy_directory="$1"
             pm2_app_name="$2"
             cd "$HOME/$deploy_directory"
-            if [ "$pm2_app_name" = "metmma-backend-v2" ] && [ ! -s .env ]; then
-              echo "Prepare the version-2 .env with its own Neon database and PORT before deploying."
-              exit 1
-            fi
             
             # Extract tarball over existing files (.env remains untouched)
             tar -xzf release.tar.gz
@@ -124,10 +120,6 @@ jobs:
             # Fix executable permissions for node_modules binaries
             if [ -d "node_modules/.bin" ]; then
               chmod -R +x node_modules/.bin/
-            fi
-
-            if [ "$pm2_app_name" = "metmma-backend-v2" ]; then
-              node -e 'require("dotenv").config({quiet:true}); if (!process.env.PORT || process.env.PORT === "3000" || !process.env.DATABASE_URL) { console.error("Version 2 requires DATABASE_URL and a dedicated PORT other than 3000."); process.exit(1); }'
             fi
 
             # Initialize database if fresh, then execute pending migrations
@@ -143,20 +135,4 @@ jobs:
             fi
 
             pm2 save
-            if [ "$pm2_app_name" = "metmma-backend-v2" ]; then
-              node <<'NODE'
-            require('dotenv').config({quiet:true});
-            (async () => {
-              for (let attempt = 0; attempt < 12; attempt++) {
-                try {
-                  const response = await fetch(`http://127.0.0.1:${process.env.PORT}/api/health`, {signal:AbortSignal.timeout(7000)});
-                  if (response.ok) { console.info('Version 2 API is healthy.'); return; }
-                } catch {}
-                await new Promise(resolve => setTimeout(resolve, 2000));
-              }
-              console.error('Version 2 API did not become healthy. Check PM2 logs.');
-              process.exitCode = 1;
-            })();
-          NODE
-            fi
           EOF

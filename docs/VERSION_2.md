@@ -29,64 +29,59 @@ Branch selection in `.github/workflows/deploy.yml` is explicit:
 | Branch | GitHub environment | Server directory | PM2 process |
 | --- | --- | --- | --- |
 | `main` | `production` | `~/metmma-backend` | `metmma-backend` |
-| `version-2` | `version-2` | `~/metmma-backend-v2` | `metmma-backend-v2` |
+| `version-2` | `version-2` | `~/metmma-backend` | `metmma-backend` |
 
 Both push deployments and manual dispatch use this mapping. Other branches cannot run the deployment job. The frontend is checked and built by Actions; Vercel publishes it separately.
 
-## 2. New Neon database and server configuration
+The `version-2` deployment replaces the code in the existing `~/metmma-backend` directory and reloads the existing `metmma-backend` PM2 process. The server `.env` is preserved during deployment. Both branches share this target, so the workflow serializes their deployments.
 
-Create an empty Neon database for version 2. Use its application URL and its direct (non-pooler) migration URL. Do not use version 1's database URLs.
+## 2. Neon database and server configuration
 
-On the VPS, as the SSH deployment user:
+Keep the existing `~/metmma-backend/.env` on the VPS. If version 2 should use different database or frontend settings, update that file before deploying and restore the production values before deploying `main`:
 
-```sh
-mkdir -p ~/metmma-backend-v2
-chmod 700 ~/metmma-backend-v2
-```
-
-Create `~/metmma-backend-v2/.env` with the following values, replacing placeholders:
+The shared environment file should contain the appropriate values for the deployed branch:
 
 ```dotenv
 NODE_ENV=production
-PORT=3001
-DATABASE_URL=postgresql://USER:PASSWORD@YOUR_V2_NEON_HOST/neondb
-MIGRATION_DATABASE_URL=postgresql://USER:PASSWORD@YOUR_V2_DIRECT_NEON_HOST/neondb
+PORT=3000
+DATABASE_URL=postgresql://USER:PASSWORD@YOUR_NEON_HOST/neondb
+MIGRATION_DATABASE_URL=postgresql://USER:PASSWORD@YOUR_DIRECT_NEON_HOST/neondb
 DB_SSL=true
-JWT_SECRET=REPLACE_WITH_A_NEW_RANDOM_SECRET_OF_AT_LEAST_32_CHARACTERS
-ALLOWED_ORIGINS=https://v2.metmmapharmacy.com
+JWT_SECRET=YOUR_EXISTING_SECRET
+ALLOWED_ORIGINS=https://your-frontend.example
 TRUST_PROXY=1
 TAX_RATE_BPS=1650
 PHARMACY_TIMEZONE=Africa/Blantyre
 ```
 
 ```sh
-chmod 600 ~/metmma-backend-v2/.env
+chmod 600 ~/metmma-backend/.env
 ```
 
-Use your actual version-2 frontend origin, without a trailing slash. Choose a dedicated port and confirm the tax/timezone settings for this new database. As in the existing setup, omit `sslmode` and `channel_binding` parameters from URLs and let `DB_SSL=true` enforce certificate validation. `TRUST_PROXY=1` assumes one trusted reverse-proxy hop.
+Use the frontend origin configured for the deployed branch, without a trailing slash. As in the existing setup, omit `sslmode` and `channel_binding` parameters from URLs and let `DB_SSL=true` enforce certificate validation. `TRUST_PROXY=1` assumes one trusted reverse-proxy hop.
 
-The version-2 deployment fails early if its `.env`, `DATABASE_URL` or dedicated port are missing. The workflow initializes only an empty public schema, removes fixture users during initialization, then runs the existing migrations. An existing database is preserved by initialization. Version 2 needs no additional schema migration beyond the current migration set.
+The workflow initializes only an empty public schema and runs the existing migrations. An existing database is preserved by initialization.
 
 ## 3. API domain and first deploy
 
-Point a separate API domain, for example `api-v2.metmmapharmacy.com`, at the VPS and configure the existing reverse proxy to forward that host to `127.0.0.1:3001`. Keep version 1's proxy host separate.
+Keep the existing API domain and reverse-proxy target for `~/metmma-backend`. Since both branches use the same PM2 process and port, version 2 does not have a separate API endpoint.
 
-Commit and push the `version-2` branch after the environment and server `.env` are ready. The workflow will validate the code, package the backend with its SQL files, initialize/migrate the new database and start `metmma-backend-v2`.
+Commit and push the `version-2` branch after the environment and server `.env` are ready. The workflow will validate the code, package the backend with its SQL files, initialize/migrate the database and reload `metmma-backend`.
 
 The API readiness check is:
 
 ```text
-https://api-v2.metmmapharmacy.com/api/health
+https://your-api.example/api/health
 ```
 
-Expect `{"status":"OK"}`. A failed readiness check needs investigation before using the frontend. The workflow checks local API readiness after starting PM2.
+Expect `{"status":"OK"}`. A failed readiness check needs investigation before using the frontend.
 
 ## 4. First administrator
 
 On the VPS, after migration:
 
 ```sh
-cd ~/metmma-backend-v2
+cd ~/metmma-backend
 export BOOTSTRAP_USERNAME=developer
 read -rsp 'New administrator password (10–72 bytes): ' BOOTSTRAP_PASSWORD
 echo
@@ -95,7 +90,7 @@ npm run bootstrap:admin
 unset BOOTSTRAP_USERNAME BOOTSTRAP_PASSWORD
 ```
 
-This command targets the version-2 `.env`. It preserves existing valid accounts. Users in the old database are not automatically copied to this new database.
+This command targets the shared `.env` and preserves existing valid accounts.
 
 ## 5. Separate Vercel project
 
@@ -104,14 +99,14 @@ Import the same repository into a new Vercel project and select `version-2` as i
 - Root directory: `frontend`
 - Build command: `npm run build`
 - Output directory: `dist`
-- Production variable: `VITE_API_BASE_URL=https://api-v2.metmmapharmacy.com`
-- Frontend domain: your chosen version-2 host, matching backend `ALLOWED_ORIGINS`
+- Production variable: `VITE_API_BASE_URL=https://your-api.example`
+- Frontend domain: your chosen frontend host, matching backend `ALLOWED_ORIGINS`
 
 Redeploy after changing `VITE_API_BASE_URL`: Vite embeds it in the build. Do not assign the old frontend's domain to this project until you intend to switch versions.
 
 ## Acceptance checks after hosting
 
-Use the new database to check:
+Use the configured database to check:
 
 1. Sign in as the new administrator. Skip the tour; navigating and signing back in should not automatically reopen it. The question mark can restart it.
 2. Add a product with only required details and without a supplier, barcode or internal code. Confirm generated code and default stock values. Test missing fields, invalid price and expiry errors.
