@@ -14,7 +14,7 @@ const env = {
   PORT: '3000', TRUST_PROXY: '0',
   JWT_SECRET: 'local-development-only-secret-never-use-in-production',
   ALLOWED_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173',
-  PHARMACY_TIMEZONE: 'UTC', TAX_RATE_BPS: '1650',
+  PHARMACY_TIMEZONE: 'UTC',
 };
 const commands = {
   server: ['--watch', 'server.js'],

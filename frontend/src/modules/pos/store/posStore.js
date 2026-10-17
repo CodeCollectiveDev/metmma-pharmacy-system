@@ -5,7 +5,7 @@ import { minor, decimal, normalizeProduct } from '@/services/api/money'
 import { localError, userError } from '@/services/api/errors'
 export const usePosStore = defineStore('pos', () => {
   const cart = ref([]), products = ref([]), searchQuery = ref(''), selectedCategory = ref('All')
-  const loading = ref(false), processing = ref(false), error = ref(null), pending = ref(null), taxBps = ref(1650)
+  const loading = ref(false), processing = ref(false), error = ref(null), pending = ref(null)
   const productError = ref(null), pagination = ref(null)
   let owner = null, generation = 0
   function storageKey() { return `mpms:cart:v1:${owner}` }
@@ -20,9 +20,8 @@ export const usePosStore = defineStore('pos', () => {
     if (owner) { try { localStorage.setItem(storageKey(), JSON.stringify({ cart: cart.value, pending: pending.value })) } catch { error.value = localError('UNEXPECTED') } }
   }, { deep: true, flush: 'sync' })
   const subtotalMinor = computed(() => cart.value.reduce((sum, item) => sum + minor(item.price) * item.quantity, 0))
-  const taxMinor = computed(() => Math.floor((subtotalMinor.value * taxBps.value + 5000) / 10000))
   const cartTotal = computed(() => subtotalMinor.value / 100)
-  const totalAmount = computed(() => (subtotalMinor.value + taxMinor.value) / 100)
+  const totalAmount = computed(() => subtotalMinor.value / 100)
   const filteredProducts = computed(() => products.value)
   const locked = computed(() => processing.value || !!pending.value)
   async function fetchProducts(page = 1) {
@@ -34,7 +33,7 @@ export const usePosStore = defineStore('pos', () => {
     } catch (err) { if (current === generation) { products.value = []; productError.value = err } }
     finally { if (current === generation) loading.value = false }
   }
-  async function configure() { restoreCart(); error.value = null; try { taxBps.value = (await dataService.getConfig()).data.taxRateBps; if (cart.value.length && !pending.value) await refreshCart() } catch (err) { error.value = err; throw err } }
+  async function configure() { restoreCart(); error.value = null; if (cart.value.length && !pending.value) await refreshCart() }
   async function refreshCart() {
     if (pending.value) return
     const originalOwner=owner
@@ -87,10 +86,10 @@ export const usePosStore = defineStore('pos', () => {
         const items = cart.value.map(i => ({ productId: Number(i.id || i._id), quantity: i.quantity, unitPrice: decimal(minor(i.price)), subtotal: decimal(minor(i.price) * i.quantity) }))
         if (items.some(i => !Number.isSafeInteger(i.productId) || i.productId < 1)) throw localError('PRODUCT_UNAVAILABLE')
         if (amountReceived !== undefined) {
-          const received = minor(amountReceived), total = subtotalMinor.value + taxMinor.value
+          const received = minor(amountReceived), total = subtotalMinor.value
           if (received < total || (paymentMethod !== 'cash' && received !== total)) throw localError('PAYMENT_AMOUNT')
         }
-        pending.value = { idempotencyKey: crypto.randomUUID(), items, totalAmount: decimal(subtotalMinor.value + taxMinor.value), paymentMethod, customerName, ...(amountReceived !== undefined ? { amountReceived: decimal(minor(amountReceived)) } : {}) }
+        pending.value = { idempotencyKey: crypto.randomUUID(), items, totalAmount: decimal(subtotalMinor.value), paymentMethod, customerName, ...(amountReceived !== undefined ? { amountReceived: decimal(minor(amountReceived)) } : {}) }
       }
       // A retry reference must survive a reload before any sale can reach the server.
       try { localStorage.setItem(storageKey(), JSON.stringify({ cart: cart.value, pending: pending.value })) }
@@ -108,7 +107,6 @@ export const usePosStore = defineStore('pos', () => {
     } catch (err) {
       const safe = userError(err)
       if (['VALIDATION', 'PAYMENT_AMOUNT', 'INSUFFICIENT_STOCK', 'PRICE_CHANGED', 'PRODUCT_UNAVAILABLE', 'PERMISSION_DENIED', 'NOT_FOUND'].includes(safe.code)) pending.value = null
-      if (safe.code === 'PRICE_CHANGED') { try { taxBps.value = (await dataService.getConfig()).data.taxRateBps } catch {} }
       if (['PRICE_CHANGED', 'INSUFFICIENT_STOCK', 'PRODUCT_UNAVAILABLE'].includes(safe.code)) await refreshCart()
       if(safe.code==='PRODUCT_UNAVAILABLE'){
         for(const issue of err.response?.data?.unavailableItems || []){
@@ -123,5 +121,5 @@ export const usePosStore = defineStore('pos', () => {
       throw err
     } finally { processing.value = false }
   }
-  return { productError, pagination, cart, products, searchQuery, selectedCategory, filteredProducts, cartTotal, subtotalMinor, taxMinor, totalAmount, taxBps, loading, processing, error, pending, locked, restoreCart, refreshCart, configure, fetchProducts, addToCart, removeFromCart, updateQuantity, clearCart, scan, checkout }
+  return { productError, pagination, cart, products, searchQuery, selectedCategory, filteredProducts, cartTotal, subtotalMinor, totalAmount, loading, processing, error, pending, locked, restoreCart, refreshCart, configure, fetchProducts, addToCart, removeFromCart, updateQuantity, clearCart, scan, checkout }
 })

@@ -19,7 +19,6 @@ Use Node 22.12+ and PostgreSQL 16. Keep environment files and database backups o
 | DB_SSL_CA | Optional PEM private CA. Avoid URL sslmode parameters that can override pg's SSL options when using this. |
 | ALLOWED_ORIGINS | Exact HTTPS frontend origin(s), comma separated; no /api path or trailing slash. |
 | TRUST_PROXY | Number of trusted reverse-proxy hops. Render: 1. Direct service: 0. Confirm actual topology before enabling. |
-| TAX_RATE_BPS | Confirm applicable VAT. Uploaded behavior retained at 1650 (16.5%); 0–10000 supported. |
 | PHARMACY_TIMEZONE | Default UTC preserves existing naive timestamp interpretation. Malawi commonly uses Africa/Blantyre. Verify historical row semantics on a copy before changing. |
 | VITE_API_BASE_URL | Frontend build-time URL ending in /api, e.g. https://actual-backend.example/api. Default /api requires a real same-origin proxy. Never put secrets in VITE_* values. |
 | BOOTSTRAP_USERNAME / BOOTSTRAP_PASSWORD | One-time optional administrator initialization only; password 10–72 bytes. Existing valid accounts are preserved. Unset afterward. |
@@ -31,7 +30,7 @@ Use HTTPS for the frontend: native random UUID generation requires a secure brow
 
 - [ ] Choose hosting target and capture the current release identifier/environment.
 - [ ] Verify finance access: admin/manager may write expenses; pharmacist/HR may read; cashier cannot read finance and sees only own receipts; only admin reverses sales.
-- [ ] Confirm VAT, currency MWK, timestamp interpretation and full-sale return-to-stock policy.
+- [ ] Confirm currency MWK, timestamp interpretation and full-sale return-to-stock policy.
 - [ ] Reconcile pending browser records with saved receipts; export from administrator Help before clearing browser storage. Never automatically replay old pending receipts.
 - [ ] Pause sales/stock/expense writes and arrange a short maintenance window. Save a full backup; test restoration in an isolated database.
 - [ ] Restore a production backup to a separate database and inspect the actual schema against database/init.sql. Do not run init.sql on an existing production database: it includes sample inserts.
@@ -111,7 +110,7 @@ For a brand-new database only, initialize from database/init.sql, then run migra
 
 ## Smoke tests before reopening
 
-- [ ] Public readiness and /api/config show expected status, currency, VAT and timezone.
+- [ ] Public readiness and /api/config show expected status, currency and timezone.
 - [ ] HTTPS login works, disallowed roles receive friendly denial, old/expired sessions renew or sign in again.
 - [ ] Complete/skip/resume tour and reopen from Help; verify on real desktop/tablet.
 - [ ] Add a clearly labeled test product, scan its real label, sell one unit; check receipt, stock movement and one linked income. Retry the same submitted checkout reference: same receipt, no additional deduction.

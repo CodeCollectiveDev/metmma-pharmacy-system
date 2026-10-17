@@ -16,7 +16,7 @@ const barcode = computed({get: () => store.searchQuery, set: value => { store.se
 const cameraOpen = ref(false), amountReceived = ref(''), scanBusy = ref(false), notice = ref('')
 const itemCount = computed(() => store.cart.reduce((sum, item) => sum + item.quantity, 0))
 const receivedMinor = computed(() => { try { return amountReceived.value === '' ? null : minor(amountReceived.value) } catch { return null } })
-const dueMinor = computed(() => store.subtotalMinor + store.taxMinor)
+const dueMinor = computed(() => store.subtotalMinor)
 const difference = computed(() => receivedMinor.value === null ? null : receivedMinor.value - dueMinor.value)
 const paymentValid = computed(() => receivedMinor.value !== null && (payment.value === 'cash' ? difference.value >= 0 : difference.value === 0))
 watch(payment, () => { if (!store.locked) amountReceived.value = '' })
@@ -78,7 +78,6 @@ async function retryLoad() { await initialize() }
         <ul class="space-y-3 mb-4 max-h-72 overflow-auto"><li v-for="item in store.cart" :key="item._id" class="p-3 rounded-lg bg-gray-50"><p class="font-medium flex justify-between gap-2"><span>{{ item.name }}</span><span class="whitespace-nowrap">{{ currency(Number(item.price) * item.quantity) }}</span></p><p v-if="unavailableMessage(item)" role="alert" class="text-sm text-red-800 my-2">{{unavailableMessage(item)}}</p><p class="text-sm mb-2">{{ currency(item.price) }} each</p><div class="flex items-center gap-2"><button class="secondary px-3" :disabled="store.locked" :aria-label="`Decrease ${item.name} quantity`" @click="store.updateQuantity(item._id, -1)">−</button><span>{{ item.quantity }}</span><button class="secondary px-3" :disabled="store.locked" :aria-label="`Increase ${item.name} quantity`" @click="store.updateQuantity(item._id, 1)">+</button><button class="ml-auto underline text-red-800" :disabled="store.locked" :aria-label="`Remove ${item.name} from cart`" @click="removeItem(item)"><Trash2 class="h-4 w-4" aria-hidden="true"/></button></div></li></ul>
         <div class="border-t pt-3 space-y-2 mt-auto">
           <p class="flex justify-between"><span>Subtotal</span><span>{{ currency(store.cartTotal) }}</span></p>
-          <p class="flex justify-between"><span>VAT ({{ store.taxBps / 100 }}%)</span><span>{{ currency(store.taxMinor / 100) }}</span></p>
           <p class="flex justify-between text-2xl font-bold bg-blue-50 rounded-lg px-3 py-4 text-blue-950"><span>Total</span><span>{{ currency(store.totalAmount) }}</span></p>
           <details class="py-1"><summary class="text-sm cursor-pointer text-slate-600">Add customer name (optional)</summary><label class="block mt-2"><span class="sr-only">Customer name</span><input v-model="customer" maxlength="100" class="field" :disabled="store.locked" placeholder="Walk-in customer"/></label></details>
           <label class="block">How did the customer pay?<select v-model="payment" class="field mt-1" :disabled="store.locked"><option value="cash">Cash</option><option value="card">Card</option><option value="mobile_money">Mobile money</option><option value="bank_transfer">Bank transfer</option></select></label>

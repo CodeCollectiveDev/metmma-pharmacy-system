@@ -16,12 +16,13 @@ import { confirmAction } from '@/composables/useFeedback'
 const store = useInventoryStore(), route = useRoute()
 const role = localStorage.getItem('role'), canAdd = ['admin', 'pharmacist'].includes(role), canEdit = ['admin', 'pharmacist', 'store_manager'].includes(role)
 const search = ref(''), status = ref('all'), showForm = ref(false), saving = ref(false), error = ref(null), fields = ref([]), notice = ref(''), restock = ref(null), quantity = ref(1), note = ref('')
-const blank = () => ({ productCode: '', name: '', batchNumber: '', expiryDate: '', quantity: 0, sellingPrice: '', supplier: '', category: 'Other', reorderLevel: 10, barcode: '' })
+const blank = () => ({ name: '', batchNumber: '', expiryDate: '', quantity: 0, sellingPrice: '', supplier: '', category: 'Antibiotics', reorderLevel: 10, barcode: '' })
 const form = ref(blank())
 const today = periodDates('today').start
+const categories = ['Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Cold', 'First Aid', 'Diagnostics', 'Other']
 const inputs = [
   {name:'name',label:'Product name',type:'text',required:true,minlength:2,maxlength:200,help:'Include strength and pack size, e.g. Paracetamol 500 mg, 10 tablets.'},
-  {name:'sellingPrice',label:'Selling price (MWK)',type:'number',required:true,min:0,max:9999999999.99,step:'0.01',help:'Price for one selling unit, before VAT.'},
+  {name:'sellingPrice',label:'Selling price (MWK)',type:'number',required:true,min:0,max:9999999999.99,step:'0.01',help:'Price for one selling unit.'},
   {name:'batchNumber',label:'Batch / lot number',type:'text',required:true,minlength:2,maxlength:100,help:'Printed next to LOT or BATCH. This identifies the production lot, not the barcode.'},
   {name:'expiryDate',label:'Expiry date',type:'date',required:true,min:today,help:'Use the date on this batch. Add different batches as separate stock records.'},
   {name:'quantity',label:'Units in stock',type:'number',min:0,max:2147483647,step:1,help:'Count the same selling units used for the price. Starts at 0.'},
@@ -40,10 +41,10 @@ function normalizeExpiryDate(value) {
   return Number.isFinite(check.getTime()) && check.toISOString().slice(0, 10) === normalized ? normalized : value
 }
 function normalizeProductPayload(raw = {}) {
-  const productCode = String(raw.productCode ?? '').trim();
+  const payload = { ...raw }
+  delete payload.productCode
   return {
-    ...raw,
-    productCode: productCode.toUpperCase(),
+    ...payload,
     expiryDate: normalizeExpiryDate(raw.expiryDate),
     name: String(raw.name ?? '').trim(),
     batchNumber: String(raw.batchNumber ?? '').trim(),
@@ -107,6 +108,11 @@ async function deactivate(product) {
             <input v-model="form[input.name]" :name="input.name" :aria-label="input.label" :type="input.type" :required="input.required" :minlength="input.minlength" :maxlength="input.maxlength" :min="input.min" :max="input.max" :step="input.step" :aria-describedby="`help-${input.name}`" class="field mt-1" />
             <span :id="`help-${input.name}`" class="block text-xs font-normal text-slate-500 mt-1">{{ input.help }}</span>
           </label>
+          <label class="text-sm font-medium">Category
+            <select v-model="form.category" name="category" required class="field mt-1">
+              <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
+            </select>
+          </label>
         </div>
         <div class="my-5 p-4 bg-slate-50 rounded-lg">
           <label class="block text-sm font-medium">Barcode number (optional)<div class="flex gap-2 mt-1"><input v-model="form.barcode" name="barcode" maxlength="100" class="field" placeholder="Type the printed number or use a scanner" autocomplete="off" @keydown.enter.prevent/><CameraButton @click="cameraOpen = true"/></div></label>
@@ -114,8 +120,6 @@ async function deactivate(product) {
         </div>
         <details class="border-t pt-3"><summary class="font-medium cursor-pointer">Additional details (optional)</summary><div class="grid sm:grid-cols-2 gap-4 mt-3">
           <label>Supplier<input v-model.trim="form.supplier" name="supplier" minlength="2" maxlength="200" class="field mt-1" /></label>
-          <label>Category<input v-model.trim="form.category" name="category" minlength="2" maxlength="100" class="field mt-1" list="product-categories"/><datalist id="product-categories"><option>Painkillers</option><option>Antibiotics</option><option>Vitamins</option><option>First aid</option><option>Other</option></datalist></label>
-          <label class="sm:col-span-2">Internal product code<input v-model.trim="form.productCode" name="productCode" minlength="3" maxlength="50" pattern="[A-Za-z0-9-]+" class="field mt-1" placeholder="Generated automatically if blank"/><span class="text-xs text-slate-500">Only needed if you already use your own stock codes.</span></label>
         </div></details>
         <div class="form-actions"><button type="button" class="secondary" :disabled="saving" @click="showForm = false">Cancel</button><button class="primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save product' }}</button></div>
       </form>

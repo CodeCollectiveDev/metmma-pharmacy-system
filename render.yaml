@@ -19,7 +19,5 @@ services:
         value: "true"
       - key: TRUST_PROXY
         value: "1"
-      - key: TAX_RATE_BPS
-        value: "1650"
       - key: PHARMACY_TIMEZONE
         value: UTC

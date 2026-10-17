@@ -3,7 +3,7 @@ import { computed } from 'vue'
 const props = defineProps({ section: String })
 const role = localStorage.getItem('role')
 const links = computed(() => props.section === 'team'
-  ? [{ path: '/hr', label: 'Staff & attendance' }, { path: '/leave', label: 'Leave' }, ...(role === 'admin' ? [{ path: '/accounts', label: 'Sign-in accounts' }] : [])]
+  ? [{ path: '/hr', label: 'Staff records' }, { path: '/leave', label: 'Leave' }, ...(role === 'admin' ? [{ path: '/accounts', label: 'Sign-in accounts' }] : [])]
   : [{ path: '/sales', label: 'Receipts' }, ...(['admin', 'store_manager', 'pharmacist', 'hr_officer'].includes(role) ? [{ path: '/finances', label: 'Income & expenses' }, { path: '/reports', label: 'Reports' }] : [])])
 </script>
 <template>

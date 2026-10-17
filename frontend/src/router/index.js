@@ -81,6 +81,16 @@ const routes = [
       requiresAdmin: true
     }
   },
+
+  {
+    path: '/attendance',
+    component: () => import('@/modules/hr/views/AttendanceView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [ROLES.ADMIN, ROLES.HR_OFFICER],
+      label: 'Attendance'
+    }
+  },
   
   {
     path: '/reports',

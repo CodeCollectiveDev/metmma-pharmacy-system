@@ -20,18 +20,28 @@ async function save(row){
  const selectedDate=date.value;saving.value=true;error.value=null
  try{await api.post('/attendance',{employee_id:row.employee_id,date:selectedDate,status:row.chosen});notice.value=`${row.first_name} ${row.last_name}: ${row.chosen} saved for ${selectedDate}.`;await load(pagination.value?.page||1)}catch(e){error.value=e}finally{saving.value=false}
 }
+function editDate(record){date.value=String(record.date).slice(0,10);mode.value='day';notice.value=''}
 watch(mode,()=>load());onMounted(()=>load())
 </script>
 <template>
 <section aria-label="Attendance management" class="space-y-4">
-<div class="flex gap-3"><button class="secondary" :aria-pressed="mode==='day'" :disabled="saving" @click="mode='day'">Attendance by date</button><button class="secondary" :aria-pressed="mode==='history'" :disabled="saving" @click="mode='history'">Attendance history</button></div>
+<div class="flex flex-wrap gap-2" aria-label="Attendance views"><button class="secondary" :aria-pressed="mode==='day'" :disabled="saving" @click="mode='day'">Mark attendance</button><button class="secondary" :aria-pressed="mode==='history'" :disabled="saving" @click="mode='history'">Attendance history</button></div>
+<div v-if="mode==='day'" class="rounded-xl border border-blue-200 bg-blue-50 p-5">
+<p class="text-xs font-bold uppercase tracking-wide text-blue-800">Daily work · Attendance entry</p>
+<h2 class="mt-1 text-xl font-bold text-slate-900">{{ date===today() ? 'Mark attendance for today' : 'Edit attendance for selected day' }}</h2>
+<p class="mt-1 text-sm text-slate-700">Select a status for each staff member, then save it for {{ date===today() ? 'today' : date }}. Unmarked staff are not counted as absent.</p>
+</div>
+<div v-else class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+<p class="text-xs font-bold uppercase tracking-wide text-slate-600">Attendance records</p>
+<h2 class="mt-1 text-xl font-bold text-slate-900">History</h2>
+<p class="mt-1 text-sm text-slate-700">Review saved attendance. To correct a day, choose Edit this date to open it in the attendance editor.</p>
+</div>
 <form class="panel flex flex-wrap gap-3 items-end" @submit.prevent="load()">
-<label v-if="mode==='day'">Attendance date<input v-model="date" aria-label="Attendance date" type="date" required class="field" :disabled="saving" @change="load()" /></label>
+<label v-if="mode==='day'">Date to mark<input v-model="date" aria-label="Attendance date" type="date" required class="field" :disabled="saving" @change="load()" /></label>
 <template v-else><label>From<input v-model="start" type="date" class="field" aria-label="Attendance from" /></label><label>To<input v-model="end" type="date" :min="start" class="field" aria-label="Attendance to" /></label><label>Status<select v-model="status" class="field"><option value="">All statuses</option><option v-for="s in statuses" :key="s">{{s}}</option></select></label></template>
 <label class="flex-1">Find staff<input v-model="search" class="field" maxlength="100" placeholder="Name or staff code" /></label><button class="primary" :disabled="loading||saving">Apply filters</button>
 </form>
 <ErrorNotice :error="error" :retry="load"/><p v-if="notice" role="status" class="success-notice">{{notice}}</p><p v-if="loading" role="status">Loading attendance…</p>
-<p v-if="mode==='day'" class="text-sm text-gray-600">Choose a date to see saved attendance and record or correct each employee’s status. Unmarked staff are not counted as absent.</p>
-<div class="panel overflow-x-auto p-0"><table class="w-full"><thead><tr><th class="p-3 text-left">Employee</th><th class="p-3 text-left">Date</th><th class="p-3 text-left">Saved status</th><th class="p-3 text-left">{{mode==='day'?'Record attendance':'Notes'}}</th></tr></thead><tbody><tr v-for="r in records" :key="r.employee_id+'-'+r.id" class="border-t"><td class="p-3">{{r.first_name}} {{r.last_name}}</td><td class="p-3">{{mode==='day'?date:r.date}}</td><td class="p-3">{{r.status||'Not marked'}}</td><td class="p-3"><div v-if="mode==='day'" class="flex gap-2"><select v-model="r.chosen" :aria-label="`Status for ${r.first_name} ${r.last_name}`" class="field" :disabled="saving||loading"><option v-for="s in statuses" :key="s">{{s}}</option></select><button class="secondary" :disabled="saving||loading||!date||r.chosen===r.status" @click="save(r)">Save</button></div><span v-else>{{r.notes||'—'}}</span></td></tr></tbody></table><p v-if="!loading&&!records.length&&!error" class="p-5">{{mode==='day'?'No active staff match this search.':'No attendance records match these filters.'}}</p><PaginationControls :pagination="pagination" :loading="loading||saving" @change="load"/></div>
+<div class="panel overflow-x-auto p-0"><table class="w-full"><thead><tr><th class="p-3 text-left">Employee</th><th class="p-3 text-left">Date</th><th class="p-3 text-left">Saved status</th><th class="p-3 text-left">{{mode==='day'?'Record attendance':'Notes / actions'}}</th></tr></thead><tbody><tr v-for="r in records" :key="r.employee_id+'-'+r.id" class="border-t"><td class="p-3">{{r.first_name}} {{r.last_name}}</td><td class="p-3">{{mode==='day'?date:r.date}}</td><td class="p-3">{{r.status||'Not marked'}}</td><td class="p-3"><div v-if="mode==='day'" class="flex flex-wrap gap-2"><select v-model="r.chosen" :aria-label="`Status for ${r.first_name} ${r.last_name}`" class="field" :disabled="saving||loading"><option v-for="s in statuses" :key="s">{{s}}</option></select><button class="secondary" :disabled="saving||loading||!date||r.chosen===r.status" @click="save(r)">Save</button></div><div v-else class="flex flex-wrap items-center gap-3"><span>{{r.notes||'—'}}</span><button class="secondary" :disabled="saving||loading" @click="editDate(r)">Edit this date</button></div></td></tr></tbody></table><p v-if="!loading&&!records.length&&!error" class="p-5">{{mode==='day'?'No active staff match this search.':'No attendance records match these filters.'}}</p><PaginationControls :pagination="pagination" :loading="loading||saving" @change="load"/></div>
 </section>
 </template>

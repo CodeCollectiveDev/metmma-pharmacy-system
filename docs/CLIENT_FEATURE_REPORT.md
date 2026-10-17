@@ -21,7 +21,7 @@ The METMMA Pharmacy Management System is a web-based application built for manag
   - Adjust quantities in the cart
   - Choose payment method (Cash or Card)
   - Generate a printable receipt after sale
-  - VAT (16.5%) is automatically calculated on every sale
+  - The amount due is the sum of the medicine prices.
 - **Who uses it**: Cashiers and Admins (accessed via the POS screen)
 - **Status**: Fully functional. Sales are recorded in the database with receipt numbers and stock is automatically deducted.
 

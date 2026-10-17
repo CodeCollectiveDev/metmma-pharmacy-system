@@ -6,6 +6,4 @@ function minor(value) {
   return BigInt(whole)*100n+BigInt(part.padEnd(2,'0'));
 }
 const decimal = cents => `${cents/100n}.${String(cents%100n).padStart(2,'0')}`;
-const tax = (subtotal,bps) => (subtotal*BigInt(bps)+5000n)/10000n;
-const taxRate = () => Number(process.env.TAX_RATE_BPS ?? 1650);
-module.exports = { minor, decimal, tax, taxRate };
+module.exports = { minor, decimal };

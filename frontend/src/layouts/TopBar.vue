@@ -1,7 +1,7 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import NotificationsPanel from '@/components/NotificationsPanel.vue'
-import { HelpCircle, Menu } from 'lucide-vue-next'
+import { HelpCircle, Menu, Moon, Sun } from 'lucide-vue-next'
 
 defineProps({
   title: { type: String, required: true },
@@ -17,6 +17,13 @@ const currentDate = computed(() => {
     day: 'numeric'
   })
 })
+const isDark = ref(document.documentElement.classList.contains('dark'))
+function toggleTheme() {
+  isDark.value = !isDark.value
+  document.documentElement.classList.toggle('dark', isDark.value)
+  document.documentElement.style.colorScheme = isDark.value ? 'dark' : 'light'
+  localStorage.setItem('metmma-theme', isDark.value ? 'dark' : 'light')
+}
 </script>
 
 <template>
@@ -33,6 +40,17 @@ const currentDate = computed(() => {
 
     <div class="flex shrink-0 items-center gap-1 sm:gap-4">
       <div class="text-sm text-gray-500 hidden md:block">{{ currentDate }}</div>
+
+      <button
+        type="button"
+        class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        :aria-label="isDark ? 'Switch to light theme' : 'Switch to dark theme'"
+        :title="isDark ? 'Switch to light theme' : 'Switch to dark theme'"
+        @click="toggleTheme"
+      >
+        <Sun v-if="isDark" class="w-5 h-5" aria-hidden="true" />
+        <Moon v-else class="w-5 h-5" aria-hidden="true" />
+      </button>
       
       <router-link to="/help" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Short instructions and the guided tour" aria-label="Help and tour">
         <HelpCircle class="w-5 h-5" />

@@ -55,7 +55,7 @@ async function loadAudit(page = 1) { auditError.value = null; try { const res = 
     <ErrorNotice :error="summaryError" :retry="loadSummary" />
     <p v-if="!validDates" role="alert" class="field-error mb-4">Choose a start date and an end date on or after it.</p>
     <div v-if="summary" class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
-      <div class="panel"><span class="metric-label">Sales received</span><strong class="metric-value">{{ currency(summary.grossIncome) }}</strong><p class="text-xs text-slate-500 mt-2">Includes VAT; before refunds</p></div>
+      <div class="panel"><span class="metric-label">Sales received</span><strong class="metric-value">{{ currency(summary.grossIncome) }}</strong><p class="text-xs text-slate-500 mt-2">Before refunds</p></div>
       <div class="panel"><span class="metric-label">Money refunded</span><strong class="metric-value">{{ currency(summary.refunds) }}</strong><p class="text-xs text-slate-500 mt-2">Reversed sales in this period</p></div>
       <div class="panel"><span class="metric-label">Expenses paid</span><strong class="metric-value">{{ currency(summary.expenses) }}</strong><p class="text-xs text-slate-500 mt-2">Recorded spending; deleted entries excluded</p></div>
       <div class="panel border-blue-200 bg-blue-50"><span class="metric-label">Net recorded movement</span><strong class="metric-value" :class="{'text-red-800': Number(summary.net) < 0}">{{ currency(summary.net) }}</strong><p class="text-xs text-slate-600 mt-2">Sales − refunds − expenses</p></div>

@@ -1,19 +1,17 @@
 <script setup>
 import SectionNav from '@/components/SectionNav.vue'
 import { ref, onMounted, watch } from 'vue'
-import AttendancePanel from '../components/AttendancePanel.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import PaginationControls from '@/components/PaginationControls.vue'
 import { periodDates } from '@/services/api/money'
 const today = periodDates('today').start
 import { useHrStore } from '../store/hrStore'
-import { Plus, Search, UserPlus, Calendar,  } from 'lucide-vue-next'
+import { Plus, Search, UserPlus } from 'lucide-vue-next'
 
 const store = useHrStore()
 const role = localStorage.getItem('role')
 function load(page = 1) { return store.fetchEmployees({page,search:searchQuery.value}) }
-const activeTab = ref('employees')
 const showAddForm = ref(false)
 const searchQuery = ref('')
 const saving = ref(false)
@@ -62,31 +60,11 @@ const formatCurrency = (amount) => {
 </script>
 
 <template>
-  <MainLayout title="Staff & attendance" subtitle="View staff records, daily attendance and attendance history">
+  <MainLayout title="Staff records" subtitle="View and manage employee records">
     <SectionNav section="team" />
     <ErrorNotice v-if="!showAddForm" :error="store.employeeError" :retry="load" />
     <p v-if="store.loading" role="status">Loading staff…</p>
-    <!-- Tabs -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-      <div class="flex overflow-x-auto border-b border-gray-100">
-        <button
-          @click="activeTab = 'employees'"
-          :class="['px-6 py-4 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'employees' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
-        >
-          <UserPlus class="w-4 h-4" /> Employees
-        </button>
-        <button
-          @click="activeTab = 'attendance'"
-          :class="['px-6 py-4 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'attendance' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']"
-        >
-          <Calendar class="w-4 h-4" /> Attendance
-        </button>
-
-      </div>
-    </div>
-
-    <!-- Employees Tab -->
-    <div v-if="activeTab === 'employees'">
+    <div>
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div class="relative w-full sm:w-auto">
@@ -177,6 +155,5 @@ const formatCurrency = (amount) => {
       </div>
     </div>
 
-    <AttendancePanel v-if="activeTab === 'attendance'" />
   </MainLayout>
 </template>

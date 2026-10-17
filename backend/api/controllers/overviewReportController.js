@@ -12,7 +12,6 @@ async function getOverview(req, res) {
       db.query(`SELECT COUNT(*) FILTER (WHERE s.status='completed')::int AS "saleCount",
         COUNT(*) FILTER (WHERE s.status='reversed')::int AS "reversedCount",
         COALESCE(SUM(s.total_amount) FILTER (WHERE s.status='completed'),0)::text AS revenue,
-        COALESCE(SUM(s.tax_amount) FILTER (WHERE s.status='completed'),0)::text AS tax,
         COALESCE(ROUND(AVG(s.total_amount) FILTER (WHERE s.status='completed'),2),0)::text AS "averageSale"
         FROM sales s WHERE ${range}`, values),
       db.query(`SELECT s.created_at::date::text AS date,COUNT(*)::int AS count,SUM(s.total_amount)::text AS total

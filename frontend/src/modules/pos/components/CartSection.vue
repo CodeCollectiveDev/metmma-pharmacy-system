@@ -67,13 +67,9 @@ const store = usePosStore()
           <span>Subtotal</span>
           <span>${{ store.cartTotal.toFixed(2) }}</span>
         </div>
-        <div class="flex justify-between text-sm text-gray-600">
-          <span>Tax (10%)</span>
-          <span>${{ (store.cartTotal * 0.1).toFixed(2) }}</span>
-        </div>
         <div class="flex justify-between text-lg font-bold text-blue-700 pt-2 border-t border-gray-200">
           <span>Total</span>
-          <span>${{ (store.cartTotal * 1.1).toFixed(2) }}</span>
+          <span>${{ store.cartTotal.toFixed(2) }}</span>
         </div>
       </div>
 
