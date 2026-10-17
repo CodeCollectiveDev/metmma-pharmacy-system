@@ -11,6 +11,7 @@ export function usePage(fetcher) {
     } catch (err) { if (current === generation) { rows.value = []; pagination.value = null; error.value = err } }
     finally { if (current === generation) loading.value = false }
   }
+  function reset() { generation++; rows.value = []; pagination.value = null; error.value = null; loading.value = false }
   onBeforeUnmount(() => { generation++ })
-  return { rows, pagination, loading, error, load }
+  return { rows, pagination, loading, error, load, reset }
 }

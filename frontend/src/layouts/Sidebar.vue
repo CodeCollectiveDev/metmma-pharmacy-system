@@ -2,19 +2,18 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRole } from '@/composables/useRole'
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  FileText, 
-  HelpCircle,
-  Wallet, 
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Users,
+  CalendarDays,
+  FileText,
+  Wallet,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  X,
-  Lock
+  X
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -36,44 +35,17 @@ const user = computed(() => {
   }
 })
 
-// All available menu items with visibility conditions
 const allMenuItems = [
-  { path: '/accounts', label: 'Accounts', icon: Users, show: computed(() => userRole.value === 'admin') },
-  { path: '/leave', label: 'Leave', icon: FileText, show: canAccessHr },
-  { 
-    path: '/dashboard', 
-    label: 'Dashboard', 
-    icon: LayoutDashboard, 
-    show: computed(() => ['admin', 'store_manager', 'pharmacist', 'hr_officer'].includes(userRole.value))
-  },
-  { 
-    path: '/pos', 
-    label: 'Sell items', 
-    icon: ShoppingCart, 
-    show: canAccessPos
-  },
-  { path: '/sales', label: 'Sales', icon: FileText, show: computed(() => true) },
-  { path: '/finances', label: 'Finances', icon: Wallet, show: canAccessReports },
-  { path: '/help', label: 'Help and tour', icon: HelpCircle, show: computed(() => true) },
-  { 
-    path: '/inventory', 
-    label: 'Inventory', 
-    icon: Package, 
-    show: canAccessInventory
-  },
-  { 
-    path: '/hr', 
-    label: 'Staff', 
-    icon: Users, 
-    show: canAccessHr,
-    restricted: true // Marks as sensitive/restricted feature
-  },
-  { 
-    path: '/reports', 
-    label: 'Reports', 
-    icon: FileText, 
-    show: canAccessReports
-  },
+  { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, group: 'Daily work', show: computed(() => userRole.value !== 'cashier') },
+  { path: '/pos', label: 'Sell items', icon: ShoppingCart, group: 'Daily work', show: canAccessPos },
+  { path: '/inventory', label: 'Inventory', icon: Package, group: 'Daily work', show: canAccessInventory },
+  { path: '/attendance', label: 'Attendance', icon: CalendarDays, group: 'Daily work', show: canAccessHr },
+  { path: '/sales', label: 'Receipts', icon: FileText, group: 'Business', show: computed(() => true) },
+  { path: '/finances', label: 'Income & expenses', icon: Wallet, group: 'Business', show: canAccessReports },
+  { path: '/reports', label: 'Reports', icon: FileText, group: 'Business', show: canAccessReports },
+  { path: '/hr', label: 'Staff records', icon: Users, group: 'Team', show: canAccessHr },
+  { path: '/leave', label: 'Leave', icon: FileText, group: 'Team', show: canAccessHr },
+  { path: '/accounts', label: 'Sign-in accounts', icon: Users, group: 'Team', show: computed(() => userRole.value === 'admin') },
 ]
 
 const menuItems = computed(() => {
@@ -89,7 +61,7 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <aside 
+  <aside
     :class="[
       'h-screen bg-slate-900 text-white flex flex-col transition-transform duration-300 fixed left-0 top-0 z-40 w-72 md:w-auto md:translate-x-0',
       mobileOpen ? 'translate-x-0' : '-translate-x-full',
@@ -104,7 +76,7 @@ const handleLogout = () => {
         </div>
         <div>
           <div class="font-bold text-sm">METMMA PHARMACY</div>
-          <div class="text-xs text-slate-400">Management System</div>
+          <div class="text-xs text-slate-400">Workspace · Version 2</div>
         </div>
       </div>
       <div v-if="collapsed" class="hidden md:flex w-10 h-10 bg-blue-600 rounded-lg items-center justify-center font-bold text-lg mx-auto">
@@ -118,23 +90,24 @@ const handleLogout = () => {
     <!-- Menu -->
     <nav class="flex-1 py-4 overflow-y-auto">
       <ul class="space-y-1 px-2">
-        <li v-for="item in menuItems" :key="item.path">
-          <router-link 
+        <li v-for="(item, index) in menuItems" :key="item.path">
+          <p v-if="index === 0 || menuItems[index - 1].group !== item.group" class="px-3 pt-5 pb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400" :class="{ 'md:hidden': collapsed }">{{ item.group }}</p>
+          <router-link
             :to="item.path"
             :class="[
               'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-              isActive(item.path) 
-                ? 'bg-blue-600 text-white' 
+              isActive(item.path)
+                ? 'bg-blue-600 text-white'
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white'
             ]"
-            :title="item.restricted ? 'Staff records for administrators and HR officers' : `Open ${item.label}`"
+            :title="`Open ${item.label}`"
             :aria-current="isActive(item.path) ? 'page' : undefined"
             @click="emit('close')"
           >
             <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
             <span class="text-sm font-medium flex items-center gap-2" :class="{ 'md:hidden': collapsed }">
               {{ item.label }}
-              <Lock v-if="item.restricted" class="w-3 h-3 text-amber-400" />
+
             </span>
           </router-link>
         </li>
@@ -145,14 +118,14 @@ const handleLogout = () => {
     <div class="border-t border-slate-700 p-3">
       <div class="flex items-center gap-3 mb-3 px-2" :class="{ 'md:hidden': collapsed }">
         <div class="w-9 h-9 bg-slate-700 rounded-full flex items-center justify-center text-sm font-medium">
-          {{ user.name?.charAt(0) || 'U' }}
+          {{ (user.name || user.username)?.charAt(0) || 'U' }}
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium truncate">{{ user.name || 'User' }}</div>
+          <div class="text-sm font-medium truncate">{{ user.name || user.username || 'User' }}</div>
           <div class="text-xs text-slate-400 capitalize">{{ userRole }}</div>
         </div>
       </div>
-      <button 
+      <button
         @click="handleLogout"
         :class="[
           'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-slate-300 hover:bg-red-600/20 hover:text-red-400 transition-colors',
@@ -165,7 +138,7 @@ const handleLogout = () => {
     </div>
 
     <!-- Toggle Button -->
-    <button 
+    <button
       aria-label="Expand or collapse navigation" @click="emit('toggle')"
       class="hidden md:flex absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full items-center justify-center text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600"
     >

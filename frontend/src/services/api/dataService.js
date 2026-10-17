@@ -1,6 +1,7 @@
 import apiClient from './apiClient'
 import { toSalePayload } from './salePayload'
 export const dataService = {
+  getReportOverview: (params = {}) => apiClient.get('/reports/overview', { params }),
   getProductPage: (params = {}) => apiClient.get('/products', { params }),
   getProduct: id => apiClient.get(`/products/${id}`),
   getProductSummary: () => apiClient.get('/products/summary'),

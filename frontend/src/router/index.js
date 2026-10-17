@@ -1,7 +1,6 @@
 
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/modules/auth/views/Login.vue'
-import Register from '@/modules/auth/views/Register.vue'
 
 // Lazy-load dashboard view
 const Dashboard = () => import('@/modules/dashboard/views/Dashboard.vue')
@@ -27,7 +26,7 @@ const routes = [
   { path: '/accounts', component: () => import('@/modules/admin/views/AccountsView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Accounts' } },
   { path: '/leave', component: () => import('@/modules/hr/views/LeaveView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN, ROLES.HR_OFFICER], label: 'Leave' } },
   { path: '/login', component: Login, meta: { requiresAuth: false } },
-  { path: '/register', component: Register, meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Create staff account' } },
+  { path: '/register', redirect: '/accounts', meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Create staff account' } },
 
   { path: '/', redirect: '/dashboard' },
   
@@ -80,6 +79,16 @@ const routes = [
       roles: [ROLES.ADMIN, ROLES.HR_OFFICER],
       label: 'HR Management',
       requiresAdmin: true
+    }
+  },
+
+  {
+    path: '/attendance',
+    component: () => import('@/modules/hr/views/AttendanceView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: [ROLES.ADMIN, ROLES.HR_OFFICER],
+      label: 'Attendance'
     }
   },
   

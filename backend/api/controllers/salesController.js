@@ -2,7 +2,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const db = require('../db');
 const { AppError } = require('../../lib/errors');
 const { paging, dateFilter } = require('../../lib/validation');
-const { minor, decimal, tax, taxRate } = require('../../lib/money');
+const { minor, decimal } = require('../../lib/money');
 const { paymentAmounts } = require('../../lib/payment');
 const hash = body => createHash('sha256').update(JSON.stringify(body)).digest('hex');
 async function saleData(client,id) {
@@ -41,12 +41,12 @@ async function processSale(req,res) {
       if (minor(item.unitPrice)!==minor(product.selling_price) || minor(item.subtotal)!==line) throw new AppError('PRICE_CHANGED',409);
       subtotal += line;
     }
-    const bps = taxRate(), taxes = tax(subtotal,bps), total = subtotal+taxes;
+    const total = subtotal;
     if (total>999999999999n) throw new AppError('VALIDATION',400,['totalAmount']);
     if (minor(canonical.totalAmount)!==total) throw new AppError('PRICE_CHANGED',409);
     const {received,change}=paymentAmounts(total,body.paymentMethod,body.amountReceived);
     const receiptNumber=`REC-${randomUUID()}`;
-    const sale = (await client.query(`INSERT INTO sales(receipt_number,total_amount,payment_method,customer_name,user_id,idempotency_key,request_hash,subtotal_amount,tax_amount,tax_rate_bps,amount_received,change_given) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,[receiptNumber,decimal(total),body.paymentMethod,body.customerName || null,req.user.id,body.idempotencyKey,requestHash,decimal(subtotal),decimal(taxes),bps,decimal(received),decimal(change)])).rows[0];
+    const sale = (await client.query(`INSERT INTO sales(receipt_number,total_amount,payment_method,customer_name,user_id,idempotency_key,request_hash,subtotal_amount,tax_amount,tax_rate_bps,amount_received,change_given) VALUES($1,$2,$3,$4,$5,$6,$7,$8,0,0,$9,$10) RETURNING id`,[receiptNumber,decimal(total),body.paymentMethod,body.customerName || null,req.user.id,body.idempotencyKey,requestHash,decimal(subtotal),decimal(received),decimal(change)])).rows[0];
     // Bounded bulk writes, independent of cart size. All locks acquired in product ID order above.
     const quantities = canonical.items.map(i=>i.quantity), names = locked.map(p=>p.name), prices = locked.map(p=>p.selling_price), subtotals = canonical.items.map(i=>decimal(minor(locked.find(p=>p.id===i.productId).selling_price)*BigInt(i.quantity)));
     await client.query(`INSERT INTO sale_items(sale_id,product_id,quantity,unit_price,subtotal,product_name) SELECT $1,product_id,quantity,price,subtotal,name FROM UNNEST($2::int[],$3::int[],$4::numeric[],$5::numeric[],$6::text[]) AS x(product_id,quantity,price,subtotal,name)`,[sale.id,ids,quantities,prices,subtotals,names]);
@@ -60,7 +60,12 @@ async function processSale(req,res) {
 async function getSaleHistory(req,res) {
   const query=req.validatedQuery, values=[], where=dateFilter(query,values,'s.created_at');
   if(req.user.role==='cashier'){values.push(req.user.id);where.push(`s.user_id=$${values.length}`);}
-  if(query.search){values.push(`%${query.search}%`);where.push(`(s.receipt_number ILIKE $${values.length} OR s.customer_name ILIKE $${values.length})`);}
+  if(query.search){
+    values.push(`%${query.search}%`);const textIndex=values.length;
+    const receiptId=/^R-0*(\d+)$/i.exec(query.search.trim());
+    const shortMatch=receiptId?(values.push(receiptId[1]),` OR s.id::text=$${values.length}`):'';
+    where.push(`(s.receipt_number ILIKE $${textIndex} OR s.customer_name ILIKE $${textIndex}${shortMatch})`);
+  }
   const filter=where.length?`WHERE ${where.join(' AND ')}`:'';
   const count=(await db.query(`SELECT COUNT(*) FROM sales s ${filter}`,values)).rows[0].count;
   values.push(query.limit,(query.page-1)*query.limit);

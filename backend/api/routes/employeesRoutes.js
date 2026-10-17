@@ -4,7 +4,7 @@ const {employeeCreateSchema,employeeUpdateSchema}=require('../validators/employe
 const {Joi,validate,idParam,pageFields}=require('../../lib/validation');
 const {authenticate,authorize,ROLES}=require('../../middleware/roleMiddleware');
 router.use(authenticate,authorize(ROLES.ADMIN,ROLES.HR_OFFICER));
-router.get('/',validate(Joi.object({...pageFields,search:Joi.string().trim().max(100).allow('')}),'query'),c.getEmployees);
+router.get('/',validate(Joi.object({...pageFields,search:Joi.string().trim().max(100).allow(''),active:Joi.boolean(),unlinked:Joi.boolean()}),'query'),c.getEmployees);
 router.get('/:id',validate(idParam,'params'),c.getEmployeeById);
 router.post('/',authorize(ROLES.ADMIN),validate(employeeCreateSchema),c.addEmployee);
 router.put('/:id',authorize(ROLES.ADMIN),validate(idParam,'params'),validate(employeeUpdateSchema),c.updateEmployee);

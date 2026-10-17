@@ -2,6 +2,8 @@
 
 Vue 3, Vite, Tailwind and Pinia frontend; Express 5 and PostgreSQL backend. Stock and money are confirmed by the server. A failed checkout keeps a per-user cart and a retry reference.
 
+Version 2: see the [separate deployment and acceptance guide](docs/VERSION_2.md) for the `version-2` branch, GitHub Actions environment, new Neon database and Vercel project.
+
 Deployment: follow the [VPS + Neon + R2 runbook](docs/DEPLOYMENT_VPS.md) for GitHub Actions, Vercel/Netlify and local Docker development. Also read the [pre-change audit](docs/mvp/AUDIT.md), [final report](docs/mvp/FINAL_REPORT.md) and [business release checklist](docs/mvp/DEPLOYMENT_CHECKLIST.md).
 
 ## Development

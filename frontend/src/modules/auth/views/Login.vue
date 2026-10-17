@@ -28,13 +28,24 @@
         
         <div>
           <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input 
-            id="password" autocomplete="current-password" v-model="password" 
-            type="password" 
-            placeholder="••••••••" 
-            class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            required
-          />
+          <div class="relative">
+            <input
+              id="password" autocomplete="current-password" v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="••••••••"
+              class="w-full px-4 pr-14 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              required
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-0 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-r-lg"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :aria-pressed="showPassword"
+              @click="showPassword = !showPassword"
+            >
+              {{ showPassword ? 'Hide' : 'Show' }}
+            </button>
+          </div>
         </div>
 
         <button 
@@ -58,6 +69,7 @@ import { useRouter } from "vue-router";
 
 const email = ref("");
 const password = ref("");
+const showPassword = ref(false);
 const error = ref("");
 const loading = ref(false);
 const router = useRouter();

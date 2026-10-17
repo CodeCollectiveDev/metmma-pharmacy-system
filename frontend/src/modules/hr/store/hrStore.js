@@ -12,7 +12,7 @@ export const useHrStore = defineStore('hr', () => {
   async function addEmployee(employee) {
     employeeError.value = null
     try {
-      const body = { first_name: employee.first_name, last_name: employee.last_name, email: employee.email, department: employee.department, job_title: employee.position, salary: employee.salary, hire_date: employee.startDate || new Date().toISOString().slice(0,10), ...(employee.role ? { role: employee.role } : {}), ...(employee.phone ? { phone: employee.phone } : {}) }
+      const body = { first_name: employee.first_name, last_name: employee.last_name, email: employee.email, department: employee.department, job_title: employee.position, salary: employee.salary, ...(employee.startDate ? { hire_date: employee.startDate } : {}), ...(employee.role ? { role: employee.role } : {}), ...(employee.phone ? { phone: employee.phone } : {}) }
       const res = await dataService.addEmployee(body)
       await fetchEmployees()
       return res.data.data

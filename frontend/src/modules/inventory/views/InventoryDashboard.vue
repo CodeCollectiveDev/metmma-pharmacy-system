@@ -1,4 +1,6 @@
 <script setup>
+import CameraButton from '@/components/CameraButton.vue'
+import { periodDates } from '@/services/api/money'
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
@@ -14,9 +16,18 @@ import { confirmAction } from '@/composables/useFeedback'
 const store = useInventoryStore(), route = useRoute()
 const role = localStorage.getItem('role'), canAdd = ['admin', 'pharmacist'].includes(role), canEdit = ['admin', 'pharmacist', 'store_manager'].includes(role)
 const search = ref(''), status = ref('all'), showForm = ref(false), saving = ref(false), error = ref(null), fields = ref([]), notice = ref(''), restock = ref(null), quantity = ref(1), note = ref('')
-const blank = () => ({ productCode: '', name: '', batchNumber: '', expiryDate: '', quantity: 0, sellingPrice: '', supplier: '', category: 'Other', reorderLevel: 10, barcode: '' })
+const blank = () => ({ name: '', batchNumber: '', expiryDate: '', quantity: 0, sellingPrice: '', supplier: '', category: 'Antibiotics', reorderLevel: 10, barcode: '' })
 const form = ref(blank())
-const inputs = [ ['productCode','Product code','text','A unique code, such as PARA-001.'], ['name','Product name','text','The name staff will search for.'], ['batchNumber','Batch number','text','Use the number on the pack.'], ['expiryDate','Expiry date','date','Use the expiry date on the pack.'], ['quantity','Starting quantity','number','Number of units available.'], ['sellingPrice','Selling price (MWK)','number','Price for one unit, before VAT.'], ['supplier','Supplier','text','Who supplied this product.'], ['category','Category','text','For example, Painkillers or Vitamins.'], ['reorderLevel','Low stock threshold','number','You get a notice at or below this quantity.'], ['barcode','Barcode (optional)','text','The number read by your scanner.'] ]
+const today = periodDates('today').start
+const categories = ['Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Cold', 'First Aid', 'Diagnostics', 'Other']
+const inputs = [
+  {name:'name',label:'Product name',type:'text',required:true,minlength:2,maxlength:200,help:'Include strength and pack size, e.g. Paracetamol 500 mg, 10 tablets.'},
+  {name:'sellingPrice',label:'Selling price (MWK)',type:'number',required:true,min:0,max:9999999999.99,step:'0.01',help:'Price for one selling unit.'},
+  {name:'batchNumber',label:'Batch / lot number',type:'text',required:true,minlength:2,maxlength:100,help:'Printed next to LOT or BATCH. This identifies the production lot, not the barcode.'},
+  {name:'expiryDate',label:'Expiry date',type:'date',required:true,min:today,help:'Use the date on this batch. Add different batches as separate stock records.'},
+  {name:'quantity',label:'Units in stock',type:'number',min:0,max:2147483647,step:1,help:'Count the same selling units used for the price. Starts at 0.'},
+  {name:'reorderLevel',label:'Low stock alert at',type:'number',min:0,max:2147483647,step:1,help:'We flag the product when stock reaches this level. Defaults to 10.'}
+]
 const restockKey = ref('')
 const cameraOpen = ref(false), barcodeProduct = ref(null), barcodeValue = ref('')
 function normalizeExpiryDate(value) {
@@ -30,20 +41,20 @@ function normalizeExpiryDate(value) {
   return Number.isFinite(check.getTime()) && check.toISOString().slice(0, 10) === normalized ? normalized : value
 }
 function normalizeProductPayload(raw = {}) {
-  const productCode = String(raw.productCode ?? '').trim();
+  const payload = { ...raw }
+  delete payload.productCode
   return {
-    ...raw,
-    productCode: productCode.toUpperCase(),
+    ...payload,
     expiryDate: normalizeExpiryDate(raw.expiryDate),
     name: String(raw.name ?? '').trim(),
     batchNumber: String(raw.batchNumber ?? '').trim(),
     supplier: String(raw.supplier ?? '').trim(),
-    category: String(raw.category ?? '').trim(),
+    category: String(raw.category ?? '').trim() || 'Other',
     barcode: String(raw.barcode ?? '').trim(),
-    sellingPrice: Number(raw.sellingPrice),
-    unitPrice: Number(raw.sellingPrice),
-    quantity: Number(raw.quantity ?? 0),
-    reorderLevel: Number(raw.reorderLevel ?? 10)
+    sellingPrice: raw.sellingPrice,
+    unitPrice: raw.sellingPrice,
+    quantity: Number(raw.quantity === '' ? 0 : raw.quantity ?? 0),
+    reorderLevel: Number(raw.reorderLevel === '' ? 10 : raw.reorderLevel ?? 10)
   }
 }
 function cameraScan(code) { cameraOpen.value = false; if (barcodeProduct.value) barcodeValue.value = code; else if (showForm.value) form.value.barcode = code; else search.value = code }
@@ -83,16 +94,38 @@ async function deactivate(product) {
 </script>
 <template>
   <MainLayout title="Inventory" subtitle="Check current stock, add products and record deliveries">
-    <ErrorNotice :error="store.error || (!showForm && !restock ? error : null)" :retry="refresh" /><p v-if="notice" role="status" class="mb-4 text-green-800">{{ notice }}</p>
+    <ErrorNotice :error="store.error || (!showForm && !restock ? error : null)" :retry="refresh" /><p v-if="notice" role="status" class="success-notice mb-4">{{ notice }}</p>
     <div v-if="store.summary" class="grid grid-cols-3 gap-3 mb-4"><div class="panel">Products <strong class="block text-2xl">{{ store.summary.total }}</strong></div><div class="panel">Low stock <strong class="block text-2xl">{{ store.summary.low }}</strong></div><div class="panel">Expired <strong class="block text-2xl">{{ store.summary.expired }}</strong></div></div>
-    <div class="panel mb-4 flex flex-wrap items-end gap-3"><label class="flex-1">Find a product<input v-model="search" class="field mt-1" placeholder="Name, code or barcode" /></label><button type="button" class="secondary" @click="cameraOpen = true">Scan with camera</button><label>Show<select v-model="status" class="field mt-1"><option value="all">All products</option><option value="low">Low stock</option><option value="expired">Expired</option><option value="expiring">Expiry within 90 days</option></select></label><button v-if="canAdd" class="primary" @click="showForm = true; error = null">Add product</button><router-link v-if="route.query.product" to="/inventory" class="secondary">Show all products</router-link></div>
+    <div class="panel mb-4 flex flex-wrap items-end gap-3"><label class="flex-1">Find a product<input v-model="search" maxlength="100" class="field mt-1" placeholder="Name, code or barcode" /></label><CameraButton @click="cameraOpen = true"/><label>Show<select v-model="status" class="field mt-1"><option value="all">All products</option><option value="low">Low stock</option><option value="expired">Expired</option><option value="expiring">Expiry within 90 days</option></select></label><button v-if="canAdd" class="primary" @click="showForm = true; error = null">Add product</button><router-link v-if="route.query.product" to="/inventory" class="secondary">Show all products</router-link></div>
     <p v-if="store.loading" role="status" class="mb-3">Loading stock…</p>
-    <div class="panel overflow-x-auto p-0"><table class="w-full min-w-[760px]"><thead class="bg-gray-50"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-left">Batch / expiry</th><th class="p-3 text-left">Stock</th><th class="p-3 text-left">Price</th><th class="p-3 text-left">Actions</th></tr></thead><tbody><tr v-for="product in store.products" :key="product.id" class="border-t border-gray-200"><td class="p-3"><strong>{{ product.name }}</strong><p class="text-sm text-gray-600">{{ product.productCode }} · {{ product.supplier }}</p></td><td class="p-3">{{ product.batchNumber }}<p class="text-sm">{{ product.expiryDate?.slice(0,10) }}</p></td><td class="p-3">{{ product.quantity }}<p class="text-sm text-gray-600">Low at {{ product.reorderLevel }}</p><p class="text-sm text-red-800" v-if="product.expired">Expired — do not sell</p></td><td class="p-3">{{ currency(product.sellingPrice) }}</td><td class="p-3"><div class="flex gap-2"><button v-if="canEdit" class="secondary" :disabled="saving" @click="barcodeProduct = product; barcodeValue = product.barcode || ''; error = null">Edit barcode</button><button v-if="canEdit && !product.expired" class="secondary" :disabled="saving" title="Record units received in a delivery" @click="openRestock(product)">Add stock</button><button v-if="role === 'admin'" class="secondary text-red-800" :disabled="saving" @click="deactivate(product)">Deactivate</button></div></td></tr></tbody></table><div v-if="!store.loading && !store.products.length && !store.error" class="p-6 text-center"><p>No products match these filters.</p><p class="text-sm text-gray-600 my-2">Add your first product or clear the search to see available records.</p><button v-if="canAdd" class="primary" @click="showForm = true">Add product</button><button v-else class="secondary" @click="search = ''; status = 'all'; load()">Clear filters</button></div><PaginationControls :pagination="store.pagination" :loading="store.loading" @change="load" /></div>
+    <div class="panel overflow-x-auto p-0"><table class="w-full min-w-[760px]"><thead class="bg-gray-50"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-left">Batch / expiry</th><th class="p-3 text-left">Stock</th><th class="p-3 text-left">Price</th><th class="p-3 text-left">Actions</th></tr></thead><tbody><tr v-for="product in store.products" :key="product.id" class="border-t border-gray-200"><td class="p-3"><strong>{{ product.name }}</strong><p class="text-sm text-gray-600">{{ product.productCode }} · {{ product.supplier }}</p></td><td class="p-3">{{ product.batchNumber }}<p class="text-sm">{{ product.expiryDate?.slice(0,10) }}</p></td><td class="p-3">{{ product.quantity }}<p class="text-sm text-gray-600">Low at {{ product.reorderLevel }}</p><p class="text-sm text-red-800" v-if="product.expired">Expired — do not sell</p></td><td class="p-3">{{ currency(product.sellingPrice) }}</td><td class="p-3"><div class="flex gap-2"><button v-if="canEdit" class="secondary" :disabled="saving" @click="barcodeProduct = product; barcodeValue = product.barcode || ''; error = null">Barcode number</button><button v-if="canEdit && !product.expired" class="secondary" :disabled="saving" title="Record units received in a delivery" @click="openRestock(product)">Add stock</button><button v-if="role === 'admin'" class="secondary text-red-800" :disabled="saving" @click="deactivate(product)">Deactivate</button></div></td></tr></tbody></table><div v-if="!store.loading && !store.products.length && !store.error" class="p-6 text-center"><p>No products match these filters.</p><p class="text-sm text-gray-600 my-2">Add your first product or clear the search to see available records.</p><button v-if="canAdd" class="primary" @click="showForm = true">Add product</button><button v-else class="secondary" @click="search = ''; status = 'all'; load()">Clear filters</button></div><PaginationControls :pagination="store.pagination" :loading="store.loading" @change="load" /></div>
     <AppDialog :open="showForm" title="Add product" :dismissible="!saving" @close="showForm = false">
-      <form @submit.prevent="saveProduct"><ErrorNotice :error="error" /><div class="grid sm:grid-cols-2 gap-3"><label v-for="[name,label,type,help] in inputs" :key="name">{{ label }}<input :aria-label="label" v-model="form[name]" :type="type" :required="name !== 'barcode'" :min="type === 'number' ? 0 : undefined" :step="name === 'sellingPrice' ? '0.01' : type === 'number' ? '1' : undefined" :aria-invalid="invalid(name)" :aria-describedby="`help-${name}`" class="field mt-1" /><span :id="`help-${name}`" class="block text-sm text-gray-600">{{ invalid(name) ? 'Please check this value.' : help }}</span></label></div><button type="button" class="secondary mt-4 mr-3" @click="cameraOpen = true">Scan barcode with camera</button><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Save product' }}</button></form>
+      <form v-form-feedback="error" @submit.prevent="saveProduct">
+        <p class="form-note">Fields marked * are required. One record represents one batch of a product.</p>
+        <ErrorNotice :error="error" />
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label v-for="input in inputs" :key="input.name" class="text-sm font-medium">{{ input.label }}
+            <input v-model="form[input.name]" :name="input.name" :aria-label="input.label" :type="input.type" :required="input.required" :minlength="input.minlength" :maxlength="input.maxlength" :min="input.min" :max="input.max" :step="input.step" :aria-describedby="`help-${input.name}`" class="field mt-1" />
+            <span :id="`help-${input.name}`" class="block text-xs font-normal text-slate-500 mt-1">{{ input.help }}</span>
+          </label>
+          <label class="text-sm font-medium">Category
+            <select v-model="form.category" name="category" required class="field mt-1">
+              <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="my-5 p-4 bg-slate-50 rounded-lg">
+          <label class="block text-sm font-medium">Barcode number (optional)<div class="flex gap-2 mt-1"><input v-model="form.barcode" name="barcode" maxlength="100" class="field" placeholder="Type the printed number or use a scanner" autocomplete="off" @keydown.enter.prevent/><CameraButton @click="cameraOpen = true"/></div></label>
+          <p class="text-xs text-slate-500 mt-2">The number below the barcode helps you find this product at checkout. A USB scanner or the camera fills it in; no image is stored.</p>
+        </div>
+        <details class="border-t pt-3"><summary class="font-medium cursor-pointer">Additional details (optional)</summary><div class="grid sm:grid-cols-2 gap-4 mt-3">
+          <label>Supplier<input v-model.trim="form.supplier" name="supplier" minlength="2" maxlength="200" class="field mt-1" /></label>
+        </div></details>
+        <div class="form-actions"><button type="button" class="secondary" :disabled="saving" @click="showForm = false">Cancel</button><button class="primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save product' }}</button></div>
+      </form>
     </AppDialog>
-    <AppDialog :open="!!restock" title="Add stock" :dismissible="!saving" @close="restock = null"><form @submit.prevent="addStock"><p class="mb-3">Record a delivery of {{ restock?.name }}. New units are added to the latest stock count.</p><ErrorNotice :error="error" /><label class="block mb-3">Units received<input v-model.number="quantity" type="number" min="1" step="1" required class="field mt-1" /></label><label class="block">Delivery note or reason<input v-model="note" maxlength="500" required class="field mt-1" placeholder="Supplier and invoice, or a short reason" /></label><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Add stock' }}</button></form></AppDialog>
-    <AppDialog :open="!!barcodeProduct" title="Edit product barcode" :dismissible="!saving" @close="barcodeProduct = null"><form @submit.prevent="saveBarcode"><ErrorNotice :error="error"/><p class="mb-3">{{barcodeProduct?.name}}</p><label class="block">Barcode<input v-model="barcodeValue" maxlength="100" class="field" autocomplete="off"/></label><p class="text-sm text-gray-600 my-2">Scan with a USB scanner, type the barcode, or use your camera. Leave blank to remove it.</p><button type="button" class="secondary mr-3" @click="cameraOpen = true">Scan with camera</button><button class="primary" :disabled="saving">Save barcode</button></form></AppDialog>
+    <AppDialog :open="!!restock" title="Add stock" :dismissible="!saving" @close="restock = null"><form v-form-feedback="error" @submit.prevent="addStock"><p class="mb-3">Record a delivery of {{ restock?.name }}. Only add units from the same batch and expiry date. For a new batch, use Add product.</p><ErrorNotice :error="error" /><label class="block mb-3">Units received<input name="quantity" v-model.number="quantity" type="number" min="1" max="2147483647" step="1" required class="field mt-1" /></label><label class="block">Delivery note or reason<input name="reason" v-model="note" minlength="3" maxlength="500" required class="field mt-1" placeholder="Supplier and invoice, or a short reason" /></label><button class="primary mt-4" :disabled="saving">{{ saving ? 'Saving…' : 'Add stock' }}</button></form></AppDialog>
+    <AppDialog :open="!!barcodeProduct" title="Edit barcode number" :dismissible="!saving" @close="barcodeProduct = null"><form v-form-feedback="error" @submit.prevent="saveBarcode"><ErrorNotice :error="error"/><p class="mb-3">{{barcodeProduct?.name}}</p><label class="block">Barcode number (optional)<input name="barcode" v-model="barcodeValue" maxlength="100" class="field" autocomplete="off"/></label><p class="text-sm text-gray-600 my-2">Scan with a USB scanner, type the barcode, or use your camera. Leave blank to remove it.</p><CameraButton class="mr-3" @click="cameraOpen = true"/><button class="primary" :disabled="saving">Save barcode</button></form></AppDialog>
     <AppDialog :open="cameraOpen" title="Scan barcode" @close="cameraOpen = false"><BarcodeScanner v-if="cameraOpen" @close="cameraOpen = false" @detected="cameraScan"/></AppDialog>
   </MainLayout>
 </template>

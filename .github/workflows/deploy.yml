@@ -2,16 +2,21 @@ name: Validate and Deploy to PM2
 
 on:
   push:
-    branches: [main]
+    branches: [main, version-2]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-metmma-backend
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/version-2'
     environment: production
 
     steps:
@@ -21,7 +26,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install & Build Backend
         run: |
@@ -31,6 +38,13 @@ jobs:
           npm test --if-present
           npm run build --if-present
           npm prune --production
+
+      - name: Validate Frontend
+        run: |
+          npm ci --prefix frontend
+          npm run check --prefix frontend
+          npm test --prefix frontend
+          npm run build --prefix frontend
 
       - name: Package Release
         run: |
@@ -47,6 +61,8 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          DEPLOY_DIRECTORY: metmma-backend
+          PM2_APP_NAME: metmma-backend
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -54,7 +70,7 @@ jobs:
           require_env() {
             local name="$1"
             if [ -z "${!name:-}" ]; then
-              echo "::error::Missing required production environment secret: $name"
+              echo "::error::Missing required deployment environment secret: $name"
               exit 1
             fi
           }
@@ -79,13 +95,13 @@ jobs:
           target="$VPS_USER@$VPS_HOST"
           
           # 1. Target directory on VPS
-          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "mkdir -p ~/metmma-backend"
+          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "mkdir -p ~/$DEPLOY_DIRECTORY"
           
           # 2. SCP lightweight tarball directly to target
-          scp "${opts[@]}" -P "$VPS_PORT" release.tar.gz "$target:~/metmma-backend/"
+          scp "${opts[@]}" -P "$VPS_PORT" release.tar.gz "$target:~/$DEPLOY_DIRECTORY/"
           
           # 3. Extract, set PATH, fix permissions, run DB migrations, reload PM2
-          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "bash -s" << 'EOF'
+          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "bash -s -- '$DEPLOY_DIRECTORY' '$PM2_APP_NAME'" << 'EOF'
             set -e
 
             # Export Node / PM2 PATH for non-interactive SSH shells
@@ -93,7 +109,9 @@ jobs:
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
 
-            cd ~/metmma-backend
+            deploy_directory="$1"
+            pm2_app_name="$2"
+            cd "$HOME/$deploy_directory"
             
             # Extract tarball over existing files (.env remains untouched)
             tar -xzf release.tar.gz
@@ -110,10 +128,10 @@ jobs:
             npm run migrate
 
             # Reload or start process using server.js as entry point
-            if pm2 describe metmma-backend > /dev/null 2>&1; then
-              pm2 reload metmma-backend --update-env
+            if pm2 describe "$pm2_app_name" > /dev/null 2>&1; then
+              pm2 reload "$pm2_app_name" --update-env
             else
-              pm2 start server.js --name "metmma-backend"
+              pm2 start server.js --name "$pm2_app_name"
             fi
 
             pm2 save
