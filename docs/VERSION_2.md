@@ -1,6 +1,6 @@
 # Version 2: setup and deployment
 
-Version 2 is developed on `version-2`. It uses the existing GitHub Actions → SSH → PM2 workflow for the API and a separate Vercel project for the frontend. No live database is changed by preparing this branch.
+Version 2 is developed on `version-2`. The GitHub Actions → SSH → PM2 workflow now deploys only from `stagging`; `main` is reserved for Railway deployment, which is configured in Railway rather than this repository. The frontend remains on its separately configured hosting project.
 
 ## What changed
 
@@ -28,12 +28,11 @@ Branch selection in `.github/workflows/deploy.yml` is explicit:
 
 | Branch | GitHub environment | Server directory | PM2 process |
 | --- | --- | --- | --- |
-| `main` | `production` | `~/metmma-backend` | `metmma-backend` |
-| `version-2` | `production` | `~/metmma-backend` | `metmma-backend` |
+| `stagging` | `production` | `~/metmma-backend` | `metmma-backend` |
 
-Both push deployments and manual dispatch use this mapping. Other branches cannot run the deployment job. The frontend is checked and built by Actions; Vercel publishes it separately.
+Pushes to `stagging` and manual dispatches on `stagging` use this mapping. Other branches cannot run the deployment job. The workflow still uses the GitHub environment named `production` for its existing VPS secrets. Railway's deployment branch and trigger are managed in Railway project settings.
 
-The `version-2` deployment replaces the code in the existing `~/metmma-backend` directory and reloads the existing `metmma-backend` PM2 process. The server `.env` is preserved during deployment. Both branches share this target, so the workflow serializes their deployments.
+The `stagging` deployment replaces the code in the existing `~/metmma-backend` directory and reloads the existing `metmma-backend` PM2 process. The server `.env` is preserved during deployment, and concurrent deployments are serialized.
 
 ## 2. Neon database and server configuration
 
