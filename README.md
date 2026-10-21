@@ -29,6 +29,18 @@ npm run dev --prefix backend
 
 In another terminal run npm run dev from frontend. Vite serves localhost:5173 and proxies /api to localhost:3000. For Vercel, use `frontend` as the project root and set `VITE_API_BASE_URL=https://api.metmmapharmacy.com` before building. The client adds `/api` when given a bare origin. See [frontend/.env.example](frontend/.env.example) and [frontend production setup](docs/PRODUCTION_SETUP.md#4-configure-the-frontend).
 
+## Branching and releases
+
+`main` is live production. All work is pushed through `staging`:
+
+~~~sh
+git checkout staging && git pull
+git checkout -b feature/my-change
+# ... work, then open a PR into staging
+~~~
+
+A pull request into `staging` needs green CI and one teammate approval. When the staged build is tested and you are confident it works, open a pull request from `staging` into `main` — merging there deploys to production. Both branches reject direct pushes, force pushes and deletions, including from administrators. Full policy: [docs/BRANCHING_WORKFLOW.md](docs/BRANCHING_WORKFLOW.md).
+
 ## Verification
 
 ~~~sh
