@@ -1,6 +1,6 @@
 # Version 2: setup and deployment
 
-Version 2 is developed on `version-2`. The GitHub Actions → SSH → PM2 workflow now deploys only from `stagging`; `main` is reserved for Railway deployment, which is configured in Railway rather than this repository. The frontend remains on its separately configured hosting project.
+Version 2 is developed on `version-2`. The GitHub Actions → SSH → PM2 workflow deploys only from `main`; `staging` is the integration branch that every change passes through first, and the frontend remains on its separately configured hosting project. See [docs/BRANCHING_WORKFLOW.md](BRANCHING_WORKFLOW.md) for the full release flow.
 
 ## What changed
 
@@ -28,11 +28,11 @@ Branch selection in `.github/workflows/deploy.yml` is explicit:
 
 | Branch | GitHub environment | Server directory | PM2 process |
 | --- | --- | --- | --- |
-| `stagging` | `production` | `~/metmma-backend` | `metmma-backend` |
+| `main` | `production` | `~/metmma-backend` | `metmma-backend` |
 
-Pushes to `stagging` and manual dispatches on `stagging` use this mapping. Other branches cannot run the deployment job. The workflow still uses the GitHub environment named `production` for its existing VPS secrets. Railway's deployment branch and trigger are managed in Railway project settings.
+Pushes to `main` and manual dispatches on `main` use this mapping. Other branches cannot run the deployment job. The workflow still uses the GitHub environment named `production` for its existing VPS secrets. Railway's deployment branch and trigger are managed in Railway project settings.
 
-The `stagging` deployment replaces the code in the existing `~/metmma-backend` directory and reloads the existing `metmma-backend` PM2 process. The server `.env` is preserved during deployment, and concurrent deployments are serialized.
+The `main` deployment replaces the code in the existing `~/metmma-backend` directory and reloads the existing `metmma-backend` PM2 process. The server `.env` is preserved during deployment, and concurrent deployments are serialized.
 
 ## 2. Neon database and server configuration
 
