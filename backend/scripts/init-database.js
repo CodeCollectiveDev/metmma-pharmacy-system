@@ -26,4 +26,4 @@ const { pool } = require('../api/db');
     await client.query('ROLLBACK');
     throw error;
   } finally { client.release(); }
-})().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => pool.end());
+})().catch(error => { console.error(error.message || error); process.exitCode = 1; }).finally(() => pool.end());
