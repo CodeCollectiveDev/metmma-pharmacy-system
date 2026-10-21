@@ -128,10 +128,27 @@ jobs:
               chmod -R +x node_modules/.bin/
             fi
 
-            # Initialize database if fresh, then execute pending migrations
+            # Initialize database if fresh, then execute pending migrations.
+            # A suspended Neon compute refuses the first connection, so retry before failing.
             echo "Running database initialization and migrations on Neon DB..."
-            npm run db:init -- --if-empty
-            npm run migrate
+            run_with_retry() {
+              local attempt=1
+              local max_attempts=3
+              while true; do
+                if "$@"; then
+                  return 0
+                fi
+                if [ "$attempt" -ge "$max_attempts" ]; then
+                  echo "Command failed after $attempt attempts: $*"
+                  return 1
+                fi
+                echo "Attempt $attempt failed, retrying in 15s..."
+                sleep 15
+                attempt=$((attempt + 1))
+              done
+            }
+            run_with_retry npm run db:init -- --if-empty
+            run_with_retry npm run migrate
 
             # Reload or start process using server.js as entry point
             if pm2 describe "$pm2_app_name" > /dev/null 2>&1; then
