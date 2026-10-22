@@ -38,7 +38,7 @@ before(async()=>{await admin.query(`CREATE SCHEMA ${schema}`);await pool.query(r
     ('test-cashier', 'test-hash', 'cashier', 'Test Cashier', 'test-cashier@example.com'),
     ('manager1', 'test-hash', 'store_manager', 'Test Manager', 'test-manager@example.com'),
     ('test-hr', 'test-hash', 'hr_officer', 'Test HR', 'test-hr@example.com')`);
-  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261004_categories.sql'),'utf8'));await pool.query('UPDATE users SET password_hash=$1',[await bcrypt.hash('TestPassword42',10)]);server=require('../../app').listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${server.address().port}/api`;});
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261004_categories.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261005_batch_numbers.sql'),'utf8'));await pool.query('UPDATE users SET password_hash=$1',[await bcrypt.hash('TestPassword42',10)]);server=require('../../app').listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${server.address().port}/api`;});
 after(async()=>{if(server)await new Promise(r=>server.close(r));await pool.end();await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin.end();});
 
 test('atomic checkout records exact stock, lines, authenticated actor and one linked income',async()=>{

@@ -10,6 +10,7 @@ const client = { query: async (sql, values = []) => {
     return { rows: [{ valid: String(values[0]) >= today }], rowCount: 1 };
   }
   if (sql.startsWith('SELECT id FROM categories')) return { rows: [{ id: 2 }], rowCount: 1 };
+  if (sql.startsWith('SELECT id,name,product_code,batch_number')) return { rows: [], rowCount: 0 };
   if (sql.startsWith('UPDATE products SET')) {
     return { rows: [{
       id: 1, product_code: 'P-1', name: 'Corrected name', generic_name: 'Generic', batch_number: 'B-2',

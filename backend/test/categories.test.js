@@ -77,6 +77,7 @@ test('product updates reject a deactivated category before saving', async () => 
   calls = [];
   handler = async sql => {
     if (sql.startsWith('SELECT id,quantity FROM products')) return { rows: [{ id: 2, quantity: 5 }], rowCount: 1 };
+    if (sql.startsWith('SELECT id,name,product_code,batch_number')) return { rows: [], rowCount: 0 };
     if (sql.includes('FROM categories WHERE name=$1 AND is_active=TRUE')) return { rows: [], rowCount: 0 };
     return { rows: [], rowCount: 0 };
   };
