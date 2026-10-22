@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Tags,
   X
 } from 'lucide-vue-next'
 
@@ -39,6 +40,7 @@ const allMenuItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, group: 'Daily work', show: computed(() => userRole.value !== 'cashier') },
   { path: '/pos', label: 'Sell items', icon: ShoppingCart, group: 'Daily work', show: canAccessPos },
   { path: '/inventory', label: 'Inventory', icon: Package, group: 'Daily work', show: canAccessInventory },
+  { path: '/categories', label: 'Product categories', icon: Tags, group: 'Daily work', show: computed(() => userRole.value === 'admin') },
   { path: '/attendance', label: 'Attendance', icon: CalendarDays, group: 'Daily work', show: canAccessHr },
   { path: '/sales', label: 'Receipts', icon: FileText, group: 'Business', show: computed(() => true) },
   { path: '/finances', label: 'Income & expenses', icon: Wallet, group: 'Business', show: canAccessReports },

@@ -9,6 +9,7 @@ const auth=require('./authRoutes');router.use('/auth',auth);router.use('/login',
 router.use('/accounts',require('../api/routes/accountsRoutes'));
 router.use('/leave',require('../api/routes/leaveRoutes'));
 router.use('/products',require('../api/routes/productsRoutes'));
+router.use('/categories',require('../api/routes/categoriesRoutes'));
 router.use('/sales',require('../api/routes/salesRoutes'));
 router.use('/notifications',require('../api/routes/notificationsRoutes'));
 router.use('/finances',require('../api/routes/financesRoutes'));
