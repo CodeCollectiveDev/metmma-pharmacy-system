@@ -11,6 +11,10 @@ async function requireActiveCategory(client,category){
  failure.fieldDetails=[{field:'category',message:'Choose an option from the list.'}];
  throw failure;
 }
+async function requireCurrentOrFutureExpiry(client,expiryDate){
+ const valid=(await client.query('SELECT $1::date>=CURRENT_DATE AS valid',[expiryDate])).rows[0].valid;
+ if(!valid)throw new AppError('VALIDATION',400,['expiryDate']);
+}
 async function getAllProducts(req,res){
  const q=req.validatedQuery,values=[],where=['is_active=TRUE'];
  if(q.id){values.push(q.id);where.push(`id=$${values.length}`);}
@@ -32,8 +36,7 @@ async function getSummary(req,res){res.json((await db.query(`SELECT COUNT(*)::in
 async function createProduct(req,res){
  const d=req.body;
  const row=await db.transaction(async client=>{
-  const valid=(await client.query('SELECT $1::date>=CURRENT_DATE AS valid',[d.expiryDate])).rows[0].valid;
-  if(!valid)throw new AppError('VALIDATION',400,['expiryDate']);
+  await requireCurrentOrFutureExpiry(client,d.expiryDate);
   await requireActiveCategory(client,d.category);
   const result=await client.query(`INSERT INTO products(product_code,name,generic_name,batch_number,expiry_date,quantity,unit_price,selling_price,cost_price,supplier,category,reorder_level,location,barcode) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING ${columns}`,[d.productCode,d.name,d.genericName,d.batchNumber,d.expiryDate,d.quantity,d.unitPrice,d.sellingPrice,d.costPrice,d.supplier,d.category,d.reorderLevel,d.location,d.barcode]);
   const product=result.rows[0];
@@ -46,6 +49,7 @@ async function updateProduct(req,res){
  const row=await db.transaction(async client=>{
   const current=(await client.query('SELECT id,quantity FROM products WHERE id=$1 FOR UPDATE',[req.params.id])).rows[0];if(!current)throw new AppError('NOT_FOUND',404);
   if(req.body.quantity!==undefined&&req.body.expectedQuantity!==current.quantity)throw new AppError('CONFLICT',409);
+  if(req.body.expiryDate!==undefined)await requireCurrentOrFutureExpiry(client,req.body.expiryDate);
   if(req.body.category!==undefined)await requireActiveCategory(client,req.body.category);
   const fields=Object.entries(req.body).filter(([key])=>fieldMap[key]);if(!fields.length)throw new AppError('VALIDATION',400);
   const values=fields.map(([,value])=>value);values.push(req.params.id);

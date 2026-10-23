@@ -23,7 +23,8 @@ const form = ref(blank())
 const today = periodDates('today').start
 const categoriesReady = computed(() => categoryStore.categories.length > 0)
 const editProduct = ref(null), editSaving = ref(false), editError = ref(null)
-const editForm = ref({ name: '', category: '', sellingPrice: '', supplier: '' })
+const blankEdit = () => ({ name: '', genericName: '', category: '', batchNumber: '', expiryDate: '', sellingPrice: '', costPrice: '', supplier: '', reorderLevel: 10, location: '', barcode: '' })
+const editForm = ref(blankEdit())
 watch(() => categoryStore.categories, list => {
   if (!form.value.category && list.length) form.value.category = list[0].name
 }, { immediate: true })
@@ -80,17 +81,34 @@ function openAdd() {
 }
 function openEdit(product) {
   editProduct.value = product; editError.value = null
-  editForm.value = { name: product.name, category: product.category, sellingPrice: product.sellingPrice, supplier: product.supplier || '' }
+  editForm.value = {
+    name: product.name || '', genericName: product.genericName || '', category: product.category || '',
+    batchNumber: product.batchNumber || '', expiryDate: String(product.expiryDate || '').slice(0, 10),
+    sellingPrice: product.sellingPrice ?? '', costPrice: product.costPrice ?? '', supplier: product.supplier || '',
+    reorderLevel: product.reorderLevel ?? 10, location: product.location || '', barcode: product.barcode || ''
+  }
   categoryStore.fetchCategories()
 }
 async function saveEdit() {
   if (editSaving.value) return
   editSaving.value = true; editError.value = null
   try {
-    const price = editForm.value.sellingPrice
-    await dataService.updateProduct({ id: editProduct.value.id, ...editForm.value, unitPrice: price })
+    const form = editForm.value, price = form.sellingPrice, costPrice = String(form.costPrice ?? '').trim()
+    await dataService.updateProduct({
+      id: editProduct.value.id, name: String(form.name ?? '').trim(), genericName: String(form.genericName ?? '').trim(),
+      category: String(form.category ?? '').trim(), batchNumber: String(form.batchNumber ?? '').trim(),
+      expiryDate: normalizeExpiryDate(form.expiryDate), sellingPrice: price, unitPrice: price,
+      costPrice: costPrice === '' ? null : costPrice, supplier: String(form.supplier ?? '').trim(),
+      reorderLevel: Number(form.reorderLevel), location: String(form.location ?? '').trim(),
+      barcode: String(form.barcode ?? '').trim()
+    })
     editProduct.value = null; notice.value = 'Product updated.'; await refresh(); window.dispatchEvent(new Event('stock-changed'))
-  } catch (err) { editError.value = err } finally { editSaving.value = false }
+  } catch (err) {
+    const failure = userError(err)
+    editError.value = failure.code === 'CONFLICT'
+      ? { ...failure, message: 'This product changed since you opened it. Reopen it and try again.' }
+      : err
+  } finally { editSaving.value = false }
 }
 function openRestock(product) {
   restock.value = product; restockKey.value = crypto.randomUUID(); quantity.value = 1; note.value = ''; error.value = null
@@ -151,12 +169,20 @@ async function deactivate(product) {
     </AppDialog>
     <AppDialog :open="!!editProduct" title="Edit product" :dismissible="!editSaving" @close="editProduct = null">
       <form v-form-feedback="editError" @submit.prevent="saveEdit">
+        <p class="form-note">Correct spelling or details here. Use Add stock to change the quantity.</p>
         <ErrorNotice :error="editError" />
         <div class="grid sm:grid-cols-2 gap-4">
           <label class="text-sm font-medium">Product name<input v-model.trim="editForm.name" name="name" required minlength="2" maxlength="200" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Generic name (optional)<input v-model.trim="editForm.genericName" name="genericName" maxlength="200" class="field mt-1" /></label>
           <label class="text-sm font-medium">Category<CategorySelect v-model="editForm.category" name="category" required :disabled="editSaving" /></label>
+          <label class="text-sm font-medium">Batch / lot number<input v-model.trim="editForm.batchNumber" name="batchNumber" required minlength="2" maxlength="100" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Expiry date<input v-model="editForm.expiryDate" name="expiryDate" type="date" required :min="today" class="field mt-1" /></label>
           <label class="text-sm font-medium">Selling price (MWK)<input v-model="editForm.sellingPrice" name="sellingPrice" type="number" required min="0" max="9999999999.99" step="0.01" class="field mt-1" /></label>
-          <label class="text-sm font-medium">Supplier (optional)<input v-model.trim="editForm.supplier" name="supplier" maxlength="200" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Cost price (optional)<input v-model="editForm.costPrice" name="costPrice" type="number" min="0" max="9999999999.99" step="0.01" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Supplier (optional)<input v-model.trim="editForm.supplier" name="supplier" minlength="2" maxlength="200" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Low stock alert at<input v-model="editForm.reorderLevel" name="reorderLevel" type="number" required min="0" max="2147483647" step="1" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Location (optional)<input v-model.trim="editForm.location" name="location" maxlength="100" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Barcode number (optional)<input v-model.trim="editForm.barcode" name="barcode" maxlength="100" autocomplete="off" class="field mt-1" /></label>
         </div>
         <div class="form-actions"><button type="button" class="secondary" :disabled="editSaving" @click="editProduct = null">Cancel</button><button class="primary" :disabled="editSaving || !categoriesReady">{{ editSaving ? 'Saving…' : 'Save changes' }}</button></div>
       </form>
