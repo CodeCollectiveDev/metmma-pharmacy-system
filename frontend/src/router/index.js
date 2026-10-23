@@ -24,6 +24,7 @@ const ROLE_HIERARCHY = {
 
 const routes = [
   { path: '/accounts', component: () => import('@/modules/admin/views/AccountsView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Accounts' } },
+  { path: '/categories', component: () => import('@/modules/admin/views/CategoriesView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Product categories' } },
   { path: '/leave', component: () => import('@/modules/hr/views/LeaveView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN, ROLES.HR_OFFICER], label: 'Leave' } },
   { path: '/login', component: Login, meta: { requiresAuth: false } },
   { path: '/register', redirect: '/accounts', meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Create staff account' } },
