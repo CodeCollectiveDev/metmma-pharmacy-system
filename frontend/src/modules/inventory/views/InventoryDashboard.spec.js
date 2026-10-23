@@ -87,3 +87,36 @@ it('shows a clear message when the product changed before saving', async () => {
   expect(wrapper.text()).not.toContain('This record changed or already exists.')
   wrapper.unmount()
 })
+
+it('shows the batch number in upper case as it is typed on the add form', async () => {
+  const wrapper = mountView()
+  await flushPromises()
+  await wrapper.findAll('button').find(button => button.text() === 'Add product').trigger('click')
+  await flushPromises()
+
+  await wrapper.get('input[name="batchNumber"]').setValue('abc-01')
+  expect(wrapper.get('input[name="batchNumber"]').element.value).toBe('ABC-01')
+  wrapper.unmount()
+})
+
+it('offers to add stock to the existing record when a batch already exists', async () => {
+  dataService.addProduct.mockResolvedValue({ data: { data: { ...product, id: 9 }, duplicateBatch: {
+    id: 7, name: 'Paracetmol', productCode: 'P-1', batchNumber: 'B-1', expiryDate: '2030-01-01', quantity: 5
+  } } })
+  const wrapper = mountView()
+  await flushPromises()
+  await wrapper.findAll('button').find(button => button.text() === 'Add product').trigger('click')
+  await flushPromises()
+  await wrapper.get('input[name="name"]').setValue('Paracetmol')
+  await wrapper.get('input[name="batchNumber"]').setValue('b-1')
+  await wrapper.get('input[name="expiryDate"]').setValue('2030-01-01')
+  await wrapper.get('input[name="sellingPrice"]').setValue('10')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+
+  expect(wrapper.text()).toContain('This batch already exists — do you want to add units to it instead?')
+  await wrapper.findAll('button').find(button => button.text() === 'Add stock').trigger('click')
+  await flushPromises()
+  expect(wrapper.text()).toContain('Record a delivery of Paracetmol')
+  wrapper.unmount()
+})

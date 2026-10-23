@@ -21,7 +21,7 @@ async function request(path,{method='GET',body,role='admin'}={}){
 }
 before(async()=>{
  await admin.query(`CREATE SCHEMA ${schema}`);
- for(const file of ['init.sql','migrations/20261002_mvp.sql','migrations/20261003_staff_workflows.sql','migrations/20261003_payment_amounts.sql','migrations/20261004_categories.sql']){
+ for(const file of ['init.sql','migrations/20261002_mvp.sql','migrations/20261003_staff_workflows.sql','migrations/20261003_payment_amounts.sql','migrations/20261004_categories.sql','migrations/20261005_batch_numbers.sql']){
   await pool.query(readFileSync(require.resolve(`../../../database/${file}`),'utf8'));
  }
  await pool.query(`INSERT INTO users (username, password_hash, role, full_name, email) VALUES

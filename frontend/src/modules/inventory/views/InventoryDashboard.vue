@@ -37,6 +37,8 @@ const inputs = [
   {name:'reorderLevel',label:'Low stock alert at',type:'number',min:0,max:2147483647,step:1,help:'We flag the product when stock reaches this level. Defaults to 10.'}
 ]
 const restockKey = ref('')
+const duplicateBatch = ref(null)
+const uppercasing = { batchNumber: value => String(value ?? '').toUpperCase() }
 const cameraOpen = ref(false), barcodeProduct = ref(null), barcodeValue = ref('')
 function normalizeExpiryDate(value) {
   if (!value || typeof value !== 'string') return value
@@ -55,7 +57,7 @@ function normalizeProductPayload(raw = {}) {
     ...payload,
     expiryDate: normalizeExpiryDate(raw.expiryDate),
     name: String(raw.name ?? '').trim(),
-    batchNumber: String(raw.batchNumber ?? '').trim(),
+    batchNumber: String(raw.batchNumber ?? '').trim().toUpperCase(),
     supplier: String(raw.supplier ?? '').trim(),
     category: String(raw.category ?? '').trim(),
     barcode: String(raw.barcode ?? '').trim(),
@@ -74,7 +76,7 @@ watch([search, status, () => route.query.product], () => { clearTimeout(timer); 
 onMounted(() => { refresh(); categoryStore.fetchCategories() }); onBeforeUnmount(() => clearTimeout(timer))
 function invalid(name) { return fields.value.some(f => f.field === name) }
 function openAdd() {
-  error.value = null; fields.value = []
+  error.value = null; fields.value = []; duplicateBatch.value = null
   if (!form.value.category) form.value.category = categoryStore.categories[0]?.name || ''
   showForm.value = true
   categoryStore.fetchCategories()
@@ -94,15 +96,18 @@ async function saveEdit() {
   editSaving.value = true; editError.value = null
   try {
     const form = editForm.value, price = form.sellingPrice, costPrice = String(form.costPrice ?? '').trim()
-    await dataService.updateProduct({
+    const response = await dataService.updateProduct({
       id: editProduct.value.id, name: String(form.name ?? '').trim(), genericName: String(form.genericName ?? '').trim(),
-      category: String(form.category ?? '').trim(), batchNumber: String(form.batchNumber ?? '').trim(),
+      category: String(form.category ?? '').trim(), batchNumber: String(form.batchNumber ?? '').trim().toUpperCase(),
       expiryDate: normalizeExpiryDate(form.expiryDate), sellingPrice: price, unitPrice: price,
       costPrice: costPrice === '' ? null : costPrice, supplier: String(form.supplier ?? '').trim(),
       reorderLevel: Number(form.reorderLevel), location: String(form.location ?? '').trim(),
       barcode: String(form.barcode ?? '').trim()
     })
-    editProduct.value = null; notice.value = 'Product updated.'; await refresh(); window.dispatchEvent(new Event('stock-changed'))
+    editProduct.value = null; await refresh(); window.dispatchEvent(new Event('stock-changed'))
+    const advice = response?.data?.duplicateBatch
+    notice.value = advice ? '' : 'Product updated.'
+    duplicateBatch.value = advice || null
   } catch (err) {
     const failure = userError(err)
     editError.value = failure.code === 'CONFLICT'
@@ -111,15 +116,23 @@ async function saveEdit() {
   } finally { editSaving.value = false }
 }
 function openRestock(product) {
-  restock.value = product; restockKey.value = crypto.randomUUID(); quantity.value = 1; note.value = ''; error.value = null
+  restock.value = product; restockKey.value = crypto.randomUUID(); quantity.value = 1; note.value = ''; error.value = null; duplicateBatch.value = null
+}
+function addStockToDuplicate() {
+  const existing = store.products.find(product => product.id === duplicateBatch.value?.id) || duplicateBatch.value
+  duplicateBatch.value = null
+  if (existing) openRestock(existing)
 }
 async function saveProduct() {
   if (saving.value) return
-  saving.value = true; error.value = null; fields.value = []
+  saving.value = true; error.value = null; fields.value = []; duplicateBatch.value = null
   try {
     const payload = normalizeProductPayload(form.value)
-    await dataService.addProduct(payload)
-    showForm.value = false; form.value = blank(); notice.value = 'Product saved.'; await refresh(); window.dispatchEvent(new Event('stock-changed'))
+    const response = await dataService.addProduct(payload)
+    showForm.value = false; form.value = blank(); await refresh(); window.dispatchEvent(new Event('stock-changed'))
+    const advice = response?.data?.duplicateBatch
+    notice.value = advice ? '' : 'Product saved.'
+    duplicateBatch.value = advice || null
   }
   catch (err) { error.value = err; fields.value = userError(err).fields }
   finally { saving.value = false }
@@ -140,6 +153,11 @@ async function deactivate(product) {
 <template>
   <MainLayout title="Inventory" subtitle="Check current stock, add products and record deliveries">
     <ErrorNotice :error="store.error || (!showForm && !restock ? error : null)" :retry="refresh" /><p v-if="notice" role="status" class="success-notice mb-4">{{ notice }}</p>
+    <div v-if="duplicateBatch" role="alert" class="panel mb-4 border-l-4 border-amber-500 bg-amber-50">
+      <p class="font-medium">This batch already exists — do you want to add units to it instead?</p>
+      <p class="text-sm text-slate-700 my-1">{{ duplicateBatch.name }} · batch {{ duplicateBatch.batchNumber }} · expires {{ String(duplicateBatch.expiryDate).slice(0, 10) }} · {{ duplicateBatch.quantity }} in stock</p>
+      <div class="flex gap-2 mt-2"><button type="button" class="primary" @click="addStockToDuplicate">Add stock</button><button type="button" class="secondary" @click="duplicateBatch = null">Keep both batches</button></div>
+    </div>
     <div v-if="store.summary" class="grid grid-cols-3 gap-3 mb-4"><div class="panel">Products <strong class="block text-2xl">{{ store.summary.total }}</strong></div><div class="panel">Low stock <strong class="block text-2xl">{{ store.summary.low }}</strong></div><div class="panel">Expired <strong class="block text-2xl">{{ store.summary.expired }}</strong></div></div>
     <div class="panel mb-4 flex flex-wrap items-end gap-3"><label class="flex-1">Find a product<input v-model="search" maxlength="100" class="field mt-1" placeholder="Name, code or barcode" /></label><CameraButton @click="cameraOpen = true"/><label>Show<select v-model="status" class="field mt-1"><option value="all">All products</option><option value="low">Low stock</option><option value="expired">Expired</option><option value="expiring">Expiry within 90 days</option></select></label><button v-if="canAdd" class="primary" @click="openAdd">Add product</button><router-link v-if="route.query.product" to="/inventory" class="secondary">Show all products</router-link></div>
     <p v-if="store.loading" role="status" class="mb-3">Loading stock…</p>
@@ -150,7 +168,7 @@ async function deactivate(product) {
         <ErrorNotice :error="error" />
         <div class="grid sm:grid-cols-2 gap-4">
           <label v-for="input in inputs" :key="input.name" class="text-sm font-medium">{{ input.label }}
-            <input v-model="form[input.name]" :name="input.name" :aria-label="input.label" :type="input.type" :required="input.required" :minlength="input.minlength" :maxlength="input.maxlength" :min="input.min" :max="input.max" :step="input.step" :aria-describedby="`help-${input.name}`" class="field mt-1" />
+            <input v-model="form[input.name]" :name="input.name" :aria-label="input.label" :type="input.type" :required="input.required" :minlength="input.minlength" :maxlength="input.maxlength" :min="input.min" :max="input.max" :step="input.step" :aria-describedby="`help-${input.name}`" class="field mt-1" @input="input.name === 'batchNumber' && (form.batchNumber = uppercasing.batchNumber(form.batchNumber))" />
             <span :id="`help-${input.name}`" class="block text-xs font-normal text-slate-500 mt-1">{{ input.help }}</span>
           </label>
           <label class="text-sm font-medium">Category
@@ -175,7 +193,7 @@ async function deactivate(product) {
           <label class="text-sm font-medium">Product name<input v-model.trim="editForm.name" name="name" required minlength="2" maxlength="200" class="field mt-1" /></label>
           <label class="text-sm font-medium">Generic name (optional)<input v-model.trim="editForm.genericName" name="genericName" maxlength="200" class="field mt-1" /></label>
           <label class="text-sm font-medium">Category<CategorySelect v-model="editForm.category" name="category" required :disabled="editSaving" /></label>
-          <label class="text-sm font-medium">Batch / lot number<input v-model.trim="editForm.batchNumber" name="batchNumber" required minlength="2" maxlength="100" class="field mt-1" /></label>
+          <label class="text-sm font-medium">Batch / lot number<input v-model="editForm.batchNumber" name="batchNumber" required minlength="2" maxlength="100" class="field mt-1" @input="editForm.batchNumber = uppercasing.batchNumber(editForm.batchNumber)" /></label>
           <label class="text-sm font-medium">Expiry date<input v-model="editForm.expiryDate" name="expiryDate" type="date" required :min="today" class="field mt-1" /></label>
           <label class="text-sm font-medium">Selling price (MWK)<input v-model="editForm.sellingPrice" name="sellingPrice" type="number" required min="0" max="9999999999.99" step="0.01" class="field mt-1" /></label>
           <label class="text-sm font-medium">Cost price (optional)<input v-model="editForm.costPrice" name="costPrice" type="number" min="0" max="9999999999.99" step="0.01" class="field mt-1" /></label>
