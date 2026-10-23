@@ -33,6 +33,7 @@ before(async () => {
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261002_mvp.sql'), 'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_staff_workflows.sql'),'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261023_pharmacy_profile.sql'),'utf8'));
   await pool.query(`INSERT INTO users (username, password_hash, role, full_name, email) VALUES
     ('test-admin', 'test-hash', 'admin', 'Test Admin', 'test-admin@example.com'),
     ('test-pharmacist', 'test-hash', 'pharmacist', 'Test Pharmacist', 'test-pharmacist@example.com'),
@@ -49,6 +50,7 @@ before(async () => {
   app.use('/products', require('../../api/routes/productsRoutes'));
   app.use('/employees', require('../../api/routes/employeesRoutes'));
   app.use('/attendance', require('../../api/routes/attendanceRoutes'));
+  app.use('/pharmacy-profile', require('../../api/routes/pharmacyProfileRoutes'));
   app.use(require('../../lib/errors').errorHandler);
   server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -188,4 +190,28 @@ test('email migration preserves legacy rows and can run repeatedly', async () =>
     await client.query(`DROP SCHEMA IF EXISTS ${legacySchema} CASCADE`);
     client.release();
   }
+});
+
+test('pharmacy profile allows authenticated reads, restricts updates and persists admin changes', async () => {
+  const read = await request('/pharmacy-profile');
+  assert.equal(read.status, 200);
+  assert.equal(read.data.data.pharmacyName, 'METMMA Pharmacy');
+  assert.equal((await request('/pharmacy-profile', { authenticated: false })).status, 401);
+  const body = {
+    pharmacyName: 'METMMA Central Pharmacy',
+    phone: '+265 991 234 567',
+    email: 'support@metmma.example',
+    address: 'Plot 42, Lilongwe',
+    taxRegistrationNumber: 'TPIN-42',
+    logoData: null
+  };
+  assert.equal((await request('/pharmacy-profile', { method: 'PUT', body, role: 'cashier' })).status, 403);
+  const update = await request('/pharmacy-profile', { method: 'PUT', body, role: 'admin' });
+  assert.equal(update.status, 200, JSON.stringify(update.data));
+  assert.equal(update.data.data.pharmacyName, body.pharmacyName);
+  assert.equal(update.data.data.phone, body.phone);
+  const persisted = await request('/pharmacy-profile');
+  assert.equal(persisted.data.data.email, body.email);
+  assert.equal(persisted.data.data.address, body.address);
+  assert.equal(persisted.data.data.taxRegistrationNumber, body.taxRegistrationNumber);
 });

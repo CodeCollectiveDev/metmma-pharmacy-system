@@ -30,5 +30,7 @@ export const dataService = {
   addExpense: body => apiClient.post('/finances/expenses', body),
   updateExpense: (id, body) => apiClient.put(`/finances/expenses/${id}`, body),
   deleteExpense: (id, version) => apiClient.delete(`/finances/expenses/${id}`, { data: { version } }),
-  getExpenseAudit: (id, params = {}) => apiClient.get(`/finances/expenses/${id}/audit`, { params })
+  getExpenseAudit: (id, params = {}) => apiClient.get(`/finances/expenses/${id}/audit`, { params }),
+  getPharmacyProfile: () => apiClient.get('/pharmacy-profile'),
+  updatePharmacyProfile: profile => apiClient.put('/pharmacy-profile', profile)
 }
