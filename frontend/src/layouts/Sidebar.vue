@@ -46,6 +46,7 @@ const allMenuItems = [
   { path: '/hr', label: 'Staff records', icon: Users, group: 'Team', show: canAccessHr },
   { path: '/leave', label: 'Leave', icon: FileText, group: 'Team', show: canAccessHr },
   { path: '/accounts', label: 'Sign-in accounts', icon: Users, group: 'Team', show: computed(() => userRole.value === 'admin') },
+  { path: '/pharmacy-profile', label: 'Pharmacy profile', icon: FileText, group: 'Team', show: computed(() => userRole.value === 'admin') },
 ]
 
 const menuItems = computed(() => {

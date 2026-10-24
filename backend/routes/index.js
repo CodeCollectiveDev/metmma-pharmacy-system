@@ -15,6 +15,7 @@ router.use('/finances',require('../api/routes/financesRoutes'));
 router.use('/employees',require('../api/routes/employeesRoutes'));
 router.use('/attendance',require('../api/routes/attendanceRoutes'));
 router.use('/reports',require('../api/routes/reportsRoutes'));
+router.use('/pharmacy-profile',require('../api/routes/pharmacyProfileRoutes'));
 router.get('/dashboard',authenticate,authorize(ROLES.ADMIN,ROLES.STORE_MANAGER,ROLES.PHARMACIST,ROLES.HR_OFFICER),async(req,res)=>{
  const results=await Promise.all([
  db.query(`SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE quantity<=reorder_level)::int AS low,COUNT(*) FILTER(WHERE expiry_date<CURRENT_DATE)::int AS expired FROM products WHERE is_active=TRUE`),

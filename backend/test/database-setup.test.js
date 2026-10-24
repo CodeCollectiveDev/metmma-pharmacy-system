@@ -63,8 +63,9 @@ for (const packaged of [false, true]) {
 
     const migrations = await runScript(backend, 'migrate.js', { args: ['up'] });
     assert.equal(migrations.status, 0, migrations.errors.join('\n'));
-    assert.equal(migrations.queries.filter(query => query.includes('BEGIN;')).length, 4);
+    assert.equal(migrations.queries.filter(query => query.includes('BEGIN;')).length, 5);
     assert.ok(migrations.queries.some(query => query.includes('CREATE TABLE IF NOT EXISTS employee_leave')));
+    assert.ok(migrations.queries.some(query => query.includes('CREATE TABLE IF NOT EXISTS pharmacy_profile')));
   });
 }
 
