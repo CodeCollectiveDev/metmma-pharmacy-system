@@ -133,6 +133,8 @@ html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2
   @page { margin: 10mm; }
   body > * { display: none !important; }
   body > .receipt-print { display: block !important; width: 100%; max-width: 80mm; margin: 0 auto; color: #000; background: #fff; }
-  .receipt-print .sale-receipt { font: 12px/1.4 sans-serif; }
+  html.dark body > .receipt-print,
+  html.dark body > .receipt-print :where(h1,h2,h3,h4,h5,h6,p,span,div,label,small,strong,em,li,td,th,a,summary,time) { color: #000 !important; background-color: #fff !important; background-image: none !important; border-color: #000 !important; }
+  .receipt-print .sale-receipt { font: 12px/1.4 sans-serif; color: #000; background: #fff; }
   .receipt-print tr { break-inside: avoid; }
 }
