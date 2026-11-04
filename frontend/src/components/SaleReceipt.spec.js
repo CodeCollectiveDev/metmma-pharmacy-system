@@ -13,6 +13,12 @@ describe('SaleReceipt', () => {
     expect(text).toContain('Plot 42, Lilongwe')
   })
 
+  it('emphasises the total on screen and in print', () => {
+    const total = mount(SaleReceipt, { props: { sale } }).get('.receipt-total')
+    expect(total.classes()).toContain('font-extrabold')
+    expect(total.classes()).toContain('border-t-2')
+  })
+
   it('omits optional contact lines that are empty', () => {
     const text = mount(SaleReceipt, { props: { sale, profile: { pharmacyName: 'Main Branch', phone: '', email: null, address: '' } } }).text()
     expect(text).not.toContain('Phone:')
