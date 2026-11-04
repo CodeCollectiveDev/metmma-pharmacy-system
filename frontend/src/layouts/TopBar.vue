@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import NotificationsPanel from '@/components/NotificationsPanel.vue'
 import { HelpCircle, Menu, Moon, Sun } from 'lucide-vue-next'
 
@@ -17,6 +18,8 @@ const currentDate = computed(() => {
     day: 'numeric'
   })
 })
+const route = useRoute()
+const showNotifications = computed(() => route.path !== '/pos')
 const isDark = ref(document.documentElement.classList.contains('dark'))
 function toggleTheme() {
   isDark.value = !isDark.value
@@ -56,7 +59,7 @@ function toggleTheme() {
         <HelpCircle class="w-5 h-5" />
       </router-link>
 
-      <NotificationsPanel />
+      <NotificationsPanel v-if="showNotifications" />
     </div>
   </header>
 </template>
