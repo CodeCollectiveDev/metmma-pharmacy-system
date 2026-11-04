@@ -26,6 +26,10 @@ feature/xyz  ──PR──▶  staging  ──PR──▶  main
 - `main` additionally requires every review conversation to be resolved before merging.
 - Force pushes and branch deletion are blocked on both branches.
 
+## The release-source guard
+
+Branch protection can express "a pull request is required", but not "only the release branch may target `main`". `.github/workflows/release-source-guard.yml` runs on every pull request into `main` and fails unless the head branch is `staging` from this repository. It is a required status check on `main`, so a feature or `copilot/*` branch cannot be merged into production even if the rest of CI and review pass.
+
 ## What is deliberately NOT enabled
 
 `Lock branch` (read-only) is **off** on both branches. GitHub treats a locked branch as fully read-only and refuses pull request merges against it ("the base branch policy prohibits the merge"), which would make the `staging` → `main` release path impossible. Branch protection gives the same practical guarantee — no direct pushes, no force pushes, no deletions — while still allowing reviewed merges.
@@ -38,7 +42,7 @@ feature/xyz  ──PR──▶  staging  ──PR──▶  main
 | `staging` | Integration branch. Protected. Everything is tested here before release. |
 | `feature/*`, `fix/*`, `feat/*` | Short-lived work branches, branched from `staging`. |
 | `archive/staging-legacy` | Archived work (barcode scanning, thermal printing) that was never merged to `main`. Cherry-pick from it if those features are wanted. |
-| `develop` | Legacy branch, diverged from `main`. Not part of this workflow. |
+| `archive/legacy-develop` | Retired `develop` history. Its work was re-landed on `main` under different commits. Do not branch from or merge it. |
 
 ## Local setup
 
