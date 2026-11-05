@@ -1,6 +1,6 @@
 # Vercel/Netlify + VPS + Neon + Cloudflare R2
 
-This is the deployment runbook for the supplied GitHub Actions workflow. It supersedes the older Render instructions. Cloudflare backups here mean **Cloudflare R2 object storage**. No production services or cloud accounts are provisioned by committing these files.
+This is the deployment runbook for the supplied GitHub Actions workflow. Cloudflare backups here mean **Cloudflare R2 object storage**. No production services or cloud accounts are provisioned by committing these files.
 
 The frontend is built and hosted by Vercel or Netlify. GitHub Actions tests the application against disposable PostgreSQL, builds Linux AMD64 Docker images, and uploads the finished images over SSH. The VPS loads them; it does not clone the repository or install npm dependencies. Caddy serves the API over HTTPS. Neon holds production data. R2 holds daily and pre-deployment database backups.
 
@@ -108,7 +108,7 @@ The workflow obtains the VPS ED25519 host key at deployment time with `ssh-keysc
 
 Database and R2 credentials stay in protected VPS files; GitHub needs only SSH access. Never put them in frontend variables or build arguments. GitHub's environment behavior is documented in [deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
 
-The workflow deploys pushes to **`main`** and manual runs on **`main`**, after all checks pass. This repository was on `mvp-hardening` when these files were added: merge into `main` to enable deployment, or deliberately change both the workflow trigger and deploy-job branch condition to your production branch. Restrict the `production` environment to that branch. Required reviewers are optional; enabling them makes deployment wait for approval. Protect the branch and workflow files against unreviewed changes.
+The workflow deploys pushes to **`main`** and manual runs on **`main`**, after all checks pass. Restrict the `production` environment to that branch. Required reviewers are optional; enabling them makes deployment wait for approval. Protect the branch and workflow files against unreviewed changes.
 
 For a **brand-new empty Neon database**, first run Actions → **Validate and deploy** → Run workflow on main → enable **initialize_database**. Initialization refuses a database with existing public tables and removes development sample accounts. Leave that option off for all subsequent releases and for any existing database.
 
@@ -247,12 +247,6 @@ curl --fail https://YOUR_API_DOMAIN/api/health
 ln -sfn "$(readlink -f previous)" current
 ```
 
-Pause deployment triggers and the backup timer while carrying out a manual recovery. Do not roll back to the original unhardened checkout. See the business smoke tests in [the MVP release checklist](mvp/DEPLOYMENT_CHECKLIST.md).
+Pause deployment triggers and the backup timer while carrying out a manual recovery. Do not roll back to the original unhardened checkout. Run the application's smoke checks against the restored release before reopening access.
 
 The workflow retains downloaded release artifacts for seven days. VPS image/release cleanup is deliberately manual: retain the current and previous images/manifests, then remove reviewed obsolete releases when disk usage requires it. Do not prune production volumes. Update base images regularly by rebuilding and deploying a tested release.
-
-## Verification of this change
-
-Local verification passed: backend syntax checks and 16 unit tests (including isolation from inherited production URLs), frontend syntax/template checks, 52 frontend tests and the production frontend build, eight deployment/backup success/failure tests, Bash syntax, both Compose configurations, and YAML/JSON parsing. The local machine runs Node 26; frontend tests passed with `NODE_OPTIONS=--no-experimental-webstorage` so test workers use jsdom storage. The supplied development/CI runtime is Node 22.
-
-Local Docker image builds and database integration tests were not run because Docker access required a local sudo password; the user chose to continue without them. GitHub Actions is configured to run integration tests, build all images, initialize and migrate a disposable database, reject reinitialization, and smoke-test the built API. No actual GitHub run, VPS rollout, Neon migration, R2 upload or cloud restore was performed in this session.
