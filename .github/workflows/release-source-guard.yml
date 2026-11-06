@@ -1,0 +1,30 @@
+name: Release source
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-source:
+    name: release-source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require staging as the only source for main
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            echo "::error::Pull requests into main must come from $BASE_REPO:staging, not a fork ($HEAD_REPO)."
+            exit 1
+          fi
+          if [ "$HEAD_REF" != "staging" ]; then
+            echo "::error::Pull requests into main must come from the staging branch; got '$HEAD_REF'. Open feature pull requests against staging instead."
+            exit 1
+          fi
+          echo "Release source '$HEAD_REF' is allowed."

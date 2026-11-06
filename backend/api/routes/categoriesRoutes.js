@@ -1,0 +1,11 @@
+const router=require('express').Router();
+const c=require('../controllers/categoriesController');
+const {Joi,validate,idParam}=require('../../lib/validation');
+const {authenticate,authorize,ROLES}=require('../../middleware/roleMiddleware');
+const name=Joi.string().trim().min(2).max(100);
+const sortOrder=Joi.number().integer().min(0).max(1000000);
+router.use(authenticate);
+router.get('/',validate(Joi.object({all:Joi.boolean().default(false)}),'query'),c.getCategories);
+router.post('/',authorize(ROLES.ADMIN),validate(Joi.object({name:name.required(),sortOrder:sortOrder.default(0)}).required()),c.createCategory);
+router.patch('/:id',authorize(ROLES.ADMIN),validate(idParam,'params'),validate(Joi.object({name,sortOrder,isActive:Joi.boolean().strict()}).min(1).required()),c.updateCategory);
+module.exports=router;

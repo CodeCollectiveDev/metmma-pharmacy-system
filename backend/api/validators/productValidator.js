@@ -12,7 +12,7 @@ const normalizeExpiryDate=(value)=>{
  return null;
 };
 const fields={
- productCode:Joi.string().trim().uppercase().pattern(/^[A-Z0-9-]+$/).min(3).max(50),name:Joi.string().trim().min(2).max(200),genericName:Joi.string().trim().max(200).allow('',null),batchNumber:Joi.string().trim().min(2).max(100),
+ productCode:Joi.string().trim().uppercase().pattern(/^[A-Z0-9-]+$/).min(3).max(50),name:Joi.string().trim().min(2).max(200),genericName:Joi.string().trim().max(200).allow('',null), batchNumber:Joi.string().trim().uppercase().min(2).max(100),
  expiryDate:Joi.string().trim().custom((value,h)=>{const normalized=normalizeExpiryDate(value); return normalized===null?h.error('any.invalid'):normalized;}),
  quantity:Joi.number().integer().min(0).max(2147483647),unitPrice:money,sellingPrice:money,costPrice:money.allow(null),supplier:Joi.string().trim().min(2).max(200).allow('',null),category:Joi.string().trim().min(2).max(100),reorderLevel:Joi.number().integer().min(0).max(2147483647),location:Joi.string().trim().max(100).allow('',null),barcode:Joi.string().trim().max(100).allow('',null),isActive:Joi.boolean()
 };

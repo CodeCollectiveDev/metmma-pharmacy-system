@@ -1,15 +1,17 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { usePosStore } from '../store/posStore'
+import { useCategoryStore } from '@/modules/shared/store/categoryStore'
 import { Search } from 'lucide-vue-next'
 
-const store = usePosStore()
+const store = usePosStore(), categoryStore = useCategoryStore()
 
 onMounted(() => {
   store.fetchProducts()
+  categoryStore.fetchCategories()
 })
 
-const categories = ['All', 'Antibiotics', 'Painkillers', 'Vitamins', 'Cough & Cold', 'First Aid', 'Diagnostics']
+const categories = computed(() => ['All', ...categoryStore.categories.map(category => category.name)])
 
 const setCategory = (cat) => {
   store.selectedCategory = cat

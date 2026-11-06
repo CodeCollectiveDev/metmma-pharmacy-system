@@ -9,9 +9,10 @@ import ReceiptDialog from '@/components/ReceiptDialog.vue'
 import AppDialog from '@/components/AppDialog.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import { usePosStore } from '../store/posStore'
+import { useCategoryStore } from '@/modules/shared/store/categoryStore'
 import { confirmAction } from '@/composables/useFeedback'
 import { currency, minor, decimal } from '@/services/api/money'
-const store = usePosStore()
+const store = usePosStore(), categoryStore = useCategoryStore()
 const barcode = computed({get: () => store.searchQuery, set: value => { store.searchQuery = value }}), scanner = ref(null), payment = ref('cash'), customer = ref(''), receipt = ref(null), showReceipt = ref(false), configured = ref(false)
 const cameraOpen = ref(false), amountReceived = ref(''), scanBusy = ref(false), notice = ref('')
 const itemCount = computed(() => store.cart.reduce((sum, item) => sum + item.quantity, 0))
@@ -20,9 +21,12 @@ const dueMinor = computed(() => store.subtotalMinor)
 const difference = computed(() => receivedMinor.value === null ? null : receivedMinor.value - dueMinor.value)
 const paymentValid = computed(() => receivedMinor.value !== null && (payment.value === 'cash' ? difference.value >= 0 : difference.value === 0))
 watch(payment, () => { if (!store.locked) amountReceived.value = '' })
+function selectCategory(category) {
+  store.selectedCategory = category
+}
 async function initialize() {
   configured.value = false
-  await Promise.allSettled([store.fetchProducts(), store.configure().then(() => { configured.value = true })])
+  await Promise.allSettled([store.fetchProducts(), categoryStore.fetchCategories(), store.configure().then(() => { configured.value = true })])
   if (store.pending) { payment.value = store.pending.paymentMethod; customer.value = store.pending.customerName || ''; amountReceived.value = store.pending.amountReceived ?? store.pending.totalAmount }
 }
 async function cameraScan(code) { cameraOpen.value = false; barcode.value = code; await scan() }
@@ -61,6 +65,15 @@ async function retryLoad() { await initialize() }
         <ErrorNotice :error="store.productError" :retry="store.fetchProducts" />
         <div class="flex items-center justify-between gap-3 mb-4"><div><h2 class="text-lg font-bold">Find a product</h2><p class="text-sm text-slate-500">Search by name, or enter a barcode and press Enter.</p></div><router-link to="/sales" class="text-sm text-blue-800 underline">Past receipts</router-link></div>
         <form class="flex gap-2 mb-3" @submit.prevent="scan"><label class="relative flex-1"><span class="sr-only">Search products or enter barcode number</span><Search class="absolute left-3 top-3 w-5 h-5 text-slate-400" aria-hidden="true"/><input ref="scanner" id="barcode-input" v-model="barcode" :disabled="store.locked" class="field pl-10" placeholder="Product name or barcode number" maxlength="100" autocomplete="off" /></label><CameraButton :disabled="store.locked || scanBusy" @click="cameraOpen = true"/></form>
+        <div class="mb-3">
+          <p class="text-sm font-medium mb-2">Filter by category</p>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="px-3 py-1.5 text-xs font-medium rounded-full border transition-all" :class="store.selectedCategory === 'All' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400'" @click="selectCategory('All')">All</button>
+            <button v-for="category in categoryStore.categories" :key="category.id" type="button" class="px-3 py-1.5 text-xs font-medium rounded-full border transition-all" :class="store.selectedCategory === category.name ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400'" @click="selectCategory(category.name)">{{ category.name }}</button>
+          </div>
+          <p v-if="categoryStore.loading" role="status" class="text-sm text-slate-500 mt-2">Loading categories…</p>
+          <p v-else-if="categoryStore.error" role="alert" class="text-sm text-red-800 mt-2">Categories could not load. <button type="button" class="underline" @click="categoryStore.fetchCategories({ force: true })">Try again</button></p>
+        </div>
         <p class="text-sm text-slate-500 mb-3">Select a product below to add one unit. USB scanners use the same search box.</p>
         <p role="status" class="text-sm text-emerald-800 min-h-5 mb-3">{{ notice }}</p>
         <p v-if="store.loading" role="status" class="mb-3">Finding products…</p>

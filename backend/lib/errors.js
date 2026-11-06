@@ -35,7 +35,8 @@ function errorHandler(error, req, res, next) {
   if (error.code === '23505') {
     const duplicate = {
       users_username_key: { field: 'username', message: 'This username is already in use. Choose another.' },
-      products_product_code_key: { field: 'productCode', message: 'This product code is already in use. Choose another.' }
+      products_product_code_key: { field: 'productCode', message: 'This product code is already in use. Choose another.' },
+      categories_name_key: { field: 'name', message: 'A category with this name already exists. Choose another name.' }
     }[error.constraint];
     if (duplicate) error.fieldDetails = [duplicate];
   }
