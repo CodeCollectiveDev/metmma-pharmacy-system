@@ -1,78 +1,69 @@
-# Production API deployment
+# Heroku deployment
 
-This setup deploys only the production API to Heroku. The frontend remains on Vercel and the API continues using the existing production Neon database.
+Both Heroku applications run one combined web container. The repository currently uses a **Vue 3/Vite frontend and an Express API** (not React and NestJS). Vite builds the frontend into static files, which the Express app serves from the same origin as `/api`.
 
-| Component | Host | Branch | Database |
-| --- | --- | --- | --- |
-| Production API | Heroku app `metmma-pharmacy-prod-api` | `main` | Existing Neon production database |
-| Production frontend | Existing Vercel project | `main` | None |
-| Staging API and frontend | No deployment from this workflow | `staging` | None |
+| Environment | Heroku app | Branch | Dyno | Database |
+| --- | --- | --- | --- | --- |
+| Production | `metmma-pharmacy-prod-api` | `main` | One Basic `web` dyno | Existing production Neon database |
+| Staging | `metmma-pharmacy-staging` | `staging` | One Eco `web` dyno | Separate Neon staging branch/database |
+
+Routes are `/` for the frontend, `/api/...` for the API, and the existing API health endpoint is `/api/health`. The frontend build uses `VITE_API_BASE_URL=/api`, so browser requests stay on the current app's origin. Heroku supplies `PORT`; do not set it manually.
 
 ## Heroku app setup
 
-Create or select the Heroku app named `metmma-pharmacy-prod-api`. Before building or pushing images, the GitHub workflow authenticates with the production `HEROKU_API_KEY`, checks the app's current stack, and sets it to `container` if needed.
+Create both apps and set their stack to `container`. Do not add Heroku Postgres. In each app's **Resources** settings, select exactly one `web` dyno with the type in the table above. The `release` process is a one-off migration process run during a deployment; it is not an additional long-running dyno.
 
-Do **not** add a Heroku Postgres add-on. Heroku supplies the API's `PORT` value at runtime; the existing backend server listens on it.
+Set these config vars separately under each app's **Settings → Config Vars**. Use the existing production Neon values for production and a different Neon staging branch/database for staging.
 
-Set these config vars in the Heroku app's **Settings → Config Vars**:
+| Config var | Production | Staging |
+| --- | --- | --- |
+| `NODE_ENV` | `production` | `production` |
+| `DATABASE_URL` | Existing production Neon pooled/runtime URL | Staging Neon pooled/runtime URL |
+| `MIGRATION_DATABASE_URL` | Existing production Neon direct URL | Staging Neon direct URL |
+| `DB_SSL` | `true` | `true` |
+| `JWT_SECRET` | Existing production secret (keep unchanged for session continuity) | A different random secret, at least 32 characters |
+| `ALLOWED_ORIGINS` | Exact production Heroku app origin and any production custom origin | Exact staging Heroku app origin and any staging custom origin |
+| `TRUST_PROXY` | `1` | `1` |
+| `PHARMACY_TIMEZONE` | `UTC` to preserve the existing production interpretation | `UTC` unless staging is intentionally configured otherwise |
+| `DB_SSL_CA` | Optional provider CA, only if required | Optional provider CA, only if required |
 
-| Config var | Value |
-| --- | --- |
-| `NODE_ENV` | `production` |
-| `DATABASE_URL` | Existing production Neon connection URL used by the current API |
-| `MIGRATION_DATABASE_URL` | Neon direct (non-pooler) URL for migrations |
-| `DB_SSL` | `true` |
-| `JWT_SECRET` | The current production secret, copied securely from the existing API host |
-| `TRUST_PROXY` | `1` |
-| `PHARMACY_TIMEZONE` | `UTC` to preserve current timestamp interpretation |
-| `ALLOWED_ORIGINS` | The exact production Vercel frontend origin, without a trailing slash or `/api` |
+Do not copy production database URLs or `JWT_SECRET` into staging. Do not configure Heroku Postgres. For Neon URLs with `DB_SSL=true`, follow the existing deployment template: remove `sslmode` and `channel_binding` query parameters and URL-encode special characters in credentials. The migration URL must be a direct connection so PostgreSQL advisory locking works.
 
-The migration runner reads `MIGRATION_DATABASE_URL`, takes the existing PostgreSQL advisory lock, and uses the direct connection. Keep those migration files and scripts unchanged. For Neon URLs used with `DB_SSL=true`, follow the existing deployment template: remove query parameters such as `sslmode` and `channel_binding`, and URL-encode special characters in credentials.
+The app's `DATABASE_URL` and `MIGRATION_DATABASE_URL` are read by the web and release processes for that same Heroku app. Before enabling staging deployment, verify both staging values point to the staging Neon branch. The staging workflow is hard-pinned to the staging Heroku app and cannot select the production app.
 
-Keep `JWT_SECRET` equal to the current production value during cutover so active signed sessions continue to validate. Never put the database URL or JWT secret in GitHub source or Vercel frontend variables.
+## GitHub environments
 
-## GitHub Actions setup
+Create GitHub environments named `production` and `staging`.
 
-Open the repository's **Settings → Environments → production** and add this environment secret:
+| Environment | Secret | Variable |
+| --- | --- | --- |
+| `production` | `HEROKU_API_KEY` with access to the production app | `HEROKU_API_APP=metmma-pharmacy-prod-api` |
+| `staging` | `HEROKU_API_KEY` with access to the staging app | `HEROKU_API_APP=metmma-pharmacy-staging` |
 
-| Name | Value |
-| --- | --- |
-| `HEROKU_API_KEY` | A Heroku API key permitted to deploy `metmma-pharmacy-prod-api` |
+The same Heroku key can be used in both environments if it has access to both apps. Keep Neon credentials and JWT secrets in the Heroku app config, not GitHub or frontend build variables. Each workflow checks that `HEROKU_API_APP` matches its hardcoded expected app before authenticating, building, or pushing.
 
-The workflow hardcodes the specified app name; it requires no Heroku app-name or frontend build variables. It runs on pushes to `main` only, after backend checks and unit tests pass. It authenticates to Heroku, ensures the app uses the `container` stack, builds both backend Docker images from the repository root, pushes the `web` and `release` process images, releases them together to Heroku, and checks `/api/health` on the app's Heroku hostname.
+## Workflows and image build
 
-The Heroku API key is only used by this workflow; API runtime settings and Neon credentials belong in the Heroku app config vars above.
+- `.github/workflows/deploy.yml` runs on pushes to `main` using the `production` environment.
+- `.github/workflows/deploy-staging.yml` runs on pushes to `staging` using the `staging` environment.
+- Both run backend and frontend checks, build the combined `web` image from the repository root using `backend/Dockerfile`, build the migration image from `backend/Dockerfile.release`, push both images, release `web` and `release`, then check `/api/health` at the app's Heroku Web URL.
+- The web image uses a multi-stage build. Frontend development dependencies are used only in the build stage; the runtime image contains the built static assets, backend runtime dependencies, API and migration files.
+- The release command remains `npm run migrate`. It keeps the existing advisory lock and direct migration connection. It never runs the database initializer or seed/bootstrap scripts. A failed migration blocks activation of the new web release.
 
-## Database and migration safety
+The API only returns the frontend entry point for browser-style GET requests outside `/api`. Unknown `/api` endpoints remain API 404 responses, and missing asset files do not fall through to the frontend HTML.
 
-The release image runs only:
+## Domains and same-origin requests
 
-```sh
-npm run migrate
-```
+The workflows get each app's current Heroku Web URL from `heroku apps:info`, so their health check does not depend on an app-name-derived hostname. In **Settings → Domains**, add any custom domain to the matching app, copy the DNS target Heroku supplies, and create the DNS record with your DNS provider. Enable Automated Certificate Management and wait for HTTPS. Add the exact browser origin to that app's `ALLOWED_ORIGINS` if using a custom domain. The frontend and API should use the same domain, with API routes under `/api`.
 
-It does **not** run `db:init`. Production already has a Neon database, and the API migration code retains its direct-connection and advisory-lock behavior. Do not add an initializer to the release command. Before the first Heroku release, take and verify a Neon backup. A failed migration must block the release; inspect the migration and database state before retrying.
+Vercel-related files and settings are retained for rollback or a future hosting change, but Vercel is no longer part of the deployment path for these two Heroku apps.
 
-No staging database is connected or deployed by this workflow. Never point the production Heroku app at a staging database.
+## Cutover and rollback
 
-## API domain and Vercel frontend
+1. Create/configure the staging Heroku app and its separate Neon staging database. Add the `staging` GitHub environment secret and variable.
+2. Open a feature PR into `staging`. After review and CI, merge it and verify the staging frontend, API, and database.
+3. Configure the production environment variable and confirm the production app still has its existing Neon URLs and JWT secret. Do not change production database credentials during this cutover.
+4. Open the reviewed `staging` → `main` release PR. Merging to `main` runs the production checks and deployment. No deployment is run by this documentation change itself.
+5. Verify the production workflow health check, then sign in and run a safe smoke check against production.
 
-The workflow's health check uses Heroku's default hostname, so it works before custom DNS is configured. In Heroku **Settings → Domains**, add `api.metmmapharmacy.com`, copy the DNS target Heroku gives you, and create the corresponding CNAME record at your DNS provider. Enable Automated Certificate Management and wait for the certificate to be issued. Do not use a Heroku IP address. If using Cloudflare DNS, use DNS-only while Heroku verifies the record and provisions HTTPS.
-
-The existing Vercel configuration in `frontend/vercel.json` remains in place. In the existing Vercel project, keep the project root as `frontend`, build command `npm run build`, and output directory `dist`. Confirm the production branch is `main` and set the Vercel **Production** environment variable:
-
-```text
-VITE_API_BASE_URL=https://api.metmmapharmacy.com
-```
-
-The frontend client appends `/api` to this bare API origin. Redeploy the Vercel frontend after setting or changing the variable. Do not add a Heroku frontend app or staging deployment through this workflow.
-
-## Cutover order
-
-1. Configure the Heroku production app, its Neon config vars, the `production` GitHub environment secret, and the Vercel production API URL.
-2. Open a reviewed PR into `staging`, then a reviewed release PR into `main` as required by the [branching policy](BRANCHING_WORKFLOW.md). Merging into `main` runs backend checks, tests, migrations, and the Heroku API deployment.
-3. Check the workflow health step and Heroku logs. Test the API on its Heroku hostname.
-4. Point `api.metmmapharmacy.com` to the Heroku DNS target and wait for HTTPS. Confirm the existing Vercel site can sign in and complete a safe workflow against the production API.
-5. Redeploy the Vercel frontend with `VITE_API_BASE_URL=https://api.metmmapharmacy.com` if the deployed build was made before the API domain was configured.
-
-The old VPS files under `deploy/` remain as rollback assets. The GitHub deploy workflow no longer deploys to the VPS. Keep the existing Neon backup schedule active; the Heroku API dyno does not run the VPS/R2 backup timer.
+Existing VPS files under `deploy/`, Neon setup, Vercel configuration, and rollback documentation remain available. For a failed app release, Heroku retains the previously active release; inspect the release output and database migration state before retrying. Database changes already committed by earlier migrations are not reverted by an app rollback.
