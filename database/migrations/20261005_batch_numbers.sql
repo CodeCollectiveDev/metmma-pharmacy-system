@@ -16,7 +16,7 @@ BEGIN
   FOR duplicate IN
     SELECT product_code,name,batch_number,expiry_date,COUNT(*) AS copies,array_agg(id ORDER BY id) AS ids
     FROM products
-    GROUP BY product_code,batch_number,expiry_date
+    GROUP BY product_code,name,batch_number,expiry_date
     HAVING COUNT(*)>1
   LOOP
     total:=total+1;
