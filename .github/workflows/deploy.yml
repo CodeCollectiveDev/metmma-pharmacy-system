@@ -1,24 +1,24 @@
-name: Validate and Deploy to PM2
+name: Deploy production API to Heroku
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-metmma-backend
+  group: deploy-heroku-production-api
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  verify:
+    name: Verify backend
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    if: github.ref == 'refs/heads/main'
-    environment: production
-
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
@@ -26,136 +26,75 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            backend/package-lock.json
-            frontend/package-lock.json
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install & Build Backend
-        run: |
-          cd backend
-          npm ci
-          npm run check --if-present
-          npm test --if-present
-          npm run build --if-present
-          npm prune --production
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Use Node 22 for frontend
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Validate Frontend
-        run: |
-          npm ci --prefix frontend
-          npm run check --prefix frontend
-          npm test --prefix frontend
-          npm run build --prefix frontend
+      - name: Syntax check
+        run: npm run check
 
-      - name: Package Release
-        run: |
-          set -Eeuo pipefail
-          # Copy repository database folder into backend directory before packaging
-          cp -r database backend/database
-          test -s backend/database/init.sql
-          test -d backend/database/migrations
-          tar -czf release.tar.gz -C backend .
+      - name: Unit tests
+        run: npm test
 
-      - name: Deploy to VPS via SSH
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          DEPLOY_DIRECTORY: metmma-backend
-          PM2_APP_NAME: metmma-backend
+  deploy:
+    name: Deploy production API
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    env:
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_API_APP: metmma-pharmacy-prod-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Heroku credentials
         shell: bash
         run: |
-          set -Eeuo pipefail
-
-          require_env() {
-            local name="$1"
-            if [ -z "${!name:-}" ]; then
-              echo "::error::Missing required deployment environment secret: $name"
-              exit 1
-            fi
-          }
-
-          require_env VPS_HOST
-          require_env VPS_USER
-          require_env VPS_SSH_KEY
-
-          if ! [[ "$VPS_PORT" =~ ^[0-9]+$ ]]; then
-            echo "::error::VPS_PORT must be numeric."
+          if [[ -z "${HEROKU_API_KEY:-}" ]]; then
+            echo "::error::Set HEROKU_API_KEY in the production GitHub environment."
             exit 1
           fi
 
-          umask 077
-          ssh_dir=$(mktemp -d "$RUNNER_TEMP/metmma-ssh.XXXXXX")
-          trap 'rm -rf "$ssh_dir"' EXIT
-          
-          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
-          ssh-keyscan -p "$VPS_PORT" -t ed25519 "$VPS_HOST" > "$ssh_dir/known_hosts" 2>/dev/null
-          
-          opts=(-i "$ssh_dir/key" -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=30)
-          target="$VPS_USER@$VPS_HOST"
-          
-          # 1. Target directory on VPS
-          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "mkdir -p ~/$DEPLOY_DIRECTORY"
-          
-          # 2. SCP lightweight tarball directly to target
-          scp "${opts[@]}" -P "$VPS_PORT" release.tar.gz "$target:~/$DEPLOY_DIRECTORY/"
-          
-          # 3. Extract, set PATH, fix permissions, run DB migrations, reload PM2
-          ssh "${opts[@]}" -p "$VPS_PORT" "$target" "bash -s -- '$DEPLOY_DIRECTORY' '$PM2_APP_NAME'" << 'EOF'
-            set -e
+      - name: Install Heroku CLI
+        run: curl -fsSL https://cli-assets.heroku.com/install.sh | sh
 
-            # Export Node / PM2 PATH for non-interactive SSH shells
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
+      - name: Authenticate with Heroku
+        run: heroku auth:whoami
 
-            deploy_directory="$1"
-            pm2_app_name="$2"
-            cd "$HOME/$deploy_directory"
-            
-            # Extract tarball over existing files (.env remains untouched)
-            tar -xzf release.tar.gz
-            rm release.tar.gz
-            
-            # Fix executable permissions for node_modules binaries
-            if [ -d "node_modules/.bin" ]; then
-              chmod -R +x node_modules/.bin/
-            fi
+      - name: Ensure app uses the container stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack_output="$(heroku stack --app "$HEROKU_API_APP")"
+          current_stack="$(printf '%s\n' "$stack_output" | sed -n 's/^[[:space:]]*\*[[:space:]]*//p' | head -n 1)"
+          if [[ -z "$current_stack" ]]; then
+            echo "::error::Could not determine the current Heroku stack for $HEROKU_API_APP."
+            exit 1
+          fi
+          if [[ "$current_stack" != "container" ]]; then
+            heroku stack:set container --app "$HEROKU_API_APP"
+          else
+            echo "$HEROKU_API_APP already uses the container stack."
+          fi
 
-            # Initialize database if fresh, then execute pending migrations.
-            # A suspended Neon compute refuses the first connection, so retry before failing.
-            echo "Running database initialization and migrations on Neon DB..."
-            run_with_retry() {
-              local attempt=1
-              local max_attempts=3
-              while true; do
-                if "$@"; then
-                  return 0
-                fi
-                if [ "$attempt" -ge "$max_attempts" ]; then
-                  echo "Command failed after $attempt attempts: $*"
-                  return 1
-                fi
-                echo "Attempt $attempt failed, retrying in 15s..."
-                sleep 15
-                attempt=$((attempt + 1))
-              done
-            }
-            run_with_retry npm run db:init -- --if-empty
-            run_with_retry npm run migrate
+      - name: Sign in to Heroku Container Registry
+        shell: bash
+        run: printf '%s' "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
 
-            # Reload or start process using server.js as entry point
-            if pm2 describe "$pm2_app_name" > /dev/null 2>&1; then
-              pm2 reload "$pm2_app_name" --update-env
-            else
-              pm2 start server.js --name "$pm2_app_name"
-            fi
+      - name: Build API and migration images
+        shell: bash
+        run: |
+          docker build -f backend/Dockerfile -t "registry.heroku.com/$HEROKU_API_APP/web" .
+          docker build -f backend/Dockerfile.release -t "registry.heroku.com/$HEROKU_API_APP/release" .
 
-            pm2 save
-          EOF
+      - name: Push and release API processes
+        shell: bash
+        run: |
+          docker push "registry.heroku.com/$HEROKU_API_APP/web"
+          docker push "registry.heroku.com/$HEROKU_API_APP/release"
+          heroku container:release web release --app "$HEROKU_API_APP"
+
+      - name: Check API health
+        run: curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-connrefused https://metmma-pharmacy-prod-api.herokuapp.com/api/health

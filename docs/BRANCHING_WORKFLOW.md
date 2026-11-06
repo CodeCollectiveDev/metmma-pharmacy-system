@@ -16,7 +16,7 @@ feature/xyz  ──PR──▶  staging  ──PR──▶  main
 3. CI must pass and one teammate must approve. Merge to `staging`.
 4. Test the staged build. When you are confident it works, open a PR from `staging` into `main`.
 5. CI must pass, one teammate must approve, all review comments must be resolved. Merge to `main`.
-6. Merging to `main` triggers the production deploy (`.github/workflows/deploy.yml`, environment `production`).
+6. `staging` runs CI only. Merging `staging` into `main` deploys the production API to Heroku; the existing Vercel project deploys the production frontend from `main`.
 
 ## Why the gates exist
 
@@ -38,8 +38,8 @@ Branch protection can express "a pull request is required", but not "only the re
 
 | Branch | Purpose |
 | --- | --- |
-| `main` | Production. Protected. Merging here deploys to the live VPS. |
-| `staging` | Integration branch. Protected. Everything is tested here before release. |
+| `main` | Production. Protected. The API deploys to Heroku and the frontend deploys to Vercel. |
+| `staging` | Integration branch. Protected. CI runs here; no staging deployment is configured. |
 | `feature/*`, `fix/*`, `feat/*` | Short-lived work branches, branched from `staging`. |
 | `archive/staging-legacy` | Archived work (barcode scanning, thermal printing) that was never merged to `main`. Cherry-pick from it if those features are wanted. |
 | `archive/legacy-develop` | Retired `develop` history. Its work was re-landed on `main` under different commits. Do not branch from or merge it. |
@@ -72,7 +72,7 @@ The checks are required status checks on both protected branches, so a red build
 
 ## Production deploy
 
-`.github/workflows/deploy.yml` runs on push to `main` and deploys the backend to the VPS (environment `production`, secrets `VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_KEY`). It runs database migrations and reloads PM2. Frontend hosting (Vercel/Netlify) is separate and follows its own deploy settings.
+`.github/workflows/deploy.yml` runs backend checks and tests on pushes to `main`, then deploys only the production API to `metmma-pharmacy-prod-api`. The API connects to the existing Neon database. The workflow uses the `HEROKU_API_KEY` secret from the GitHub `production` environment. Vercel continues to deploy the frontend from `main` independently. See [production deployment](DEPLOYMENT_HEROKU.md) for setup.
 
 ## Recovering a bad release
 
