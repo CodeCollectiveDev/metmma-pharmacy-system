@@ -16,7 +16,7 @@ feature/xyz  ──PR──▶  staging  ──PR──▶  main
 3. CI must pass and one teammate must approve. Merge to `staging`.
 4. Test the staged build. When you are confident it works, open a PR from `staging` into `main`.
 5. CI must pass, one teammate must approve, all review comments must be resolved. Merge to `main`.
-6. `staging` runs CI only. Merging `staging` into `main` deploys the production API to Heroku; the existing Vercel project deploys the production frontend from `main`.
+6. A push to `staging` runs CI and deploys the combined app to the staging Heroku app. A push to `main` runs CI and deploys the combined app to production.
 
 ## Why the gates exist
 
@@ -38,8 +38,8 @@ Branch protection can express "a pull request is required", but not "only the re
 
 | Branch | Purpose |
 | --- | --- |
-| `main` | Production. Protected. The API deploys to Heroku and the frontend deploys to Vercel. |
-| `staging` | Integration branch. Protected. CI runs here; no staging deployment is configured. |
+| `main` | Production. Protected. The combined frontend/API deploys to `metmma-pharmacy-prod-api`. |
+| `staging` | Integration branch. Protected. The combined frontend/API deploys to `metmma-pharmacy-staging`. |
 | `feature/*`, `fix/*`, `feat/*` | Short-lived work branches, branched from `staging`. |
 | `archive/staging-legacy` | Archived work (barcode scanning, thermal printing) that was never merged to `main`. Cherry-pick from it if those features are wanted. |
 | `archive/legacy-develop` | Retired `develop` history. Its work was re-landed on `main` under different commits. Do not branch from or merge it. |
@@ -70,9 +70,9 @@ git pull --ff-only origin main
 
 The checks are required status checks on both protected branches, so a red build blocks the merge.
 
-## Production deploy
+## Heroku deploys
 
-`.github/workflows/deploy.yml` runs backend checks and tests on pushes to `main`, then deploys only the production API to `metmma-pharmacy-prod-api`. The API connects to the existing Neon database. The workflow uses the `HEROKU_API_KEY` secret from the GitHub `production` environment. Vercel continues to deploy the frontend from `main` independently. See [production deployment](DEPLOYMENT_HEROKU.md) for setup.
+`.github/workflows/deploy.yml` deploys the combined app from `main` to `metmma-pharmacy-prod-api`. `.github/workflows/deploy-staging.yml` deploys the combined app from `staging` to `metmma-pharmacy-staging`. Each workflow uses its matching GitHub environment and verifies the expected app name before pushing images. Configure production and staging databases separately in the corresponding Heroku app. See [Heroku deployment](DEPLOYMENT_HEROKU.md) for setup.
 
 ## Recovering a bad release
 

@@ -1,0 +1,87 @@
+name: Deploy staging to Heroku
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-heroku-staging
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify application
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Check and test backend
+        run: |
+          npm ci --prefix backend
+          npm run check --prefix backend
+          npm test --prefix backend
+      - name: Check, test, and build frontend
+        run: |
+          npm ci --prefix frontend
+          npm run check --prefix frontend
+          npm test --prefix frontend
+          npm run build --prefix frontend
+
+  deploy:
+    name: Deploy staging app
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    env:
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_API_APP: ${{ vars.HEROKU_API_APP }}
+      EXPECTED_HEROKU_APP: metmma-pharmacy-staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment target and credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$HEROKU_API_KEY" ]] || { echo "::error::Set HEROKU_API_KEY in the staging environment."; exit 1; }
+          [[ "$HEROKU_API_APP" == "$EXPECTED_HEROKU_APP" ]] || { echo "::error::staging HEROKU_API_APP must be $EXPECTED_HEROKU_APP."; exit 1; }
+      - name: Install Heroku CLI
+        run: curl -fsSL https://cli-assets.heroku.com/install.sh | sh
+      - name: Authenticate with Heroku
+        run: heroku auth:whoami
+      - name: Ensure app uses the container stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack_output="$(heroku stack --app "$HEROKU_API_APP")"
+          current_stack="$(printf '%s\n' "$stack_output" | sed -n 's/^[[:space:]]*\*[[:space:]]*//p' | head -n 1)"
+          [[ -n "$current_stack" ]] || { echo "::error::Could not determine the Heroku stack."; exit 1; }
+          [[ "$current_stack" == container ]] || heroku stack:set container --app "$HEROKU_API_APP"
+      - name: Sign in to Heroku Container Registry
+        run: printf '%s' "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+      - name: Build combined web and migration images
+        run: |
+          docker build -f backend/Dockerfile --build-arg VITE_API_BASE_URL=/api -t "registry.heroku.com/$HEROKU_API_APP/web" .
+          docker build -f backend/Dockerfile.release -t "registry.heroku.com/$HEROKU_API_APP/release" .
+      - name: Push and release app processes
+        run: |
+          docker push "registry.heroku.com/$HEROKU_API_APP/web"
+          docker push "registry.heroku.com/$HEROKU_API_APP/release"
+          heroku container:release web release --app "$HEROKU_API_APP"
+      - name: Check deployed API health
+        shell: bash
+        run: |
+          set -euo pipefail
+          web_url="$(heroku apps:info --app "$HEROKU_API_APP" | sed -n 's/^[[:space:]]*Web URL:[[:space:]]*//p' | head -n 1)"
+          [[ -n "$web_url" ]] || { echo "::error::Could not determine the Heroku web URL."; exit 1; }
+          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-connrefused "${web_url%/}/api/health"

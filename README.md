@@ -11,7 +11,7 @@ The frontend lives in `frontend/`; the API and database tools live in `backend/`
 ## Documentation
 
 - [Local development setup](docs/DEVELOPMENT_SETUP.md)
-- [Production deployment: Heroku API and Vercel frontend](docs/DEPLOYMENT_HEROKU.md)
+- [Heroku production and staging deployment](docs/DEPLOYMENT_HEROKU.md)
 - [Branching and release policy](docs/BRANCHING_WORKFLOW.md)
 
 ## Checks
