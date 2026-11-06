@@ -97,12 +97,4 @@ jobs:
           heroku container:release web release --app "$HEROKU_API_APP"
 
       - name: Check API health
-        shell: bash
-        run: |
-          set -euo pipefail
-          web_url="$(heroku apps:info --json --app "$HEROKU_API_APP" | jq -r '.web_url // empty')"
-          if [[ -z "$web_url" ]]; then
-            echo "::error::Could not determine the Heroku web URL for $HEROKU_API_APP."
-            exit 1
-          fi
-          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-connrefused "${web_url%/}/api/health"
+        run: curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-connrefused https://metmma-pharmacy-prod-api-c80404fe54ae.herokuapp.com/api/health
