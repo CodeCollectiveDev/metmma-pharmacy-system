@@ -13,7 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Tags,
+  Settings,
   X
 } from 'lucide-vue-next'
 
@@ -40,7 +40,6 @@ const allMenuItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, group: 'Daily work', show: computed(() => userRole.value !== 'cashier') },
   { path: '/pos', label: 'Sell items', icon: ShoppingCart, group: 'Daily work', show: canAccessPos },
   { path: '/inventory', label: 'Inventory', icon: Package, group: 'Daily work', show: canAccessInventory },
-  { path: '/categories', label: 'Product categories', icon: Tags, group: 'Daily work', show: computed(() => userRole.value === 'admin') },
   { path: '/attendance', label: 'Attendance', icon: CalendarDays, group: 'Daily work', show: canAccessHr },
   { path: '/sales', label: 'Receipts', icon: FileText, group: 'Business', show: computed(() => true) },
   { path: '/finances', label: 'Income & expenses', icon: Wallet, group: 'Business', show: canAccessReports },
@@ -48,7 +47,7 @@ const allMenuItems = [
   { path: '/hr', label: 'Staff records', icon: Users, group: 'Team', show: canAccessHr },
   { path: '/leave', label: 'Leave', icon: FileText, group: 'Team', show: canAccessHr },
   { path: '/accounts', label: 'Sign-in accounts', icon: Users, group: 'Team', show: computed(() => userRole.value === 'admin') },
-  { path: '/pharmacy-profile', label: 'Pharmacy profile', icon: FileText, group: 'Team', show: computed(() => userRole.value === 'admin') },
+  { path: '/settings', label: 'Settings', icon: Settings, group: 'System', show: computed(() => userRole.value === 'admin') },
 ]
 
 const menuItems = computed(() => {

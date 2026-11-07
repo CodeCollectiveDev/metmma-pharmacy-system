@@ -1,7 +1,5 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import MainLayout from '@/layouts/MainLayout.vue'
-import SectionNav from '@/components/SectionNav.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import { cachedPharmacyProfile, fetchPharmacyProfile, savePharmacyProfile } from '@/composables/usePharmacyProfile'
 import defaultLogo from '@/assets/metmma_pharmacy_logo.svg'
@@ -85,9 +83,9 @@ async function save() {
 
 onMounted(load)
 </script>
+
 <template>
-  <MainLayout title="Pharmacy profile" subtitle="Receipt details and logo">
-    <SectionNav section="team" />
+  <div>
     <ErrorNotice :error="error" :retry="load" />
     <p v-if="notice" role="status" class="success-notice mb-4">{{ notice }}</p>
     <p v-if="loading" role="status">Loading pharmacy profile…</p>
@@ -106,5 +104,5 @@ onMounted(load)
       <p v-if="formHint" role="alert" class="text-sm text-red-700">{{ formHint }}</p>
       <button class="primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save profile' }}</button>
     </form>
-  </MainLayout>
+  </div>
 </template>

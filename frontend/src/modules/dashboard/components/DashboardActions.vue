@@ -18,6 +18,7 @@
       <button
         v-if="role === 'admin'"
         class="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-5 py-2.5 rounded-lg transition-colors font-medium"
+        @click="$router.push('/settings')"
       >
         <span class="text-lg">⚙️</span> Admin Settings
       </button>
