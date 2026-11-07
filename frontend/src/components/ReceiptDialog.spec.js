@@ -13,3 +13,14 @@ it('prepares a standalone printable receipt and opens the browser print dialog',
  await w.findAll('button').find(b=>b.text()==='Print receipt').trigger('click');await flushPromises();expect(print).toHaveBeenCalledOnce()
  await w.setProps({open:false});expect(document.querySelector('.receipt-print')).toBeNull();w.unmount();print.mockRestore()
 })
+
+it('names the printed or saved PDF after the receipt and restores the page title',async()=>{
+ const print=vi.spyOn(window,'print').mockImplementation(()=>{})
+ document.title='METMMA Pharmacy Management System'
+ const w=mount(ReceiptDialog,{props:{sale:{...sale,id:123},open:true},global:{stubs:{AppDialog:{template:'<section><slot/></section>'}}}})
+ await w.findAll('button').find(b=>b.text()==='Print receipt').trigger('click');await flushPromises()
+ expect(document.title).toBe('R-000123')
+ window.dispatchEvent(new Event('afterprint'))
+ expect(document.title).toBe('METMMA Pharmacy Management System')
+ w.unmount();print.mockRestore();document.title=''
+})
