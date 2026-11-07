@@ -24,8 +24,9 @@ const ROLE_HIERARCHY = {
 
 const routes = [
   { path: '/accounts', component: () => import('@/modules/admin/views/AccountsView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Accounts' } },
-  { path: '/categories', component: () => import('@/modules/admin/views/CategoriesView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Product categories' } },
-  { path: '/pharmacy-profile', component: () => import('@/modules/admin/views/PharmacyProfileView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Pharmacy profile' } },
+  { path: '/settings', component: () => import('@/modules/admin/views/SettingsView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Settings' } },
+  { path: '/categories', redirect: { path: '/settings', query: { tab: 'categories' } }, meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Product categories' } },
+  { path: '/pharmacy-profile', redirect: { path: '/settings', query: { tab: 'profile' } }, meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Pharmacy profile' } },
   { path: '/leave', component: () => import('@/modules/hr/views/LeaveView.vue'), meta: { requiresAuth: true, roles: [ROLES.ADMIN, ROLES.HR_OFFICER], label: 'Leave' } },
   { path: '/login', component: Login, meta: { requiresAuth: false } },
   { path: '/register', redirect: '/accounts', meta: { requiresAuth: true, roles: [ROLES.ADMIN], label: 'Create staff account' } },

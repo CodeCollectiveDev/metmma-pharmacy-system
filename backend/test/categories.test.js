@@ -14,13 +14,13 @@ const response = () => {
   return res;
 };
 
-test('active categories are listed in configured order', async () => {
+test('active categories are listed alphabetically', async () => {
   calls = [];
   handler = async () => ({ rows: [{ id: 1, name: 'Vitamins', sortOrder: 30, isActive: true }], rowCount: 1 });
   const res = response();
   await categories.getCategories({ validatedQuery: { all: false }, user: { role: 'cashier' } }, res);
   assert.match(calls[0].sql, /WHERE is_active=TRUE/);
-  assert.match(calls[0].sql, /ORDER BY sort_order ASC,name ASC,id ASC/);
+  assert.match(calls[0].sql, /ORDER BY name ASC,id ASC/);
   assert.deepEqual(res._body.data, [{ id: 1, name: 'Vitamins', sortOrder: 30, isActive: true }]);
 });
 

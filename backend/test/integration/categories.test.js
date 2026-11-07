@@ -45,10 +45,10 @@ after(async()=>{
  await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
  await admin.end();
 });
-test('every signed-in role reads active categories in configured order',async()=>{
+test('every signed-in role reads active categories alphabetically',async()=>{
  const response=await request('/categories',{role:'cashier'});
  assert.equal(response.status,200,JSON.stringify(response.data));
- assert.deepEqual(response.data.data.map(category=>category.name),['Antibiotics','Painkillers','Vitamins','Cough & Cold','First Aid','Diagnostics','Other']);
+ assert.deepEqual(response.data.data.map(category=>category.name),['Antibiotics','Cough & Cold','Diagnostics','First Aid','Other','Painkillers','Vitamins']);
  assert.ok(response.data.data.every(category=>category.isActive===true));
 });
 test('category writes are restricted to administrators',async()=>{
@@ -57,15 +57,15 @@ test('category writes are restricted to administrators',async()=>{
   assert.equal((await request('/categories/1',{method:'PATCH',role,body:{name:'Not allowed'}})).status,403);
  }
 });
-test('admin can add, rename, reorder and deactivate a category without deleting it',async()=>{
- const created=await request('/categories',{method:'POST',body:{name:'Seasonal',sortOrder:5}});
+test('admin can add, rename and deactivate a category without deleting it',async()=>{
+ const created=await request('/categories',{method:'POST',body:{name:'Seasonal'}});
  assert.equal(created.status,201,JSON.stringify(created.data));
  const id=created.data.data.id;
- assert.equal((await request('/categories')).data.data[0].name,'Seasonal');
- const renamed=await request(`/categories/${id}`,{method:'PATCH',body:{name:'Seasonal remedies',sortOrder:90}});
+ assert.ok((await request('/categories')).data.data.some(category=>category.id===id&&category.name==='Seasonal'));
+ const renamed=await request(`/categories/${id}`,{method:'PATCH',body:{name:'Seasonal remedies'}});
  assert.equal(renamed.status,200);
  assert.equal(renamed.data.data.name,'Seasonal remedies');
- assert.equal((await request('/categories')).data.data.at(-1).name,'Seasonal remedies');
+ assert.ok((await request('/categories')).data.data.some(category=>category.id===id&&category.name==='Seasonal remedies'));
  const deactivated=await request(`/categories/${id}`,{method:'PATCH',body:{isActive:false}});
  assert.equal(deactivated.status,200);
  assert.equal(deactivated.data.data.isActive,false);

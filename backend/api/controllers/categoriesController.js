@@ -5,7 +5,7 @@ const formatCategory=category=>({id:category.id,name:category.name,sortOrder:cat
 async function getCategories(req,res){
  const all=req.validatedQuery.all;
  if(all&&req.user.role!=='admin')throw new AppError('PERMISSION_DENIED',403);
- const result=await db.query(`SELECT ${columns} FROM categories ${all?'':'WHERE is_active=TRUE'} ORDER BY sort_order ASC,name ASC,id ASC`);
+ const result=await db.query(`SELECT ${columns} FROM categories ${all?'':'WHERE is_active=TRUE'} ORDER BY name ASC,id ASC`);
  res.json({success:true,data:result.rows.map(formatCategory)});
 }
 async function createCategory(req,res){
