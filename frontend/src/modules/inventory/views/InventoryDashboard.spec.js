@@ -99,6 +99,55 @@ it('shows the batch number in upper case as it is typed on the add form', async 
   wrapper.unmount()
 })
 
+it('sends the purchase price and supplier invoice when adding a product', async () => {
+  dataService.addProduct.mockResolvedValue({ data: { data: { ...product, id: 9 } } })
+  const wrapper = mountView()
+  await flushPromises()
+  await wrapper.findAll('button').find(button => button.text() === 'Add product').trigger('click')
+  await flushPromises()
+
+  await wrapper.get('input[name="name"]').setValue('Amoxicillin 500 mg')
+  await wrapper.get('input[name="batchNumber"]').setValue('amox-01')
+  await wrapper.get('input[name="expiryDate"]').setValue('2030-01-01')
+  await wrapper.get('input[name="sellingPrice"]').setValue('30')
+  await wrapper.get('input[name="quantity"]').setValue('6')
+  await wrapper.get('input[name="costPrice"]').setValue('12.50')
+  await wrapper.get('input[name="supplierInvoice"]').setValue('INV-77')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+
+  expect(dataService.addProduct).toHaveBeenCalledWith(expect.objectContaining({
+    name: 'Amoxicillin 500 mg',
+    batchNumber: 'AMOX-01',
+    quantity: 6,
+    sellingPrice: 30,
+    unitPrice: 30,
+    costPrice: '12.5',
+    supplierInvoice: 'INV-77'
+  }))
+  wrapper.unmount()
+})
+
+it('omits empty purchase details when adding a product', async () => {
+  dataService.addProduct.mockResolvedValue({ data: { data: { ...product, id: 9 } } })
+  const wrapper = mountView()
+  await flushPromises()
+  await wrapper.findAll('button').find(button => button.text() === 'Add product').trigger('click')
+  await flushPromises()
+
+  await wrapper.get('input[name="name"]').setValue('Amoxicillin 500 mg')
+  await wrapper.get('input[name="batchNumber"]').setValue('amox-01')
+  await wrapper.get('input[name="expiryDate"]').setValue('2030-01-01')
+  await wrapper.get('input[name="sellingPrice"]').setValue('30')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+
+  const payload = dataService.addProduct.mock.calls[0][0]
+  expect(payload).not.toHaveProperty('costPrice')
+  expect(payload).not.toHaveProperty('supplierInvoice')
+  wrapper.unmount()
+})
+
 it('sends the purchase price and supplier invoice when adding stock', async () => {
   dataService.restockProduct.mockResolvedValue({ data: { data: product } })
   const wrapper = mountView()

@@ -54,6 +54,7 @@ test('product validation accepts lowercase codes and localized expiry dates', ()
     unitPrice: 50,
     sellingPrice: 1000,
     costPrice: 40,
+    supplierInvoice: ' INV-100 ',
     supplier: 'Mylan',
     category: 'Painkillers',
     reorderLevel: 10,
@@ -64,6 +65,15 @@ test('product validation accepts lowercase codes and localized expiry dates', ()
   assert.equal(result.error, undefined);
   assert.equal(result.value.productCode, 'LOFNAC');
   assert.equal(result.value.expiryDate, '2028-11-30');
+  assert.equal(result.value.supplierInvoice, 'INV-100');
+});
+
+test('new product purchase price must be positive when provided', () => {
+  const { createProductSchema } = require('../api/validators/productValidator');
+  const base = { name: 'Test product', batchNumber: 'B-1', expiryDate: '2030-01-01', unitPrice: 1, sellingPrice: 2 };
+
+  assert.ok(createProductSchema.validate({ ...base, costPrice: 0 }).error);
+  assert.equal(createProductSchema.validate({ ...base, costPrice: '2.50' }).error, undefined);
 });
 
 test('product pages hide the purchase price from cashier and hr roles', async () => {

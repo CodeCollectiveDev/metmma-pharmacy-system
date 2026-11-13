@@ -180,6 +180,16 @@ test('a delivery with a purchase price updates cost price and writes one stock p
  const retry=await request(`/products/${p.id}/restock`,{method:'POST',body,role:'store_manager'});assert.equal(retry.status,200);assert.equal((await pool.query('SELECT quantity FROM products WHERE id=$1',[p.id])).rows[0].quantity,14);assert.equal(await count('stock_movements','WHERE product_id=$1',[p.id]),1);assert.equal(await count('financial_transactions',"WHERE type='expense' AND category='Stock purchase' AND note LIKE '%INV-2048%'"),1);
 });
 
+test('creating a product with initial stock and a purchase price writes one stock purchase expense',async()=>{
+ const tag=randomUUID().slice(0,8),invoice=`INV-INITIAL-${tag}`;
+ const created=await request('/products',{method:'POST',role:'pharmacist',body:{name:`New product ${tag}`,batchNumber:`B-${tag}`,expiryDate:'2030-01-01',quantity:6,unitPrice:'20.00',sellingPrice:'30.00',costPrice:'12.50',supplierInvoice:invoice,supplier:'Acme',category:'Other',reorderLevel:2}});
+ assert.equal(created.status,201,JSON.stringify(created.data));const product=created.data.data;
+ assert.equal(product.quantity,6);assert.equal(product.costPrice,'12.50');assert.equal(product.lastInvoiceReference,invoice);
+ assert.equal(await count('stock_movements','WHERE product_id=$1',[product.id]),1);
+ const expenses=(await pool.query("SELECT * FROM financial_transactions WHERE type='expense' AND category='Stock purchase' AND note LIKE $1",[`%${invoice}%`])).rows;
+ assert.equal(expenses.length,1);assert.equal(expenses[0].amount,'-75.00');assert.equal(expenses[0].supplier,'Acme');assert.match(expenses[0].note,/Initial stock/);
+});
+
 test('purchase price is hidden from cashier and hr but remains available to inventory roles',async()=>{
  const p=await product(10);await pool.query("UPDATE products SET cost_price=8.00,last_invoice_reference='INV-1' WHERE id=$1",[p.id]);
  for(const role of ['cashier','hr_officer'])assert.equal((await request(`/products/${p.id}`,{role})).data.data.costPrice,undefined);
