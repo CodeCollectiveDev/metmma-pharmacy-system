@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS last_invoice_reference VARCHAR(100);
+COMMIT;

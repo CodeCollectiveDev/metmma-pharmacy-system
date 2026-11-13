@@ -36,6 +36,7 @@ before(async () => {
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261004_categories.sql'),'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261005_batch_numbers.sql'),'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261023_pharmacy_profile.sql'),'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261113_stock_purchase_invoice.sql'),'utf8'));
   await pool.query(`INSERT INTO users (username, password_hash, role, full_name, email) VALUES
     ('test-admin', 'test-hash', 'admin', 'Test Admin', 'test-admin@example.com'),
     ('test-pharmacist', 'test-hash', 'pharmacist', 'Test Pharmacist', 'test-pharmacist@example.com'),

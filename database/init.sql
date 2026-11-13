@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS products (
     unit_price DECIMAL(10, 2) NOT NULL CHECK (unit_price >= 0),
     selling_price DECIMAL(10, 2) NOT NULL CHECK (selling_price >= 0),
     cost_price DECIMAL(10, 2),
+    last_invoice_reference VARCHAR(100),
     supplier VARCHAR(200),
     category VARCHAR(100),
     reorder_level INTEGER DEFAULT 10,
