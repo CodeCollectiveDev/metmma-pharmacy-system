@@ -36,6 +36,7 @@ before(async () => {
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261004_categories.sql'),'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261005_batch_numbers.sql'),'utf8'));
   await pool.query(readFileSync(require.resolve('../../../database/migrations/20261023_pharmacy_profile.sql'),'utf8'));
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261113_customer_contact.sql'),'utf8'));
   await pool.query(`INSERT INTO users (username, password_hash, role, full_name, email) VALUES
     ('test-admin', 'test-hash', 'admin', 'Test Admin', 'test-admin@example.com'),
     ('test-pharmacist', 'test-hash', 'pharmacist', 'Test Pharmacist', 'test-pharmacist@example.com'),
@@ -87,17 +88,19 @@ test('all catalogue pages, filters, metadata and low-stock products remain reach
 test('frontend checkout payload persists sale fields, lines and a single stock decrement', async () => {
   const { toSalePayload } = await import('../../../frontend/src/services/api/salePayload.js');
   const payload = toSalePayload({
-    idempotencyKey:randomUUID(),totalAmount: 23.3, paymentMethod: 'card', customerName: 'Customer', userId: 1,
+    idempotencyKey:randomUUID(),totalAmount: 23.3, paymentMethod: 'card', customerName: 'Customer', customerContact: 'customer@example.com', userId: 1,
     items: [{ productId: 103, name: 'Product 103', quantity: 2, unitPrice: 10, subtotal: 20 }]
   });
   const response = await request('/sales/checkout', { method: 'POST', body: payload, role: 'cashier' });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   assert.equal(response.data.data.totalAmount, '23.30');
   assert.equal(response.data.data.receiptNumber, response.data.receiptNumber);
+  assert.equal(response.data.data.customerContact, 'customer@example.com');
   const sale = (await pool.query('SELECT * FROM sales WHERE id = $1', [response.data.saleId])).rows[0];
   assert.equal(sale.total_amount, '23.30');
   assert.equal(sale.payment_method, 'card');
   assert.equal(sale.customer_name, 'Customer');
+  assert.equal(sale.customer_contact, 'customer@example.com');
   assert.equal(sale.user_id, 3);
   const line = (await pool.query('SELECT * FROM sale_items WHERE sale_id = $1', [sale.id])).rows[0];
   assert.equal(line.subtotal, '20.00');
@@ -106,6 +109,7 @@ test('frontend checkout payload persists sale fields, lines and a single stock d
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 103')).rowCount, 1);
   const history = await request('/sales/history');
   assert.equal(history.data.data[0].items[0].productId, 103);
+  assert.equal(history.data.data[0].customerContact, 'customer@example.com');
 
   const retry = await request('/sales/checkout', { method: 'POST', body: {
     ...payload,idempotencyKey:randomUUID(),
@@ -116,6 +120,19 @@ test('frontend checkout payload persists sale fields, lines and a single stock d
   assert.equal((await pool.query('SELECT * FROM sales')).rowCount, 1, 'failed checkout rolled back');
   assert.equal((await pool.query('SELECT quantity FROM products WHERE id = 1')).rows[0].quantity, 100);
   assert.equal((await pool.query('SELECT * FROM stock_movements WHERE product_id = 1')).rowCount, 0);
+});
+
+test('customer contact details are saved and returned only when provided', async () => {
+  const payload = { idempotencyKey: randomUUID(), totalAmount: 10, paymentMethod: 'cash', customerName: 'Contact Customer', customerContact: '+265 999 123 456', items: [{ productId: 50, quantity: 1, unitPrice: 10, subtotal: 10 }] };
+  const response = await request('/sales/checkout', { method: 'POST', body: payload, role: 'cashier' });
+  assert.equal(response.status, 201, JSON.stringify(response.data));
+  assert.equal(response.data.data.customerContact, '+265 999 123 456');
+  const saved = (await pool.query('SELECT customer_contact FROM sales WHERE id = $1', [response.data.saleId])).rows[0];
+  assert.equal(saved.customer_contact, '+265 999 123 456');
+
+  const without = await request('/sales/checkout', { method: 'POST', body: { ...payload, idempotencyKey: randomUUID(), customerContact: undefined, items: [{ productId: 51, quantity: 1, unitPrice: 10, subtotal: 10 }] }, role: 'cashier' });
+  assert.equal(without.status, 201, JSON.stringify(without.data));
+  assert.equal(without.data.data.customerContact, null);
 });
 
 test('invalid checkout and unauthorized writes are rejected without inserting records', async () => {

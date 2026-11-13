@@ -13,7 +13,7 @@ import { useCategoryStore } from '@/modules/shared/store/categoryStore'
 import { confirmAction } from '@/composables/useFeedback'
 import { currency, minor, decimal } from '@/services/api/money'
 const store = usePosStore(), categoryStore = useCategoryStore()
-const barcode = computed({get: () => store.searchQuery, set: value => { store.searchQuery = value }}), scanner = ref(null), payment = ref('cash'), customer = ref(''), receipt = ref(null), showReceipt = ref(false), configured = ref(false)
+const barcode = computed({get: () => store.searchQuery, set: value => { store.searchQuery = value }}), scanner = ref(null), payment = ref('cash'), customer = ref(''), contact = ref(''), receipt = ref(null), showReceipt = ref(false), configured = ref(false)
 const cameraOpen = ref(false), amountReceived = ref(''), scanBusy = ref(false), notice = ref('')
 const itemCount = computed(() => store.cart.reduce((sum, item) => sum + item.quantity, 0))
 const receivedMinor = computed(() => { try { return amountReceived.value === '' ? null : minor(amountReceived.value) } catch { return null } })
@@ -27,7 +27,7 @@ function selectCategory(category) {
 async function initialize() {
   configured.value = false
   await Promise.allSettled([store.fetchProducts(), categoryStore.fetchCategories(), store.configure().then(() => { configured.value = true })])
-  if (store.pending) { payment.value = store.pending.paymentMethod; customer.value = store.pending.customerName || ''; amountReceived.value = store.pending.amountReceived ?? store.pending.totalAmount }
+  if (store.pending) { payment.value = store.pending.paymentMethod; customer.value = store.pending.customerName || ''; contact.value = store.pending.customerContact || ''; amountReceived.value = store.pending.amountReceived ?? store.pending.totalAmount }
 }
 async function cameraScan(code) { cameraOpen.value = false; barcode.value = code; await scan() }
 watch(() => store.locked, locked => { if (locked) cameraOpen.value = false })
@@ -48,7 +48,7 @@ async function scan() {
 function addProduct(product) { if (store.addToCart(product)) { notice.value = `${product.name} added to the cart.`; scanner.value?.focus() } }
 function removeItem(item) { store.removeFromCart(item._id); notice.value = `${item.name} removed from the cart.` }
 
-async function pay() { if (!store.pending && !paymentValid.value) return; try { const result = await store.checkout(payment.value, customer.value, amountReceived.value); if (result) { receipt.value = result.transaction; showReceipt.value = true; notice.value = 'Sale saved. Your receipt is ready.'; customer.value = ''; amountReceived.value = '' } } catch {} }
+async function pay() { if (!store.pending && !paymentValid.value) return; try { const result = await store.checkout(payment.value, customer.value, amountReceived.value, contact.value); if (result) { receipt.value = result.transaction; showReceipt.value = true; notice.value = 'Sale saved. Your receipt is ready.'; customer.value = ''; contact.value = ''; amountReceived.value = '' } } catch {} }
 async function clear() { if (await confirmAction('Clear this cart?', 'All items in this cart will be removed. No sale will be saved.', 'Clear cart')) store.clearCart() }
 function unavailableMessage(item) {
   const reason=item.unavailableReason || (item.expired?'expired':item.isActive===false?'inactive':null)
@@ -92,7 +92,7 @@ async function retryLoad() { await initialize() }
         <div class="border-t pt-3 space-y-2 mt-auto">
           <p class="flex justify-between"><span>Subtotal</span><span>{{ currency(store.cartTotal) }}</span></p>
           <p class="flex justify-between text-2xl font-bold bg-blue-50 rounded-lg px-3 py-4 text-blue-950"><span>Total</span><span>{{ currency(store.totalAmount) }}</span></p>
-          <details class="py-1"><summary class="text-sm cursor-pointer text-slate-600">Add customer name (optional)</summary><label class="block mt-2"><span class="sr-only">Customer name</span><input v-model="customer" maxlength="100" class="field" :disabled="store.locked" placeholder="Walk-in customer"/></label></details>
+          <details class="py-1"><summary class="text-sm cursor-pointer text-slate-600">Add customer details (optional)</summary><label class="block mt-2">Customer name<input v-model="customer" maxlength="100" class="field mt-1" :disabled="store.locked" placeholder="Walk-in customer"/></label><label class="block mt-2">Contact details<input v-model="contact" maxlength="200" class="field mt-1" :disabled="store.locked" placeholder="Phone or email for the receipt"/></label><p class="text-xs text-slate-500 mt-1">Only shown on the receipt when the customer provides it.</p></details>
           <label class="block">How did the customer pay?<select v-model="payment" class="field mt-1" :disabled="store.locked"><option value="cash">Cash</option><option value="card">Card</option><option value="mobile_money">Mobile money</option><option value="bank_transfer">Bank transfer</option></select></label>
           <label class="block">{{ payment === 'cash' ? 'Cash received (MWK)' : 'Amount received (MWK)' }}<input v-model="amountReceived" aria-label="Amount received" type="number" min="0" max="9999999999.99" step="0.01" inputmode="decimal" class="field mt-1" :disabled="store.locked" /></label>
           <button class="secondary" :disabled="store.locked || !store.cart.length" @click="amountReceived = decimal(dueMinor)">Exact amount</button>

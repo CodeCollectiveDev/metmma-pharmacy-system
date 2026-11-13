@@ -13,6 +13,13 @@ describe('SaleReceipt', () => {
     expect(text).toContain('Plot 42, Lilongwe')
   })
 
+  it('renders customer contact details only when the customer provided them', () => {
+    const withContact = mount(SaleReceipt, { props: { sale: { ...sale, customerContact: 'customer@example.com' } } })
+    expect(withContact.text()).toContain('Contact: customer@example.com')
+    const withoutContact = mount(SaleReceipt, { props: { sale } })
+    expect(withoutContact.text()).not.toContain('Contact:')
+  })
+
   it('omits optional contact lines that are empty', () => {
     const text = mount(SaleReceipt, { props: { sale, profile: { pharmacyName: 'Main Branch', phone: '', email: null, address: '' } } }).text()
     expect(text).not.toContain('Phone:')
