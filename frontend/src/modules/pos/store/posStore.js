@@ -77,7 +77,7 @@ export const usePosStore = defineStore('pos', () => {
     } catch (err) { error.value = err }
     return false
   }
-  async function checkout(paymentMethod, customerName = '', amountReceived) {
+  async function checkout(paymentMethod, customerName = '', amountReceived, customerContact = '') {
     if (processing.value || !cart.value.length) return
     processing.value = true; error.value = null
     try {
@@ -89,7 +89,7 @@ export const usePosStore = defineStore('pos', () => {
           const received = minor(amountReceived), total = subtotalMinor.value
           if (received < total || (paymentMethod !== 'cash' && received !== total)) throw localError('PAYMENT_AMOUNT')
         }
-        pending.value = { idempotencyKey: crypto.randomUUID(), items, totalAmount: decimal(subtotalMinor.value), paymentMethod, customerName, ...(amountReceived !== undefined ? { amountReceived: decimal(minor(amountReceived)) } : {}) }
+        pending.value = { idempotencyKey: crypto.randomUUID(), items, totalAmount: decimal(subtotalMinor.value), paymentMethod, customerName, customerContact, ...(amountReceived !== undefined ? { amountReceived: decimal(minor(amountReceived)) } : {}) }
       }
       // A retry reference must survive a reload before any sale can reach the server.
       try { localStorage.setItem(storageKey(), JSON.stringify({ cart: cart.value, pending: pending.value })) }

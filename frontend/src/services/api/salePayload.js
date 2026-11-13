@@ -5,5 +5,6 @@ export const toSalePayload = sale => ({
   ...(sale.amountReceived !== undefined ? { amountReceived: sale.amountReceived } : {}),
   paymentMethod: sale.paymentMethod,
   customerName: sale.customerName,
+  customerContact: sale.customerContact,
   userId: sale.userId
 })
