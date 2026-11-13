@@ -43,13 +43,22 @@ async function getProductById(req,res){const row=(await db.query(`SELECT ${colum
 async function getSummary(req,res){res.json((await db.query(`SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE quantity<=reorder_level)::int AS low,COUNT(*) FILTER(WHERE expiry_date<CURRENT_DATE)::int AS expired FROM products WHERE is_active=TRUE`)).rows[0]);}
 async function createProduct(req,res){
  const d=req.body;
+ const hasCost=d.costPrice!==undefined&&d.costPrice!==null;
+ const unitCost=hasCost?decimal(minor(d.costPrice)):null;
+ const supplierInvoice=String(d.supplierInvoice??'').trim()||null;
+ const amountCents=hasCost?minor(unitCost)*BigInt(d.quantity):null;
+ if(amountCents!==null&&amountCents>99999999999999n)throw new AppError('VALIDATION',400,['costPrice']);
  const row=await db.transaction(async client=>{
   await requireCurrentOrFutureExpiry(client,d.expiryDate);
   await requireActiveCategory(client,d.category);
   const duplicateBatch=await findDuplicateBatch(client,d.name,d.batchNumber);
-  const result=await client.query(`INSERT INTO products(product_code,name,generic_name,batch_number,expiry_date,quantity,unit_price,selling_price,cost_price,supplier,category,reorder_level,location,barcode) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING ${columns}`,[d.productCode,d.name,d.genericName,d.batchNumber,d.expiryDate,d.quantity,d.unitPrice,d.sellingPrice,d.costPrice,d.supplier,d.category,d.reorderLevel,d.location,d.barcode]);
+  const result=await client.query(`INSERT INTO products(product_code,name,generic_name,batch_number,expiry_date,quantity,unit_price,selling_price,cost_price,last_invoice_reference,supplier,category,reorder_level,location,barcode) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING ${columns}`,[d.productCode,d.name,d.genericName,d.batchNumber,d.expiryDate,d.quantity,d.unitPrice,d.sellingPrice,d.costPrice,supplierInvoice,d.supplier,d.category,d.reorderLevel,d.location,d.barcode]);
   const product=result.rows[0];
   if(d.quantity)await client.query(`INSERT INTO stock_movements(product_id,user_id,movement_type,quantity_change,previous_quantity,new_quantity,notes) VALUES($1,$2,'purchase',$3,0,$3,'Initial stock')`,[product.id,req.user.id,d.quantity]);
+  if(amountCents!==null&&amountCents>0n){
+   const note=[supplierInvoice?`Invoice ${supplierInvoice}`:null,'Initial stock'].filter(Boolean).join(' · ').slice(0,500);
+   await client.query(`INSERT INTO financial_transactions(type,amount,payment_method,transaction_date,category,note,supplier,created_by) VALUES('expense',-$1::numeric,'cash',CURRENT_TIMESTAMP,'Stock purchase',$2,$3,$4)`,[decimal(amountCents),note,d.supplier||null,req.user.id]);
+  }
   return {product,duplicateBatch};
  });
  res.status(201).json({success:true,data:formatProduct(row.product,req.user.role),...(row.duplicateBatch?{duplicateBatch:row.duplicateBatch}:{})});

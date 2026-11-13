@@ -18,7 +18,7 @@ import { confirmAction } from '@/composables/useFeedback'
 const store = useInventoryStore(), categoryStore = useCategoryStore(), route = useRoute()
 const role = localStorage.getItem('role'), canAdd = ['admin', 'pharmacist'].includes(role), canEdit = ['admin', 'pharmacist', 'store_manager'].includes(role)
 const search = ref(''), status = ref('all'), showForm = ref(false), saving = ref(false), error = ref(null), fields = ref([]), notice = ref(''), restock = ref(null), quantity = ref(1), note = ref(''), purchasePrice = ref(''), supplierInvoice = ref('')
-const blank = () => ({ name: '', batchNumber: '', expiryDate: '', quantity: 0, sellingPrice: '', supplier: '', category: '', reorderLevel: 10, barcode: '' })
+const blank = () => ({ name: '', batchNumber: '', expiryDate: '', quantity: 0, sellingPrice: '', costPrice: '', supplierInvoice: '', supplier: '', category: '', reorderLevel: 10, barcode: '' })
 const form = ref(blank())
 const today = periodDates('today').start
 const categoriesReady = computed(() => categoryStore.categories.length > 0)
@@ -31,6 +31,8 @@ watch(() => categoryStore.categories, list => {
 const inputs = [
   {name:'name',label:'Product name',type:'text',required:true,minlength:2,maxlength:200,help:'Include strength and pack size, e.g. Paracetamol 500 mg, 10 tablets.'},
   {name:'sellingPrice',label:'Selling price (MWK)',type:'number',required:true,min:0,max:9999999999.99,step:'0.01',help:'Price for one selling unit.'},
+  {name:'costPrice',label:'Purchase price per unit (MWK, optional)',type:'number',min:0.01,max:9999999999.99,step:'0.01',help:'What the pharmacy paid per selling unit. When units in stock are entered, they become a Stock purchase expense.'},
+  {name:'supplierInvoice',label:'Supplier invoice / reference number (optional)',type:'text',maxlength:100,help:'Printed on the supplier invoice. Kept with this batch for reference.'},
   {name:'batchNumber',label:'Batch / lot number',type:'text',required:true,minlength:2,maxlength:100,help:'Printed next to LOT or BATCH. This identifies the production lot, not the barcode.'},
   {name:'expiryDate',label:'Expiry date',type:'date',required:true,min:today,help:'Use the date on this batch. Add different batches as separate stock records.'},
   {name:'quantity',label:'Units in stock',type:'number',min:0,max:2147483647,step:1,help:'Count the same selling units used for the price. Starts at 0.'},
@@ -53,8 +55,14 @@ function normalizeExpiryDate(value) {
 function normalizeProductPayload(raw = {}) {
   const payload = { ...raw }
   delete payload.productCode
+  delete payload.costPrice
+  delete payload.supplierInvoice
+  const costPrice = String(raw.costPrice ?? '').trim()
+  const supplierInvoice = String(raw.supplierInvoice ?? '').trim()
   return {
     ...payload,
+    ...(costPrice ? { costPrice } : {}),
+    ...(supplierInvoice ? { supplierInvoice } : {}),
     expiryDate: normalizeExpiryDate(raw.expiryDate),
     name: String(raw.name ?? '').trim(),
     batchNumber: String(raw.batchNumber ?? '').trim().toUpperCase(),
