@@ -16,6 +16,9 @@ const store = usePosStore(), categoryStore = useCategoryStore()
 const barcode = computed({get: () => store.searchQuery, set: value => { store.searchQuery = value }}), scanner = ref(null), payment = ref('cash'), customer = ref(''), contact = ref(''), receipt = ref(null), showReceipt = ref(false), configured = ref(false)
 const cameraOpen = ref(false), amountReceived = ref(''), scanBusy = ref(false), notice = ref('')
 const itemCount = computed(() => store.cart.reduce((sum, item) => sum + item.quantity, 0))
+const cartSection = ref(null)
+const cartButtonLabel = computed(() => store.cart.length ? `Open cart, ${itemCount.value} ${itemCount.value === 1 ? 'item' : 'items'}, total ${currency(store.totalAmount)}` : 'Your cart is empty')
+function openCart() { cartSection.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }
 const receivedMinor = computed(() => { try { return amountReceived.value === '' ? null : minor(amountReceived.value) } catch { return null } })
 const dueMinor = computed(() => store.subtotalMinor)
 const difference = computed(() => receivedMinor.value === null ? null : receivedMinor.value - dueMinor.value)
@@ -63,6 +66,10 @@ async function retryLoad() { await initialize() }
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem] xl:grid-cols-[minmax(0,1fr)_27rem]">
       <section class="panel" aria-label="Products to sell">
         <ErrorNotice :error="store.productError" :retry="store.fetchProducts" />
+        <button type="button" class="lg:hidden mb-4 flex w-full items-center justify-between gap-3 rounded-lg border border-blue-700 bg-blue-50 px-4 py-3 text-left text-blue-950 hover:bg-blue-100 disabled:border-slate-300 disabled:bg-slate-50 disabled:text-slate-500" :disabled="!store.cart.length" :aria-label="cartButtonLabel" @click="openCart">
+          <span class="flex items-center gap-2 font-semibold"><ShoppingBasket class="h-5 w-5" aria-hidden="true" />{{ store.cart.length ? 'View cart' : 'Your cart is empty' }}</span>
+          <span class="text-sm font-medium">{{ store.cart.length ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'} · ${currency(store.totalAmount)}` : 'Add items to begin' }}</span>
+        </button>
         <div class="flex items-center justify-between gap-3 mb-4"><div><h2 class="text-lg font-bold">Find a product</h2><p class="text-sm text-slate-500">Search by name, or enter a barcode and press Enter.</p></div><router-link to="/sales" class="text-sm text-blue-800 underline">Past receipts</router-link></div>
         <form class="flex gap-2 mb-3" @submit.prevent="scan"><label class="relative flex-1"><span class="sr-only">Search products or enter barcode number</span><Search class="absolute left-3 top-3 w-5 h-5 text-slate-400" aria-hidden="true"/><input ref="scanner" id="barcode-input" v-model="barcode" :disabled="store.locked" class="field pl-10" placeholder="Product name or barcode number" maxlength="100" autocomplete="off" /></label><CameraButton :disabled="store.locked || scanBusy" @click="cameraOpen = true"/></form>
         <div class="mb-3">
@@ -85,7 +92,7 @@ async function retryLoad() { await initialize() }
         <div v-if="!store.loading && !store.products.length && !store.productError" class="py-6 text-center"><p>No products match this search.</p><p class="text-gray-600 text-sm my-2">Try a shorter name or ask the stock manager to add available stock.</p><button class="secondary" @click="store.searchQuery = ''; store.fetchProducts()">Show all products</button></div>
         <PaginationControls :pagination="store.pagination" :loading="store.loading" @change="store.fetchProducts" />
       </section>
-      <section class="panel flex flex-col lg:sticky lg:top-4 self-start" aria-label="Current cart">
+      <section ref="cartSection" class="panel flex flex-col lg:sticky lg:top-4 self-start scroll-mt-4" aria-label="Current cart">
         <div class="flex items-start justify-between gap-2 mb-4"><div><h2 class="text-lg font-bold flex items-center gap-2"><ShoppingBasket class="h-5 w-5"/>Current cart</h2><p class="text-sm text-slate-500">{{ itemCount }} units · {{ store.cart.length }} products</p></div><button class="text-sm text-slate-500 underline" :disabled="store.locked || !store.cart.length" @click="clear">Clear cart</button></div>
         <div v-if="!store.cart.length" class="py-5"><p>Your cart is empty.</p><p class="text-gray-600 text-sm mb-2">Search for a product or scan its barcode to begin.</p><button class="secondary" @click="scanner?.focus()">Find your first item</button></div>
         <ul class="space-y-3 mb-4 max-h-72 overflow-auto"><li v-for="item in store.cart" :key="item._id" class="p-3 rounded-lg bg-gray-50"><p class="font-medium flex justify-between gap-2"><span>{{ item.name }}</span><span class="whitespace-nowrap">{{ currency(Number(item.price) * item.quantity) }}</span></p><p v-if="unavailableMessage(item)" role="alert" class="text-sm text-red-800 my-2">{{unavailableMessage(item)}}</p><p class="text-sm mb-2">{{ currency(item.price) }} each</p><div class="flex items-center gap-2"><button class="secondary px-3" :disabled="store.locked" :aria-label="`Decrease ${item.name} quantity`" @click="store.updateQuantity(item._id, -1)">−</button><span>{{ item.quantity }}</span><button class="secondary px-3" :disabled="store.locked" :aria-label="`Increase ${item.name} quantity`" @click="store.updateQuantity(item._id, 1)">+</button><button class="ml-auto underline text-red-800" :disabled="store.locked" :aria-label="`Remove ${item.name} from cart`" @click="removeItem(item)"><Trash2 class="h-4 w-4" aria-hidden="true"/></button></div></li></ul>

@@ -17,6 +17,20 @@ it('loads products even when checkout configuration fails',async()=>{
  expect(w.findAll('button').some(b=>b.attributes('aria-label')==='Add Medicine to cart')).toBe(true)
  expect(w.findAll('button').find(b=>b.text()==='Complete Sale').attributes('disabled')).toBeDefined();w.unmount()
 })
+it('shows a mobile cart button with the item count and total',async()=>{
+ const w=mount(PosView,{global:{stubs:{MainLayout:{template:'<main><slot/></main>'},AppDialog:true}}});await flushPromises();const s=usePosStore();s.addToCart(s.products[0]);await w.vm.$nextTick()
+ const button=w.get('button[aria-label^="Open cart"]')
+ expect(button.attributes('aria-label')).toContain('1 item')
+ expect(button.text()).toContain(currency(s.totalAmount))
+ w.unmount()
+})
+it('shows an empty cart state instead of a shortcut',async()=>{
+ const w=mount(PosView,{global:{stubs:{MainLayout:{template:'<main><slot/></main>'},AppDialog:true}}});await flushPromises()
+ const button=w.get('button[aria-label="Your cart is empty"]')
+ expect(button.attributes('disabled')).toBeDefined()
+ expect(button.text()).toContain('Your cart is empty')
+ w.unmount()
+})
 it('shows exact cash change and blocks underpayment',async()=>{
  const w=mount(PosView,{global:{stubs:{MainLayout:{template:'<main><slot/></main>'},AppDialog:true}}});await flushPromises();const s=usePosStore();s.addToCart(s.products[0]);await flushPromises()
  await w.get('input[aria-label="Amount received"]').setValue('20');expect(w.text()).toContain(`Change to give: ${currency(10)}`)
