@@ -17,7 +17,7 @@ const barcode = computed({get: () => store.searchQuery, set: value => { store.se
 const cameraOpen = ref(false), amountReceived = ref(''), scanBusy = ref(false), notice = ref('')
 const itemCount = computed(() => store.cart.reduce((sum, item) => sum + item.quantity, 0))
 const cartSection = ref(null)
-const cartButtonLabel = computed(() => store.cart.length ? `Open cart, ${itemCount.value} ${itemCount.value === 1 ? 'item' : 'items'}, total ${currency(store.totalAmount)}` : 'Cart is empty')
+const cartButtonLabel = computed(() => store.cart.length ? `Open cart, ${itemCount.value} ${itemCount.value === 1 ? 'item' : 'items'}, total ${currency(store.totalAmount)}` : 'Your cart is empty')
 function openCart() { cartSection.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }
 const receivedMinor = computed(() => { try { return amountReceived.value === '' ? null : minor(amountReceived.value) } catch { return null } })
 const dueMinor = computed(() => store.subtotalMinor)
@@ -67,7 +67,7 @@ async function retryLoad() { await initialize() }
       <section class="panel" aria-label="Products to sell">
         <ErrorNotice :error="store.productError" :retry="store.fetchProducts" />
         <button type="button" class="lg:hidden mb-4 flex w-full items-center justify-between gap-3 rounded-lg border border-blue-700 bg-blue-50 px-4 py-3 text-left text-blue-950 hover:bg-blue-100 disabled:border-slate-300 disabled:bg-slate-50 disabled:text-slate-500" :disabled="!store.cart.length" :aria-label="cartButtonLabel" @click="openCart">
-          <span class="flex items-center gap-2 font-semibold"><ShoppingBasket class="h-5 w-5" aria-hidden="true" />{{ store.cart.length ? 'View cart' : 'Cart is empty' }}</span>
+          <span class="flex items-center gap-2 font-semibold"><ShoppingBasket class="h-5 w-5" aria-hidden="true" />{{ store.cart.length ? 'View cart' : 'Your cart is empty' }}</span>
           <span class="text-sm font-medium">{{ store.cart.length ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'} · ${currency(store.totalAmount)}` : 'Add items to begin' }}</span>
         </button>
         <div class="flex items-center justify-between gap-3 mb-4"><div><h2 class="text-lg font-bold">Find a product</h2><p class="text-sm text-slate-500">Search by name, or enter a barcode and press Enter.</p></div><router-link to="/sales" class="text-sm text-blue-800 underline">Past receipts</router-link></div>
