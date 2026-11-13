@@ -8,7 +8,7 @@ const { attendanceSchema } = require('../api/validators/attendanceValidators');
 const sale = {
   idempotencyKey: '123e4567-e89b-42d3-a456-426614174000',
   items: [{ productId: 1, quantity: 2, unitPrice: 10, subtotal: 20 }],
-  totalAmount: 23.30, paymentMethod: 'cash', customerName: 'Customer', userId: 1
+  totalAmount: 23.30, paymentMethod: 'cash', customerName: 'Customer', customerContact: '0999123456', userId: 1
 };
 const employee = {
   first_name: 'Jane', last_name: 'Smith', email: 'JANE@example.com',
@@ -31,7 +31,8 @@ test('checkout accepts the established contract and rejects invalid required fie
     { ...sale, items: [{ ...sale.items[0], quantity: -1 }] },
     { ...sale, items: [{ ...sale.items[0], quantity: 0 }] },
     { ...sale, items: [{ ...sale.items[0], quantity: 0.5 }] },
-    { ...sale, items: [{ ...sale.items[0], subtotal: undefined }] }
+    { ...sale, items: [{ ...sale.items[0], subtotal: undefined }] },
+    { ...sale, customerContact: 'x'.repeat(201) }
   ]) assert.ok(saleSchema.validate(invalid).error);
 });
 

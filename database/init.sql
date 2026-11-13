@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS sales (
     total_amount DECIMAL(12, 2) NOT NULL,
     payment_method VARCHAR(20) DEFAULT 'cash',
     customer_name VARCHAR(100),
+    customer_contact VARCHAR(200),
     user_id INTEGER, -- Removed NOT NULL for easier testing
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
