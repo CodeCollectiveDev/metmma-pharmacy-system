@@ -38,7 +38,7 @@ before(async()=>{await admin.query(`CREATE SCHEMA ${schema}`);await pool.query(r
     ('test-cashier', 'test-hash', 'cashier', 'Test Cashier', 'test-cashier@example.com'),
     ('manager1', 'test-hash', 'store_manager', 'Test Manager', 'test-manager@example.com'),
     ('test-hr', 'test-hash', 'hr_officer', 'Test HR', 'test-hr@example.com')`);
-  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261004_categories.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261005_batch_numbers.sql'),'utf8'));await pool.query('UPDATE users SET password_hash=$1',[await bcrypt.hash('TestPassword42',10)]);server=require('../../app').listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${server.address().port}/api`;});
+  await pool.query(readFileSync(require.resolve('../../../database/migrations/20261003_payment_amounts.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261004_categories.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261005_batch_numbers.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261113_customer_contact.sql'),'utf8'));await pool.query(readFileSync(require.resolve('../../../database/migrations/20261113_stock_purchase_invoice.sql'),'utf8'));await pool.query('UPDATE users SET password_hash=$1',[await bcrypt.hash('TestPassword42',10)]);server=require('../../app').listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${server.address().port}/api`;});
 after(async()=>{if(server)await new Promise(r=>server.close(r));await pool.end();await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin.end();});
 
 test('atomic checkout records exact stock, lines, authenticated actor and one linked income',async()=>{
@@ -168,6 +168,23 @@ test('delivery retries do not add the same stock twice',async()=>{
  const p=await product(10),body={idempotencyKey:randomUUID(),quantity:5,reason:'Supplier delivery'};
  const results=await Promise.all(Array.from({length:5},()=>request(`/products/${p.id}/restock`,{method:'POST',body})));
  assert.ok(results.every(r=>r.status===200));assert.equal((await pool.query('SELECT quantity FROM products WHERE id=$1',[p.id])).rows[0].quantity,15);assert.equal(await count('stock_movements','WHERE product_id=$1',[p.id]),1);
+});
+
+test('a delivery with a purchase price updates cost price and writes one stock purchase expense',async()=>{
+ const p=await product(10),body={idempotencyKey:randomUUID(),quantity:4,reason:'Supplier delivery',costPrice:'12.50',supplierInvoice:'INV-2048'};
+ const delivered=await request(`/products/${p.id}/restock`,{method:'POST',body,role:'store_manager'});
+ assert.equal(delivered.status,200,JSON.stringify(delivered.data));assert.equal(delivered.data.data.quantity,14);assert.equal(delivered.data.data.costPrice,'12.50');assert.equal(delivered.data.data.lastInvoiceReference,'INV-2048');
+ const saved=(await pool.query('SELECT cost_price,last_invoice_reference FROM products WHERE id=$1',[p.id])).rows[0];assert.equal(saved.cost_price,'12.50');assert.equal(saved.last_invoice_reference,'INV-2048');
+ const expenses=(await pool.query("SELECT * FROM financial_transactions WHERE type='expense' AND category='Stock purchase' AND note LIKE '%INV-2048%'")).rows;
+ assert.equal(expenses.length,1);assert.equal(expenses[0].amount,'-50.00');assert.equal(expenses[0].supplier,'Supplier');assert.match(expenses[0].note,/Supplier delivery/);
+ const retry=await request(`/products/${p.id}/restock`,{method:'POST',body,role:'store_manager'});assert.equal(retry.status,200);assert.equal((await pool.query('SELECT quantity FROM products WHERE id=$1',[p.id])).rows[0].quantity,14);assert.equal(await count('stock_movements','WHERE product_id=$1',[p.id]),1);assert.equal(await count('financial_transactions',"WHERE type='expense' AND category='Stock purchase' AND note LIKE '%INV-2048%'"),1);
+});
+
+test('purchase price is hidden from cashier and hr but remains available to inventory roles',async()=>{
+ const p=await product(10);await pool.query("UPDATE products SET cost_price=8.00,last_invoice_reference='INV-1' WHERE id=$1",[p.id]);
+ for(const role of ['cashier','hr_officer'])assert.equal((await request(`/products/${p.id}`,{role})).data.data.costPrice,undefined);
+ assert.equal((await request(`/products/${p.id}`,{role:'store_manager'})).data.data.costPrice,'8.00');
+ assert.equal((await request(`/products/${p.id}`,{role:'pharmacist'})).data.data.costPrice,'8.00');
 });
 
 test('account provisioning links employees atomically and management protects access',async()=>{

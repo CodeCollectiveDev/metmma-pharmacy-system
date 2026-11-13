@@ -1,9 +1,11 @@
 const db=require('../db');
 const {createHash}=require('node:crypto');
 const {AppError}=require('../../lib/errors');
+const {minor,decimal}=require('../../lib/money');
 const {paging}=require('../../lib/validation');
-const columns=`id,product_code,name,generic_name,batch_number,expiry_date::text,quantity,unit_price,selling_price,cost_price,supplier,category,reorder_level,location,barcode,is_active,expiry_date<CURRENT_DATE AS expired`;
-const formatProduct=p=>({id:p.id,productCode:p.product_code,name:p.name,genericName:p.generic_name,batchNumber:p.batch_number,expiryDate:p.expiry_date,quantity:p.quantity,unitPrice:p.unit_price,sellingPrice:p.selling_price,costPrice:p.cost_price,supplier:p.supplier,category:p.category,reorderLevel:p.reorder_level,location:p.location,barcode:p.barcode,isActive:p.is_active,expired:p.expired,stockStatus:p.quantity===0?'Out of Stock':p.quantity<=p.reorder_level?'Low Stock':'In Stock'});
+const columns=`id,product_code,name,generic_name,batch_number,expiry_date::text,quantity,unit_price,selling_price,cost_price,last_invoice_reference,supplier,category,reorder_level,location,barcode,is_active,expiry_date<CURRENT_DATE AS expired`;
+const costVisible=role=>['admin','pharmacist','store_manager'].includes(role);
+const formatProduct=(p,role)=>{const product={id:p.id,productCode:p.product_code,name:p.name,genericName:p.generic_name,batchNumber:p.batch_number,expiryDate:p.expiry_date,quantity:p.quantity,unitPrice:p.unit_price,sellingPrice:p.selling_price,costPrice:p.cost_price,lastInvoiceReference:p.last_invoice_reference,supplier:p.supplier,category:p.category,reorderLevel:p.reorder_level,location:p.location,barcode:p.barcode,isActive:p.is_active,expired:p.expired,stockStatus:p.quantity===0?'Out of Stock':p.quantity<=p.reorder_level?'Low Stock':'In Stock'};if(!costVisible(role))delete product.costPrice;return product;};
 async function requireActiveCategory(client,category){
  const result=await client.query('SELECT id FROM categories WHERE name=$1 AND is_active=TRUE FOR SHARE',[category]);
  if(result.rowCount)return;
@@ -35,9 +37,9 @@ async function getAllProducts(req,res){
  const filter=where.join(' AND '),count=(await db.query(`SELECT COUNT(*) FROM products WHERE ${filter}`,values)).rows[0].count;
  values.push(q.limit,(q.page-1)*q.limit);
  const result=await db.query(`SELECT ${columns} FROM products WHERE ${filter} ORDER BY name ASC,id ASC LIMIT $${values.length-1} OFFSET $${values.length}`,values);
- res.json({success:true,count:result.rowCount,data:result.rows.map(formatProduct),pagination:paging(q,count,result.rowCount)});
+ res.json({success:true,count:result.rowCount,data:result.rows.map(row=>formatProduct(row,req.user?.role)),pagination:paging(q,count,result.rowCount)});
 }
-async function getProductById(req,res){const row=(await db.query(`SELECT ${columns} FROM products WHERE id=$1`,[req.params.id])).rows[0];if(!row)throw new AppError('NOT_FOUND',404);res.json({success:true,data:formatProduct(row)});}
+async function getProductById(req,res){const row=(await db.query(`SELECT ${columns} FROM products WHERE id=$1`,[req.params.id])).rows[0];if(!row)throw new AppError('NOT_FOUND',404);res.json({success:true,data:formatProduct(row,req.user?.role)});}
 async function getSummary(req,res){res.json((await db.query(`SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE quantity<=reorder_level)::int AS low,COUNT(*) FILTER(WHERE expiry_date<CURRENT_DATE)::int AS expired FROM products WHERE is_active=TRUE`)).rows[0]);}
 async function createProduct(req,res){
  const d=req.body;
@@ -50,7 +52,7 @@ async function createProduct(req,res){
   if(d.quantity)await client.query(`INSERT INTO stock_movements(product_id,user_id,movement_type,quantity_change,previous_quantity,new_quantity,notes) VALUES($1,$2,'purchase',$3,0,$3,'Initial stock')`,[product.id,req.user.id,d.quantity]);
   return {product,duplicateBatch};
  });
- res.status(201).json({success:true,data:formatProduct(row.product),...(row.duplicateBatch?{duplicateBatch:row.duplicateBatch}:{})});
+ res.status(201).json({success:true,data:formatProduct(row.product,req.user.role),...(row.duplicateBatch?{duplicateBatch:row.duplicateBatch}:{})});
 }
 const fieldMap={productCode:'product_code',name:'name',genericName:'generic_name',batchNumber:'batch_number',expiryDate:'expiry_date',quantity:'quantity',unitPrice:'unit_price',sellingPrice:'selling_price',costPrice:'cost_price',supplier:'supplier',category:'category',reorderLevel:'reorder_level',location:'location',barcode:'barcode',isActive:'is_active'};
 async function updateProduct(req,res){
@@ -66,19 +68,29 @@ async function updateProduct(req,res){
   const duplicateBatch=await findDuplicateBatch(client,row.name,row.batch_number,row.id);
   return {row,duplicateBatch};
  });
- res.json({success:true,data:formatProduct(result.row),...(result.duplicateBatch?{duplicateBatch:result.duplicateBatch}:{})});
+ res.json({success:true,data:formatProduct(result.row,req.user.role),...(result.duplicateBatch?{duplicateBatch:result.duplicateBatch}:{})});
 }
 async function restockProduct(req,res){
- const hash=createHash('sha256').update(JSON.stringify({id:req.params.id,quantity:req.body.quantity,reason:req.body.reason})).digest('hex');
+ const hasCost=req.body.costPrice!==undefined;
+ const unitCost=hasCost?decimal(minor(req.body.costPrice)):null;
+ const supplierInvoice=String(req.body.supplierInvoice??'').trim()||null;
+ const hash=createHash('sha256').update(JSON.stringify({id:req.params.id,quantity:req.body.quantity,reason:req.body.reason,costPrice:unitCost,supplierInvoice})).digest('hex');
  const row=await db.transaction(async client=>{
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`restock:${req.user.id}:${req.body.idempotencyKey}`]);
   const previous=(await client.query('SELECT request_hash FROM stock_movements WHERE user_id=$1 AND idempotency_key=$2',[req.user.id,req.body.idempotencyKey])).rows[0];
   if(previous){if(previous.request_hash!==hash)throw new AppError('CONFLICT',409);return (await client.query(`SELECT ${columns} FROM products WHERE id=$1`,[req.params.id])).rows[0];}
-  const old=(await client.query('SELECT id,quantity,is_active,expiry_date>=CURRENT_DATE AS valid FROM products WHERE id=$1 FOR UPDATE',[req.params.id])).rows[0];if(!old)throw new AppError('NOT_FOUND',404);if(!old.is_active||!old.valid)throw new AppError('PRODUCT_UNAVAILABLE',409);
+  const old=(await client.query('SELECT id,quantity,supplier,is_active,expiry_date>=CURRENT_DATE AS valid FROM products WHERE id=$1 FOR UPDATE',[req.params.id])).rows[0];if(!old)throw new AppError('NOT_FOUND',404);if(!old.is_active||!old.valid)throw new AppError('PRODUCT_UNAVAILABLE',409);
   if(old.quantity+req.body.quantity>2147483647)throw new AppError('VALIDATION',400,['quantity']);
-  const row=(await client.query(`UPDATE products SET quantity=quantity+$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING ${columns}`,[req.body.quantity,old.id])).rows[0];
-  await client.query(`INSERT INTO stock_movements(product_id,user_id,movement_type,quantity_change,previous_quantity,new_quantity,notes,idempotency_key,request_hash) VALUES($1,$2,'purchase',$3,$4,$5,$6,$7,$8)`,[old.id,req.user.id,req.body.quantity,old.quantity,row.quantity,req.body.reason,req.body.idempotencyKey,hash]);return row;
- });res.json({success:true,data:formatProduct(row)});
+  const amountCents=hasCost?minor(unitCost)*BigInt(req.body.quantity):null;
+  if(amountCents!==null&&amountCents>99999999999999n)throw new AppError('VALIDATION',400,['costPrice']);
+  const row=(await client.query(`UPDATE products SET quantity=quantity+$1,cost_price=COALESCE($2::numeric,cost_price),last_invoice_reference=COALESCE($3,last_invoice_reference),updated_at=CURRENT_TIMESTAMP WHERE id=$4 RETURNING ${columns}`,[req.body.quantity,unitCost,supplierInvoice,old.id])).rows[0];
+  await client.query(`INSERT INTO stock_movements(product_id,user_id,movement_type,quantity_change,previous_quantity,new_quantity,notes,idempotency_key,request_hash) VALUES($1,$2,'purchase',$3,$4,$5,$6,$7,$8)`,[old.id,req.user.id,req.body.quantity,old.quantity,row.quantity,req.body.reason,req.body.idempotencyKey,hash]);
+  if(amountCents!==null){
+   const note=[supplierInvoice?`Invoice ${supplierInvoice}`:null,req.body.reason].filter(Boolean).join(' · ').slice(0,500);
+   await client.query(`INSERT INTO financial_transactions(type,amount,payment_method,transaction_date,category,note,supplier,created_by,idempotency_key,request_hash) VALUES('expense',-$1::numeric,'cash',CURRENT_TIMESTAMP,'Stock purchase',$2,$3,$4,$5,$6)`,[decimal(amountCents),note,old.supplier||null,req.user.id,req.body.idempotencyKey,hash]);
+  }
+  return row;
+ });res.json({success:true,data:formatProduct(row,req.user.role)});
 }
 async function deleteProduct(req,res){const row=(await db.query(`UPDATE products SET is_active=FALSE,updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id`,[req.params.id])).rows[0];if(!row)throw new AppError('NOT_FOUND',404);res.json({success:true,message:'Product deactivated. Past records are kept.'});}
 module.exports={getAllProducts,getProductById,getSummary,createProduct,updateProduct,restockProduct,deleteProduct,formatProduct,findDuplicateBatch};

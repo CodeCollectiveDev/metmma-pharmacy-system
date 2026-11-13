@@ -99,6 +99,30 @@ it('shows the batch number in upper case as it is typed on the add form', async 
   wrapper.unmount()
 })
 
+it('sends the purchase price and supplier invoice when adding stock', async () => {
+  dataService.restockProduct.mockResolvedValue({ data: { data: product } })
+  const wrapper = mountView()
+  await flushPromises()
+  await wrapper.findAll('button').find(button => button.text() === 'Add stock').trigger('click')
+  await flushPromises()
+
+  await wrapper.get('input[name="quantity"]').setValue('4')
+  await wrapper.get('input[name="purchasePrice"]').setValue('12.50')
+  await wrapper.get('input[name="supplierInvoice"]').setValue('INV-2048')
+  await wrapper.get('input[name="reason"]').setValue('Supplier delivery')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+
+  expect(dataService.restockProduct).toHaveBeenCalledWith(7, {
+    idempotencyKey: expect.any(String),
+    quantity: 4,
+    reason: 'Supplier delivery',
+    costPrice: '12.5',
+    supplierInvoice: 'INV-2048'
+  })
+  wrapper.unmount()
+})
+
 it('offers to add stock to the existing record when a batch already exists', async () => {
   dataService.addProduct.mockResolvedValue({ data: { data: { ...product, id: 9 }, duplicateBatch: {
     id: 7, name: 'Paracetmol', productCode: 'P-1', batchNumber: 'B-1', expiryDate: '2030-01-01', quantity: 5

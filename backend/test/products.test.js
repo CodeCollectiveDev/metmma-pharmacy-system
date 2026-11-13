@@ -11,11 +11,11 @@ const pool = { query: async (sql, values) => {
 require.cache[require.resolve('../api/db')] = { exports: { pool,query:pool.query } };
 const { getAllProducts } = require('../api/controllers/productsController');
 
-const request = async (query) => {
+const request = async (query, role) => {
   calls.length = 0;
   let response;
   let status = 200;
-  await getAllProducts({ validatedQuery: {page:1,limit:50,...query,page:Number(query.page || 1),limit:Number(query.limit || 50)} }, {
+  await getAllProducts({ validatedQuery: {page:1,limit:50,...query,page:Number(query.page || 1),limit:Number(query.limit || 50)}, user: role ? { role } : undefined }, {
     status(code) { status = code; return this; },
     json(body) { response = body; }
   });
@@ -64,6 +64,14 @@ test('product validation accepts lowercase codes and localized expiry dates', ()
   assert.equal(result.error, undefined);
   assert.equal(result.value.productCode, 'LOFNAC');
   assert.equal(result.value.expiryDate, '2028-11-30');
+});
+
+test('product pages hide the purchase price from cashier and hr roles', async () => {
+  rows = [{ id: 51, name: 'Later product', quantity: 2, reorder_level: 10, cost_price: '8.00', last_invoice_reference: 'INV-1' }];
+  assert.equal((await request({}, 'cashier')).response.data[0].costPrice, undefined);
+  assert.equal((await request({}, 'hr_officer')).response.data[0].costPrice, undefined);
+  assert.equal((await request({}, 'store_manager')).response.data[0].costPrice, '8.00');
+  rows = [{ id: 51, name: 'Later product', quantity: 2, reorder_level: 10 }];
 });
 
 test('page validation caps oversized requests and rejects invalid pagination', () => {
